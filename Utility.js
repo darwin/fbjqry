@@ -62,6 +62,7 @@ Utility.attr = (function() {
             s = v[i].split(":");
             if(s.length == 2) {
                 name = Utility.camelCase(trim(s[0].toLowerCase()));
+                if(name == 'float') { name = 'cssFloat'; }
                 node.setStyle(name, trim(s[1]));
             }
         }

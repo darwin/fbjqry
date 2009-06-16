@@ -113,7 +113,7 @@ var find = (function() {
             case "*": matchFunc = function(a,b) { return a.indexOf(b) >= 0; }; break;
             default:  
                 if(v === true) {
-                    matchFunc = function(a,b) { return !!a; }
+                    matchFunc = function(a,b) { return !!a; };
                 } else {
                     matchFunc = function(a,b) { return a == b; };
                 }
@@ -395,16 +395,25 @@ FBjqRY.fn = FBjqRY.prototype = {
             width:  node.getOffsetWidth(),
             height: node.getOffsetHeight(),
             right:  node.getAbsoluteLeft() + node.getOffsetWidth(),
-            bottom: node.getAbsoluteTop() + node.getOffsetHeight()
+            bottom: node.getAbsoluteTop() + node.getOffsetHeight(),
+            clientWidth: node.getClientWidth(),
+            clientHeight: node.getClientHeight(),
+            scrollTop: node.getScrollTop(),
+            scrollLeft: node.getScrollLeft()
         };
     },
 
     //CSS:
     //========================================
     css: function(name, value) {
-        if(typeof value != 'undefined') {
+        if(typeof name == 'string' && typeof value != 'undefined') {
+            if(name == 'float') { name = 'cssFloat'; }
             each(this.nodes, function() { this.setStyle(name, value); });
             return this;
+        }
+        if(typeof name == 'object') {
+            if(name['float'] && !name.cssFloat) { name.cssFloat = name['float']; }
+            each(this.nodes, function() { this.setStyle(name); });
         }
         return this.nodes[0].getStyle(name);
     },
@@ -417,9 +426,15 @@ FBjqRY.fn = FBjqRY.prototype = {
         };
     },
 
-    height: function(h) { return this.css("height", h); },
+    height: function(h) {
+        if(typeof h == 'undefined') { return this.nodes[0].getOffsetHeight(); }
+        return this.css("height", h);
+    },
 
-    width: function(w) { return this.css("width", w); },
+    width: function(w) { 
+        if(typeof w == 'undefined') { return this.nodes[0].getOffsetWidth(); }
+        return this.css("width", w);
+    },
 
     //MANIPULATION:
     //========================================
@@ -433,17 +448,29 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this;
     },
 
-    appendTo: function(nodes) {
-        if(typeof nodes == "string") { nodes = FBjqRY(nodes); }
-        nodes.append(this);
+    appendTo: function(nodes) { return FBjqRY(nodes).append(this); },
+
+    prepend: function(content) {
+        content = FBjqRY(content).get();
+        content = content.length ? content : [content];
+        each(this.nodes, function() {
+            var node = this;
+            each(content, function() { node.insertBefore(this); });
+        });
         return this;
     },
 
-    prepend: function(content) {},
+    prependTo: function(nodes) { return FBjqRY(nodes).prepend(this); },
 
-    prependTo: function(content) {},
-
-    after: function(content) {},
+    after: function(content) {
+        content = FBjqRY(content).get();
+        content = content.length ? content : [content];
+        each(this.nodes, function() {
+            var node = this;
+            each(content, function() { node.getParentNode().insertBefore(this, node.getNextSibling()); });
+        });
+        return this;
+    },
 
     before: function(content) {},
 
@@ -477,7 +504,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     clone: function(includeEvents) {
         var cloned = [];
         each(this.nodes, function() { cloned.push(this.cloneNode()); });
-        return cloned;
+        return FBjqRY(cloned);
     },
 
     //TRAVERSING:
@@ -525,8 +552,9 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     slice: function(start, end) {
-        this.nodes = this.nodes.slice(start, end);
-        return this;
+        var nodes;
+        nodes = end ? this.nodes.slice(start, end) : this.nodes.slice(start);
+        return FBjqRY(nodes);
     },
 
     add: function(expr) {
@@ -539,17 +567,13 @@ FBjqRY.fn = FBjqRY.prototype = {
     children: function(expr) {
         var i, j, jlen, ilen, nodes = [], children = [];
         
-        for(i = 0, ilen = this.nodes.length; i < ilen; i++) {
-            children = this.nodes[i].getChildNodes();
-            if(expr) {
-                for(j = 0, jlen = children.length; j < jlen; j++) {
-                    if(FBjqRY(children[j]).is(expr)) { nodes.push(children[j]); }
-                }
-            } else {
-                nodes = nodes.concat(children);
+        if(expr) {
+            nodes = FBjqRY(this.nodes).find(expr).get();
+        } else {
+            for(i = 0, ilen = this.nodes.length; i < ilen; i++) {
+                nodes = nodes.concat(this.nodes[i].getChildNodes());
             }
         }
-
         return FBjqRY(unique(nodes));
     },
 
@@ -682,6 +706,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             });
             return outerThis;
         }, [type, fn]);
+        return this;
     },
 
     one: function(type, fn) { //removed "data" argument
