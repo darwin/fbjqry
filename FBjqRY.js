@@ -415,6 +415,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         if(typeof name == 'object') {
             if(name['float'] && !name.cssFloat) { name.cssFloat = name['float']; }
             each(this.nodes, function() { this.setStyle(name); });
+            return this;
         }
         return this.nodes[0].getStyle(name);
     },
