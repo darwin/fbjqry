@@ -499,7 +499,10 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     replaceAll: function(selector) {},
 
-    empty: function() {},
+    empty: function() {
+        this.children().remove();
+        return this;
+    },
 
     remove: function(expr) {
         if(!expr) {
