@@ -330,7 +330,9 @@ FBjqRY.fn = FBjqRY.prototype = {
             each(this.nodes, function() { Utility.attr(this, k, v); });
             return this;
         }
-        return Utility.attr(this.nodes[0], k);
+        var node = this.nodes[0];
+        if (!node) return;
+        return Utility.attr(node, k);
     },
 
     addClass: function(cssClass) {
