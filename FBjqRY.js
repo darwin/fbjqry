@@ -312,6 +312,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     eq: function(pos) {
         this.nodes = [this.nodes[pos]];
+        this.length = 1;
         return this;
     },
 
