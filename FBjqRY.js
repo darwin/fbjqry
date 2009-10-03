@@ -986,7 +986,7 @@ FBjqRY.extend({
     
     //current version is slightly modified from jQuery version
     isFunction: function( fn ) {
-        return !!fn && typeof fn != "string" && !fn.nodeName &&  /^[\s[]?function/.test( fn + "" );
+        return !!fn && typeof fn != "string" && !fn.nodeName && (/^[\s[]?function/.test( fn + "" ));
              //the following condition should be in there too, but FBJS prevents access to Array
              //fn.constructor != [].constructor
     },
