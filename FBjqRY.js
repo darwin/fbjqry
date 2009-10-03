@@ -409,12 +409,19 @@ FBjqRY.fn = FBjqRY.prototype = {
     css: function(name, value) {
         if(typeof name == 'string' && typeof value != 'undefined') {
             if(name == 'float') { name = 'cssFloat'; }
+            name = Utility.camelCase(name);
             each(this.nodes, function() { this.setStyle(name, value); });
             return this;
         }
         if(typeof name == 'object') {
             if(name['float'] && !name.cssFloat) { name.cssFloat = name['float']; }
-            each(this.nodes, function() { this.setStyle(name); });
+            var camelized = {};
+            for(var o in name) {
+                if (name.hasOwnProperty(o)) {
+                    camelized[Utility.camelCase(o)] = name[o];
+                }
+            }
+            each(this.nodes, function() { this.setStyle(camelized); });
             return this;
         }
         return this.nodes[0].getStyle(name);
