@@ -33,8 +33,8 @@ var Utility = {};  // expose variable globally
 /** Helpers */
 // ============================================================================
 //IE console work-arounds
-if (typeof console == 'undefined') { console = {}; }
-if (typeof console.error != 'function') {  console.error = function() {}; }
+if (typeof console === 'undefined') { console = {}; }
+if (typeof console.error !== 'function') {  console.error = function() {}; }
 
 Utility.memo = function(fn, cache) { // function return value memoization
     cache = cache || {};
@@ -47,11 +47,11 @@ Utility.memo = function(fn, cache) { // function return value memoization
 
 // copied from facebooker
 Utility.encodeURIComponent = function(str) {
-    if ( typeof(str) == "string" ) {
+    if ( typeof(str) === "string" ) {
         return str.replace(/=/g,'%3D').replace(/&/g,'%26');
     }
     // checkboxes and radio buttons return objects instead of a string
-    else if( typeof(str) == "object" ){
+    else if( typeof(str) === "object" ){
         for (var i in str) {
             return str[i].replace(/=/g,'%3D').replace(/&/g,'%26');
         }
@@ -166,7 +166,7 @@ Utility.extend = function() {
 					, copy );
                 }
 				// Don't bring in undefined values
-				else if ( copy !== undefined ) target[ name ] = copy;
+				else if ( typeof copy !== 'undefined' ) target[ name ] = copy;
 
 			}
     }
@@ -225,7 +225,7 @@ Utility.attr = (function() {
            return undefined;
         }
 
-        var method = (typeof v != "undefined") ? "set" : "get";
+        var method = (typeof v !== 'undefined') ? "set" : "get";
         method += attr.charAt(0).toUpperCase() + attr.substr(1);
         if ( val || val === "" || val === 0 ) {
            if (method == "setStyle") setStyle(node, val);
@@ -335,7 +335,7 @@ Utility.merge = function( first, second ) {
         }
     }
     else {
-        while ( second[j] !== undefined ) {
+        while ( typeof(second[j]) !== 'undefined' ) {
             first[i++] = second[j++];
         }
     }

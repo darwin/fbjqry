@@ -53,7 +53,7 @@ function notSupported(errStr) {
 var find = (function() {
     var idCheck = /^#(\w+)/,
         classCheck = /^\.([\w\-]+)/,
-        tagCheck = /^([A-Za-z_]{1}\w*)/,
+        tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*)?=?"?'?([^\]]+)?'?"?\]/,
         pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
         pseudoCheck = /^:(\w+)/;
@@ -113,20 +113,18 @@ var find = (function() {
             case "$": matchFunc = function(a,b) { return a.indexOf(b) + b.length == a.length; }; break;
             case "*": matchFunc = function(a,b) { return a.indexOf(b) >= 0; }; break;
             default:
-                if ( v === true ) matchFunc = function(a,b) { return !!a; };
+                if ( v === true ) matchFunc = function(a,b) {return !!a;};
                 else matchFunc = function(a,b) {return a == b;};
                 break;
         }
 
-        return filter(nodes, function() {
-                return matchFunc(FBjqRY(this).attr(a), v);
-            },
+        return filter(nodes, function() { return matchFunc(FBjqRY(this).attr(a), v); },
             [a, v], getChildren
         );
     }
 
     return function(nodes, sel, context) { // the find function
-        if ( typeof(sel) != "string" ) {
+        if ( typeof(sel) !== "string" ) {
             if ( sel.length || sel.length === 0 ) return sel;
             return [ sel ];
         }
@@ -142,14 +140,14 @@ var find = (function() {
             allNodes = [],
             origNodes = nodes;
 
-        for (var i = 0, len = selectors.length; i < len; i++) {
+        for ( var i = 0, len = selectors.length; i < len; i++ ) {
             sel = trim(selectors[i]);
             prevSel = "";
             getChildren = true;
             while ( sel && sel != prevSel ) {
                 if ( prevSel ) {
-                    if ( !nodes.length ) break;
-                    getChildren = (sel.charAt(0) == " ");
+                    if ( ! nodes.length ) break;
+                    getChildren = (sel.charAt(0) === ' ');
                     sel = trim(sel);
                 }
                 prevSel = sel;
@@ -186,12 +184,35 @@ var find = (function() {
                 }
 
                 match = pseudoCheckParen.exec(sel);
-                if ( ! match ) {match = pseudoCheck.exec(sel);}
+                if ( ! match ) match = pseudoCheck.exec(sel);
                 if ( match ) {
                     var matchStr = match[0];
                     var pseudo = match[1];
-                    var v = match.length > 2 ? match[2] : null; //the value in the parenthesis
-                    var vInt = v ? parseInt(v, 10) : null;
+                    var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
+                    var intValue = value ? parseInt(value, 10) : null;
+                    
+                    var _nodes = nodes, _tmp;
+                    // Elements can be considered hidden for several reasons :
+                    // * They have a CSS display value of none.
+                    // * They are form elements with type="hidden".
+                    // * Their width and height are explicitly set to 0.
+                    // * An ancestor element is hidden, so the element is not shown on the page.
+                    var _isHidden = function(node) {
+                        if ( node.getTagName().toLowerCase() === 'input' ) {
+                            var type = node.getType();
+                            if ( type && type.toLowerCase() === 'hidden' ) return true;
+                        }
+                        while ( node ) {
+                            if ( node.getStyle('display') === 'none' ) return true;
+                            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
+                            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
+                        }
+                        return false;
+                    };
+                    var _isInputType = function(node, type) {
+                        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
+                        return node.getType() && node.getType().toLowerCase() === type;
+                    };
 
                     switch ( pseudo ) {
                         case "first":
@@ -199,34 +220,132 @@ var find = (function() {
                         case "last":
                             nodes = [ nodes[nodes.length - 1] ]; break;
                         case "eq":
-                            nodes = [ nodes[vInt] ]; break;
+                            nodes = [ nodes[intValue] ]; break;
                         case "lt":
-                            nodes = nodes.splice(0, vInt); break;
+                            nodes = nodes.splice(0, intValue); break;
                         case "gt":
-                            nodes = nodes.splice(vInt + 1, (nodes.length - vInt)); break;
+                            nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
                         case "even":
-                            nodes = grep(nodes, function(v, i) { return (i % 2 === 0); } ); break;
+                            nodes = grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
                         case "odd":
-                            nodes = grep(nodes, function(v, i) { return (i % 2 == 1); } ); break;
+                            nodes = grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
                         case "contains":
                             nodes = null;
-                            notSupported("We cannot read from nodes, so we cannot support the :contains pseudo selector!");
-                            break;
-                        case "visible":
-                            nodes = filter(nodes, function() {
-                                var node = FBjqRY(this);
-                                var vis = node.css("visibility") || ''; // @todo FB returns undefined ?!
-                                return ( vis != "hidden" && node.css("display") != "none" );
-                            });
+                            notSupported(":contains pseudo selector not supported (cannot read text from FB nodes)");
                             break;
                         case "hidden":
-                            nodes = filter(nodes, function() {
-                                var node = FBjqRY(this);
-                                var vis = node.css("visibility") || ''; // @todo FB returns undefined ?!
-                                return ( vis == "hidden" || node.css("display") == "none" );
+                            nodes = grep(nodes, _isHidden); break;
+                        case "visible":
+                            nodes = grep(nodes, function(node) { return ! _isHidden(node); }); break;
+                        case "has":
+                            nodes = grep(nodes, function(node) {
+                                var matches = find([ node ], value);
+                                return matches.length > 0;
                             });
                             break;
-                        //TODO: Finish adding pseudo selectors
+                        case "not":
+                            nodes = grep(nodes, function(node) {
+                                var notMatches = find([ node ], value);
+                                // if smt is matched return false :
+                                return notMatches.length == 0;
+                            });
+                            break;
+                        case "nth-child":
+                            nodes = [];
+                            each(_nodes, function(node) {
+                                var childs = node.getChildNodes();
+                                if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
+                            });
+                            break;
+                        case "first-child":
+                            nodes = [];
+                            each(_nodes, function(node) {
+                                var childs = node.getChildNodes();
+                                if ( childs && childs[0] ) nodes.push( childs[0] );
+                            });
+                            break;
+                        case "last-child":
+                            nodes = [];
+                            each(_nodes, function(node) {
+                                var childs = node.getChildNodes();
+                                var length = childs && childs.length;
+                                if ( length ) nodes.push( childs[length - 1] );
+                            });
+                            break;
+                        case "only-child":
+                            nodes = grep(nodes, function(node) {
+                                var parentChilds = node.getParentNode().getChildNodes();
+                                return parentChilds.length === 1;
+                            });
+                            break;
+                        case "parent": // all elements that are the parent of another element :
+                            nodes = grep(nodes, function(node) {
+                                var childNodes = node.getChildNodes();
+                                return childNodes && childNodes.length > 0;
+                            });
+                            break;
+                        case "empty": // all elements that have no children :
+                            nodes = grep(nodes, function(node) {
+                                var childNodes = node.getChildNodes();
+                                return ! childNodes || childNodes.length === 0;
+                            });
+                            break;
+                        case "disabled":
+                            nodes = grep(nodes, function(node) {
+                                var disabled = node.getDisabled();
+                                return !! disabled; // @todo disabled === 'disabled'
+                            });
+                            break;
+                        case "enabled":
+                            nodes = grep(nodes, function(node) {
+                                var disabled = node.getDisabled();
+                                return ! disabled;
+                            });
+                            break;
+                        case "selected":
+                            nodes = grep(nodes, function(node) {
+                                var selected = node.getSelected();
+                                return !! selected; // @todo selected === 'selected'
+                            });
+                            break;
+                        case "input": // all input, textarea, select and button elements
+                            nodes = grep(nodes, function(node) {
+                                var tagName = node.getTagName().toLowerCase();
+                                return tagName === 'input' || tagName === 'textarea' 
+                                    || tagName === 'select' || tagName === 'button';
+                            });
+                            break;
+                        case "text":
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'text') });
+                            break;
+                        case "password":
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'password') });
+                            break;
+                        case "radio":
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'radio') });
+                            break;
+                        case "file":
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'file') });
+                            break;
+                        case "image": // all image inputs
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'image') });
+                            break;
+                        case "reset":
+                            nodes = grep(nodes, function(node) { return _isInputType(node, 'reset') });
+                            break;
+                        case "submit":
+                            nodes = grep(nodes, function(node) {
+                                var type = node.getType(), tagName = node.getTagName().toLowerCase();
+                                return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
+                                       (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
+                            });
+                            break;
+                        case "header":
+                            nodes = grep(nodes, function(node) {
+                                var tagName = node.getTagName().toLowerCase();
+                                return tagName.length === 2 && tagName.charAt(0) === 'h';
+                            });
+                            break;
                     }
 
                     sel = sel.substr(matchStr.length);
@@ -235,7 +354,7 @@ var find = (function() {
             }
             if ( sel ) {
                 nodes = [];
-                console.log("We could not parse the remaining selector \"" + sel + "\"");
+                console.log("We could not parse the remaining selector '" + sel + "'");
             }
             else {
                 allNodes = allNodes.concat(nodes);
@@ -261,13 +380,12 @@ var filter = function(expr, nodes) {
     return fNodes;
 };
 
-var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/,
-    isSimple  = /^.[^:#\[\.]*$/,
-    undefined;
+var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
+    //isSimple  = /^.[^:#\[\.]*$/, undefined;
 
 FBjqRY.fn = FBjqRY.prototype = {
 
-    version: "0.2.0",
+    version: "0.2.0-SNAPSHOT",
     
     //CORE
     //====================================
@@ -277,7 +395,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         //ready state shortcut handler -- no need for ready event because FBJS delays execution
         if ( isFunction(selector) ) return this.ready(selector);
         //Are we dealing with an FBjqRY object?
-        else if ( selector.selector ) {
+        else if ( typeof(selector.selector) !== 'undefined' ) {
             var nodes = selector.get();
             this.nodes = nodes.length ? nodes : [ nodes ];
             this.length = nodes.length;
@@ -288,7 +406,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         //Are we dealing with FB DOM Nodes?
         else if ( isFBNode(selector) || isFBNode(selector[0]) ) {
             this.nodes = selector.length ? selector : [ selector ];
-            this.length = 1;
+            this.length = this.nodes.length;
             this.context = selector;
             return this;
         }
@@ -328,7 +446,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	// Get the whole matched element set as a clean array
 	get: function( num ) {
         // Return a 'clean' array or just the object :
-		return num === undefined ? slice.call( this ) : this.nodes[ num ];
+		return typeof(num) === 'undefined' ? slice.call( this.nodes ) : this.nodes[ num ];
 	},
     index: function(elem) {
         for (var i = this.nodes.length - 1; i >= 0; i--) {
@@ -347,9 +465,8 @@ FBjqRY.fn = FBjqRY.prototype = {
     }, */
     slice: function() {
         return this.pushStack( 
-            slice.apply( this, arguments ), 
-            "slice",
-            slice.call(arguments).join(",")
+            slice.apply( this.nodes, arguments ),
+            "slice", slice.call(arguments).join(",")
         );
     },
     /*
@@ -405,8 +522,8 @@ FBjqRY.fn = FBjqRY.prototype = {
         var options = name;
         var node = this.nodes[0];
         // Look for the case where we're accessing a style value
-        if ( typeof(name) == 'string' ) {
-            if ( typeof(value) == 'undefined' ) {
+        if ( typeof(name) === 'string' ) {
+            if ( typeof(value) === 'undefined' ) {
                 return node && Utility.attr(node, name);
             }
             else {
@@ -426,65 +543,68 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     addClass: function(cssClass) {
-        each(this.nodes, function() { this.addClassName(cssClass); });
+        //each(this.nodes, function() {this.addClassName(cssClass);});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            this.nodes[i].addClassName(cssClass);
+        }
         return this;
     },
 
     removeClass: function(cssClass) {
-        each(this.nodes, function() { this.removeClassName(cssClass); });
+        //each(this.nodes, function() {this.removeClassName(cssClass);});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            this.nodes[i].removeClassName(cssClass);
+        }
         return this;
     },
 
     toggleClass: function(cssClass) {
-        each(this.nodes, function() {
-            /*
-            var i = FBjqRY(this);
-            if (i.hasClass(cssClass)) {
-                i.removeClass(cssClass);
-            }
-            else {
-                i.addClass(cssClass);
-            } */
-            this.toggleClassName(cssClass);
-        });
+        //each(this.nodes, function() { this.toggleClassName(cssClass); });
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            this.nodes[i].toggleClassName(cssClass);
+        }
         return this;
     },
 
     html: function(html) {
-        if ( typeof(html) != 'undefined' ) {
-            each(this.nodes, function() { 
-                Utility.html(html, this);
-            });
+        if ( typeof(html) !== 'undefined' ) {
+            //each(this.nodes, function() { Utility.html(html, this); });
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                Utility.html( html, this.nodes[i] );
+            }
             return this;
         }
-        return notSupported("There is no html getter in FBJS");
+        return notSupported("html() getter not supported in FBJS");
     },
 
     fbml: function(fbml) {
-        if ( typeof(fbml) != 'undefined' ) {
-            each(this.nodes, function() { 
-                this.setInnerFBML(fbml);
-            });
+        if ( typeof(fbml) !== 'undefined' ) {
+            //each(this.nodes, function() { this.setInnerFBML(fbml); });
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                this.nodes[i].setInnerFBML(fbml);
+            }
             return this;
         }
-        return notSupported("There is no fbml getter in FBJS");
+        return notSupported("fbml() getter not supported in FBJS");
     },
 
     text: function(text) {
-        if ( typeof(text) != 'undefined' ) {
-            each(this.nodes, function() { 
-                this.setTextValue(text);
-            });
+        if ( typeof(text) !== 'undefined' ) {
+            //each(this.nodes, function() {  this.setTextValue(text); });
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                this.nodes[i].setTextValue(text);
+            }
             return this;
         }
-        return notSupported("There is no text getter in FBJS");
+        return notSupported("text() getter not supported in FBJS");
     },
 
     val: function(val) {
-        if( typeof(val) != 'undefined' ) {
-            each(this.nodes, function() {
-                this.setValue(val);
-            });
+        if( typeof(val) !== 'undefined' ) {
+            //each(this.nodes, function() { this.setValue(val); });
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                this.nodes[i].setValue(val);
+            }
             return this;
         }
         return this.nodes[0].getValue();
@@ -510,24 +630,24 @@ FBjqRY.fn = FBjqRY.prototype = {
     //CSS:
     //========================================
     css: function(name, value) {
-        if (typeof name == 'string' && typeof value != 'undefined') {
+        if (typeof name === 'string' && typeof value !== 'undefined') {
             if (name == 'float') name = 'cssFloat';
             name = Utility.camelCase(name);
             if (typeof(value) == 'number') value = value + "px";
-            each(this.nodes, function() { this.setStyle(name, value); } );
+            each(this.nodes, function() {this.setStyle(name, value);} );
             return this;
         }
-        if (typeof name == 'object') {
+        if (typeof name === 'object') {
             if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
             var values = {};
             for ( var o in name ) {
                 if ( name.hasOwnProperty(o) ) {
                     value = name[o];
-                    if (typeof(value) == 'number') value = value + "px";
+                    if (typeof(value) === 'number') value = value + "px";
                     values[Utility.camelCase(o)] = value;
                 }
             }
-            each(this.nodes, function() { this.setStyle(values); });
+            each(this.nodes, function() {this.setStyle(values);});
             return this;
         }
         return this.nodes[0].getStyle(name);
@@ -542,12 +662,12 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     height: function(h) {
-        if (typeof h == 'undefined') return this.nodes[0].getOffsetHeight();
+        if (typeof h === 'undefined') return this.nodes[0].getOffsetHeight();
         return this.css("height", h);
     },
 
     width: function(w) {
-        if (typeof w == 'undefined') return this.nodes[0].getOffsetWidth();
+        if (typeof w === 'undefined') return this.nodes[0].getOffsetWidth();
         return this.css("width", w);
     },
 
@@ -557,10 +677,14 @@ FBjqRY.fn = FBjqRY.prototype = {
     append: function(content) {
         content = FBjqRY(content).get();
         content = content.length ? content : [ content ];
-        each(this.nodes, function() {
-            var node = this;
-            each(content, function() { node.appendChild(this); });
-        });
+        //each(this.nodes, function() {
+        //    var node = this;
+        //    each(content, function() {node.appendChild(this);});
+        //});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            for ( var j = 0; j < content.length; j++ ) node.appendChild( content[j] );
+        }
         return this;
     },
     //appendTo: function(nodes) { return FBjqRY(nodes).append(this); },
@@ -568,10 +692,14 @@ FBjqRY.fn = FBjqRY.prototype = {
     prepend: function(content) {
         content = FBjqRY(content).get();
         content = content.length ? content : [ content ];
-        each(this.nodes, function() {
-            var node = this;
-            each(content, function() { node.insertBefore(this); });
-        });
+        //each(this.nodes, function() {
+        //    var node = this;
+        //    each(content, function() {node.insertBefore(this);});
+        //});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            for ( var j = 0; j < content.length; j++ ) node.insertBefore( content[j] );
+        }
         return this;
     },
     //prependTo: function(nodes) { return FBjqRY(nodes).prepend(this); },
@@ -579,24 +707,34 @@ FBjqRY.fn = FBjqRY.prototype = {
     after: function(content) {
         content = FBjqRY(content).get();
         content = content.length ? content : [content];
-        each(this.nodes, function() {
-            var node = this;
-            each(content, function() { 
-                node.getParentNode().insertBefore(this, node.getNextSibling());
-            });
-        });
+        //each(this.nodes, function() {
+        //    var node = this;
+        //    each(content, function() {
+        //        node.getParentNode().insertBefore(this, node.getNextSibling());
+        //    });
+        //});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            for ( var j = 0; j < content.length; j++ )
+                node.getParentNode().insertBefore( content[j], node.getNextSibling() );
+        }
         return this;
     },
 
     before: function(content) {
         content = FBjqRY(content).get();
         content = content.length ? content : [content];
-        each(this.nodes, function() {
-            var node = this;
-            each(content, function() {
-                node.getParentNode().insertBefore(this, node);
-            });
-        });
+        //each(this.nodes, function() {
+        //    var node = this;
+        //    each(content, function() {
+        //        node.getParentNode().insertBefore(this, node);
+        //    });
+        //});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            for ( var j = 0; j < content.length; j++ )
+                node.getParentNode().insertBefore( content[j], node );
+        }
         return this;
     },
 
@@ -641,29 +779,36 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     remove: function(expr) {
-        if ( ! expr ) {
-            each(this.nodes, function() { this.getParentNode().removeChild(this); });
-        }
-        else {
-            each(this.nodes, function() {
-                if ( is(expr, [ this ]) ) this.getParentNode().removeChild(this);
-            });
+        //each(this.nodes, function() {
+        //    if ( ! expr || is(expr, [ this ]) ) {
+        //        this.getParentNode().removeChild(this);
+        //    }
+        //});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            if ( ! expr || is(expr, [ node ]) ) {
+                node.getParentNode().removeChild(node);
+            }
         }
         return this;
     },
 
     clone: function(includeEvents) {
         var cloned = [];
-        each(this.nodes, function() { cloned.push( this.cloneNode() ); });
+        //each(this.nodes, function() {cloned.push( this.cloneNode() );});
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            cloned.push( this.nodes[i].cloneNode() );
+        }
         return FBjqRY(cloned);
     },
 
     //TRAVERSING:
     //========================================
     hasClass: function(className) {
-        var retVal = false;
-        each(this.nodes, function() { retVal = retVal || this.hasClassName(className); });
-        return retVal;
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( this.nodes[i].hasClassName(className) ) return true;
+        }
+        return false;
     },
 
     filter: function(selector) {
@@ -683,6 +828,13 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     find: function(expr) {
         //return FBjqRY( find(this.nodes, expr) );
+        /*
+        var nodes = [];
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            nodes = nodes.concat( find([], expr, node) );
+        }
+        return this.pushStack( nodes, "find", expr ); */
         return this.pushStack( find(this.nodes, expr), "find", expr );
     },
 
@@ -690,18 +842,18 @@ FBjqRY.fn = FBjqRY.prototype = {
         return is(expr, this.nodes);
     },
 
-    not: function(selector) {
+    not: function(selector) { // @todo TEST
         //filter out specified nodes
         var notNodes;
-        if ( selector.selector ) notNodes = selector.nodes;
+        if ( typeof(selector.selector) !== 'undefined' ) notNodes = selector.nodes;
         else if ( isArray(selector) ) notNodes = selector;
 
         if ( notNodes ) {
-            var nodes = this.get();
-            each(notNodes, function() {
-                var i = indexOf(this, nodes);
-                if ( i != -1 ) nodes.splice(i, 1);
-            });
+            var nodes = this.get(); // is a copy already
+            for ( var i = 0, len = notNodes.length; i < len; i++ ) {
+                var idx = indexOf( notNodes[i], nodes );
+                if ( idx != -1 ) nodes.splice(idx, 1); // remove element
+            }
             return this.pushStack( nodes, "not", selector );
         }
         else { // expr assumed to be a selector :
@@ -994,9 +1146,9 @@ FBjqRY.fn = FBjqRY.prototype = {
             if ( typeof(speed) == "string" ) {
                 speed = trim(speed).toLowerCase();
                 switch ( speed ) {
-                    case "fast": speed = 200; break;
-                    case "slow": speed = 600; break;
-                    default: speed = 400; break;
+                    case "fast":speed = 200;break;
+                    case "slow":speed = 600;break;
+                    default:speed = 400;break;
                 }
             }
             return speed ? speed : 400;
@@ -1018,7 +1170,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         };
 
         this.stop();
-        each(this.nodes, function() { animObj(this).go(); });
+        each(this.nodes, function() {animObj(this).go();});
         if(cb) {setTimeout(cb, dur);}
         return this;
     },
@@ -1088,7 +1240,7 @@ var validEvents = ("blur,change,click,dblclick,error,focus,keydown,keypress,keyu
 for ( var i = validEvents.length - 1; i >= 0; i-- ) {
     (function() {
         var ev = validEvents[i];
-        FBjqRY.fn[ev] = function(fn) { return fn ? this.bind(ev, fn) : this.trigger(ev); };
+        FBjqRY.fn[ev] = function(fn) {return fn ? this.bind(ev, fn) : this.trigger(ev);};
     })();
 }
 
@@ -1533,8 +1685,8 @@ FBjqRY.extend( FBjqRY.fx, {
         def: 400
     },
     step: {
-        scrollLeft: function(fx) { fx.elem.scrollLeft = fx.now; },
-        scrollTop: function(fx) { fx.elem.scrollTop = fx.now; },
+        scrollLeft: function(fx) {fx.elem.scrollLeft = fx.now;},
+        scrollTop: function(fx) {fx.elem.scrollTop = fx.now;},
         opacity: function(fx) {
             //jQuery.attr(fx.elem.style, "opacity", fx.now);
             FBjqRY.attr('style', {"opacity": fx.now});
@@ -1568,7 +1720,7 @@ FBjqRY.extend({
         if ( name && ! FBjqRY.cache[ id ] ) FBjqRY.cache[ id ] = {};
 
         // Prevent overriding the named cache with undefined values
-        if ( data !== undefined ) {
+        if ( typeof(data) !== 'undefined' ) {
             FBjqRY.cache[ id ][ name ] = data;
         }
 
@@ -1624,28 +1776,28 @@ FBjqRY.extend({
         var queue = FBjqRY.queue( elem, type ), fn = queue.shift();
 
         if ( !type || type === "fx" ) fn = queue[0];
-        if ( fn !== undefined ) fn.call(elem);
+        if ( typeof(fn) !== 'undefined' ) fn.call(elem);
     }
 });
 
 FBjqRY.fn.extend({
     data: function( key, value ) {
-        if ( typeof key === "undefined" && this.length ) {
+        if ( typeof(key) === 'undefined' && this.length ) {
             return FBjqRY.data( this.nodes[0] );
         }
         else if ( typeof key === "object" ) {
-            return this.each(function() { FBjqRY.data( this, key ); });
+            return this.each(function() {FBjqRY.data( this, key );});
         }
 
         var parts = key.split(".");
         parts[1] = parts[1] ? "." + parts[1] : "";
 
-        if ( value === undefined ) {
+        if ( typeof(value) === 'undefined' ) {
             //var data = this.triggerHandler("getData" + parts[1] + "!", [parts[0]]);
-            if ( data === undefined && this.length ) {
+            if ( typeof(data) === 'undefined' && this.length ) {
                 var data = FBjqRY.data( this.nodes[0], key );
             }
-            return (data === undefined && parts[1]) ? this.data( parts[0] ) : data;
+            return (typeof(data) === 'undefined' && parts[1]) ? this.data( parts[0] ) : data;
         }
         else {
             //return this.trigger("setData" + parts[1] + "!", [parts[0], value])
@@ -1655,14 +1807,14 @@ FBjqRY.fn.extend({
         }
     },
     removeData: function( key ) {
-        return this.each(function(){ FBjqRY.removeData( this, key ); });
+        return this.each(function(){FBjqRY.removeData( this, key );});
     },
     queue: function(type, data) {
         if ( typeof type !== "string" ) {
-            data = type; type = "fx";
+            data = type;type = "fx";
         }
 
-        if ( data === undefined ) return FBjqRY.queue( this.get(0), type );
+        if ( typeof(data) === 'undefined' ) return FBjqRY.queue( this.get(0), type );
 
         return this.each(function() {
             var queue = FBjqRY.queue( this, type, data );
@@ -1670,7 +1822,7 @@ FBjqRY.fn.extend({
         });
     },
     dequeue: function(type) {
-        return this.each(function(){ FBjqRY.dequeue( this, type ); });
+        return this.each(function(){FBjqRY.dequeue( this, type );});
     }
 });
 
