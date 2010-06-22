@@ -1,0 +1,78 @@
+<fb:js-string var="selectors1FBML">
+
+<div id="id1" class="class1">
+    <span class="class2"></span>
+    <span class="class1"></span>
+    <span id="id2"> </span>
+    <div>
+        <a href="#"> </a>
+    </div>
+</div>
+
+<div name="id1"></div>
+
+<div class="class2">
+    <a href="#" id="id3" class="class2 class1"></a>
+</div>
+
+<a href="#"></a>
+
+</fb:js-string>
+
+<script type="text/javascript">
+    var selectors1Suite = { suiteName: "selectors1" };
+    
+    selectors1Suite.setUp = function () {
+        document.getRootElement().setInnerFBML(selectors1FBML);
+    };
+
+    selectors1Suite.testExistingId = function () {
+        Asserts.assertEqual(1, $('#id1').length);
+    };
+    selectors1Suite.testMissingId = function () {
+        Asserts.assertEqual(0, $('#idx').length);
+    };
+    selectors1Suite.testIdWithCorrectTagName = function () {
+        Asserts.assertEqual(1, $('div#id1').length);
+    };
+    selectors1Suite.testIdWithWrongTagName = function () {
+        Asserts.assertEqual(0, $('span#id1').length);
+    };
+    selectors1Suite.testIdWithExistingContext = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(1, $('#id2', context).length);
+    };
+    selectors1Suite.testIdWithMisingContext = function () {
+        var context = document.getElementById('id3');
+        Asserts.assertEqual(0, $('#id2', context).length);
+    };
+
+    selectors1Suite.testExistingClass1 = function () {
+        Asserts.assertEqual(3, $('.class1').length);
+    };
+    selectors1Suite.testExistingClass2 = function () {
+        Asserts.assertEqual(3, $('.class2').length);
+    };
+    selectors1Suite.testMissingClass = function () {
+        Asserts.assertEqual(0, $('.class3').length);
+    };
+    selectors1Suite.testExistingClassWithTagName = function () {
+        Asserts.assertEqual(1, $('span.class1').length);
+    };
+
+    selectors1Suite.testExistingTagName1 = function () {
+        Asserts.assertEqual(3, $('a').length);
+    };
+    selectors1Suite.testExistingTagName2 = function () {
+        Asserts.assertEqual(4, $('div').length);
+    };
+    selectors1Suite.testMissingTagName = function () {
+        Asserts.assertEqual(0, $('h4').length);
+    };
+    selectors1Suite.testAllTagName = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(5, $('*', context).length);
+
+        Asserts.assertEqual(10, $('*').length);
+    };
+</script>

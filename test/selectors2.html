@@ -1,0 +1,57 @@
+<fb:js-string var="selectors2FBML">
+
+<div id="id11">
+    <div class="class11">
+        <span class="class12"></span>
+        <span class="class11"></span>
+        <div>
+            <span></span>
+            <div>
+                <span class="class11"></span>
+            </div>
+            <h6 class="class11"></h6>
+        </div>
+    </div>
+</div>
+
+<div class="class11 class12">
+    <span class="class13"></span>
+    <span class="class12"></span>
+    <span class="class11"></span>
+</div>
+    
+</fb:js-string>
+
+<script type="text/javascript">
+    var selectors2Suite = { suiteName: "selectors2" };
+
+    selectors2Suite.setUp = function () {
+        document.getRootElement().setInnerFBML(selectors2FBML);
+    };
+
+//    selectors2Suite.testNestedTagSelector = function () {
+//        Asserts.assertEqual(4, $('#id11 span').length);
+//        Asserts.assertEqual(7, $('div.class11 span').length);
+//    };
+//    selectors2Suite.testNestedSelectorWithContext1 = function () {
+//        var context = $('#id11').get(0);
+//        Asserts.assertEqual(4, $('div span', context).length);
+//    };
+    selectors2Suite.testNestedSelectorWithContext2 = function () {
+        var context = $('#id11').get(0); // should not match the div.class11 :
+        Asserts.assertEqual(3, $('div .class11', context).length);
+    };
+//    selectors2Suite.testNestedSelectorWithContext3 = function () {
+//        var context = $('#id11').get(0);
+//        Asserts.assertEqual(2, $('div span.class11', context).length);
+//    };
+//    selectors2Suite.testNestedClassSelector1 = function () {
+//        Asserts.assertEqual(4, $('#id11 .class11').length);
+//    };
+//    selectors2Suite.testNestedClassSelector2 = function () {
+//        Asserts.assertEqual(1, $('#id11 .class12').length);
+//    };
+//    selectors2Suite.testNestedClassSelector3 = function () {
+//        Asserts.assertEqual(0, $('#id11 .class13').length);
+//    };
+</script>

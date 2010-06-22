@@ -1,0 +1,18 @@
+.testResults {
+    font-size: 1.05em;
+    overflow: auto;
+}
+.testResults .passed {
+    width: 99%; margin: 1px 0; padding: 2px;
+    background-color: green;
+}
+.testResults .failed {
+    width: 99%; margin: 1px 0; padding: 2px;
+    background-color: red;
+}
+.testResults .suiteName {
+    padding: 2px;
+}
+.testResults .testName {
+    font-weight: bolder;
+}
