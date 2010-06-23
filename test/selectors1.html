@@ -56,8 +56,19 @@
     selectors1Suite.testMissingClass = function () {
         Asserts.assertEqual(0, $('.class3').length);
     };
-    selectors1Suite.testExistingClassWithTagName = function () {
+    selectors1Suite.testExistingClassWithContext = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(1, $('.class2', context).length);
+    };
+    selectors1Suite.testMissingClassWithContext = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(0, $('.class3', context).length);
+    };
+    selectors1Suite.testExistingClassWithTagName1 = function () {
         Asserts.assertEqual(1, $('span.class1').length);
+    };
+    selectors1Suite.testExistingClassWithTagName2 = function () {
+        Asserts.assertEqual(1, $('div.class2').length);
     };
 
     selectors1Suite.testExistingTagName1 = function () {
@@ -66,13 +77,24 @@
     selectors1Suite.testExistingTagName2 = function () {
         Asserts.assertEqual(4, $('div').length);
     };
+    selectors1Suite.testExistingTagNameWithContext = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(1, $('a', context).length);
+    };
     selectors1Suite.testMissingTagName = function () {
         Asserts.assertEqual(0, $('h4').length);
     };
+    selectors1Suite.testMissingTagNameWithContext = function () {
+        var context = $('div.class2');
+        Asserts.assertEqual(1, context.length, "non-unique context");
+        Asserts.assertEqual(0, $('span', context).length);
+    };
+    
     selectors1Suite.testAllTagName = function () {
+        Asserts.assertEqual(10, $('*').length);
+    };
+    selectors1Suite.testAllTagNameWithContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(5, $('*', context).length);
-
-        Asserts.assertEqual(10, $('*').length);
     };
 </script>

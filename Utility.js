@@ -182,13 +182,26 @@ var isFBNode = Utility.isFBNode = function(node) {
     return node && (node.__instance || node.__instance === 0);
 };
 
+// NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
+// having the same elements matched with a different __instance identifier !
+var nextId = 1;
+var getFBNodeId = Utility.getFBNodeId = function(node) {
+    // __instance is a unique identifier for FBDOM nodes
+    //return node && node.__instance;
+    if ( node ) {
+        var nodeId = node.getId();
+        if ( ! nodeId ) {
+            nodeId = '_generated-' + nextId++;
+            node.setId( nodeId );
+        }
+        return nodeId;
+    }
+    return node;
+};
 var sameFBNode = Utility.sameFBNode = function(node1, node2) {
     // __instance is a unique identifier for FBDOM nodes
-    return node1.__instance == node2.__instance; // == does not work for nodes !
-};
-
-var getFBNodeId = Utility.getFBNodeId = function(node) {
-    return node && node.__instance;
+    //return node1.__instance == node2.__instance;
+    return getFBNodeId(node1) === getFBNodeId(node2);
 };
 
 Utility.attr = (function() {
@@ -288,7 +301,7 @@ Utility.unique = function(array) {
         if ( isFBNode(array[0]) ) {
             for (i = 0, len = array.length; i < len; i++) {
                 e = array[i]; id = getFBNodeId(e);
-                if ( !done[id] ) {
+                if ( ! done[id] ) {
                     done[id] = true;
                     ret.push(e);
                 }
@@ -297,14 +310,15 @@ Utility.unique = function(array) {
         else {
             for (i = 0, len = array.length; i < len; i++) {
                 e = array[i]; id = e;
-                if ( !done[id] ) {
+                if ( ! done[id] ) {
                     done[id] = true;
                     ret.push(e);
                 }
             }
         }
     }
-    catch( e ) {
+    catch (e) {
+        console.log("Support.unique()", e);
         ret = array;
     }
     return ret;

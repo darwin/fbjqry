@@ -66,6 +66,7 @@ var removeAllElements = function() {
     var result = jsUnity.result;
     jsUnity.result = function (passed, name, e) {
         result.call(this, passed, name, e);
+        if ( e ) console.log(name, e);
         // keep the test result for the "green - red" test bar :
         currentSuite.push({ name: name, passed: passed, e: e });
     };

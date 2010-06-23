@@ -58,68 +58,104 @@ var find = (function() {
         pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
         pseudoCheck = /^:(\w+)/;
 
-    function filter(nodes, fn, args, getChildren) {
+    function filter(nodes, fn, recurse, level) {
         var retNodes = [];
         if ( ! nodes || ! nodes.length ) return retNodes;
+        //if ( typeof(level) === 'undefined' ) level = 0;
 
-        for (var i = 0, len = nodes.length; i < len; i++) {
-            if ( fn.apply(nodes[i], args) ) retNodes.push( nodes[i] );
-            if ( getChildren ) {
-                var childNodes = filter(nodes[i].getChildNodes(), fn, args, getChildren);
-                retNodes = retNodes.concat( childNodes );
+        for ( var i = 0, len = nodes.length; i < len; i++ ) {
+            if ( fn.call(nodes[i]) ) retNodes.push( nodes[i] );
+            if ( recurse ) { // hierarchy
+                /*
+                var relevantNodes;
+                if ( hierarchy === true ) {
+                    relevantNodes = nodes[i].getChildNodes();
+                }
+                else { // function :
+                    relevantNodes = hierarchy.call(nodes[i], level);
+                }
+                if ( relevantNodes && relevantNodes.length ) {
+                    retNodes = retNodes.concat( 
+                        filter(relevantNodes, fn, hierarchy, ++level)
+                    );
+                }
+                */
+                retNodes = retNodes.concat(
+                    filter(nodes[i].getChildNodes(), fn, recurse)
+                );
             }
         }
         return retNodes;
     }
 
-    function selectById(nodes, id, t, getChildren) {
-        if ( nodes.length === 0 ) {
-            nodes = [ document.getElementById(id) ];
+    function selectById(nodes, id, sel, recurse) {
+        //if ( nodes.length === 0 ) {
+        if ( ! nodes ) {
+            nodes = [];
+            var node = document.getElementById(id);
+            if ( node ) nodes[0] = node;
         }
         else {
-            nodes = filter(nodes, function() {return this.getId() == id;}, [ id ], true);
+            nodes = filter( nodes,
+                function() { return this.getId() == id; },
+                recurse
+            );
         }
         return nodes;
     }
 
-    function selectByClass(nodes, cssClass, t, getChildren) {
-        if ( nodes.length === 0 ) {
+    function selectByClass(nodes, cssClass, sel, recurse) {
+        //if ( nodes.length === 0 ) {
+        if ( ! nodes ) {
             nodes = [ document.getRootElement() ];
         }
-
-        nodes = filter(nodes, function() {return this.hasClassName(cssClass);}, [ cssClass ], getChildren);
-        return nodes;
+        return filter( nodes,
+            function() { return this.hasClassName(cssClass); },
+            recurse
+        );
     }
 
-    function selectByTag(nodes, tag, t, getChildren) {
-        if ( nodes.length === 0 ) {
+    function selectByTag(nodes, tag, sel, recurse) {
+        //if ( nodes.length === 0 ) {
+        if ( ! nodes ) {
             nodes = document.getRootElement().getElementsByTagName(tag);
         }
-        else {
-            var newNodes = [];
-            for (var i = 0, len = nodes.length; i < len; i++) {
-                newNodes = newNodes.concat( nodes[i].getElementsByTagName(tag) );
-            }
-            nodes = newNodes;
+        else { // @todo optimize !
+//            if ( hierarchy === true ) { // optimization for the "most" case :
+//                var tagNodes = [];
+//                //console.log('selectByTag() nodes: ', nodes);
+//                for (var i = 0, len = nodes.length; i < len; i++) {
+//                    tagNodes = tagNodes.concat( nodes[i].getElementsByTagName(tag) );
+//                }
+//                //console.log('selectByTag() len: ', tagNodes.length);
+//                nodes = tagNodes;
+//            }
+//            else {
+                tag = tag.toUpperCase();
+                nodes = filter( nodes,
+                    function() { return tag === '*' || this.getTagName() == tag; },
+                    recurse
+                );
+//            }
         }
         return nodes;
     }
 
-    function selectByAttribute(nodes, a, matchType, v, t, getChildren) {
+    function selectByAttribute(nodes, attr, matchType, value, t, getChildren) {
         var matchFunc = null;
-        switch (matchType) {
+        switch ( matchType ) {
             case "!": matchFunc = function(a,b) { return a != b; }; break;
             case "^": matchFunc = function(a,b) { return a.indexOf(b) === 0; }; break;
             case "$": matchFunc = function(a,b) { return a.indexOf(b) + b.length == a.length; }; break;
             case "*": matchFunc = function(a,b) { return a.indexOf(b) >= 0; }; break;
             default:
-                if ( v === true ) matchFunc = function(a,b) {return !!a;};
-                else matchFunc = function(a,b) {return a == b;};
+                if ( value === true ) matchFunc = function(a,b) {return !!a; };
+                else matchFunc = function(a,b) { return a == b; };
                 break;
         }
-
-        return filter(nodes, function() { return matchFunc(FBjqRY(this).attr(a), v); },
-            [a, v], getChildren
+        return filter( nodes,
+            function() { return matchFunc( FBjqRY(this).attr(attr), value ); }, [attr, value],
+            getChildren
         );
     }
 
@@ -129,47 +165,106 @@ var find = (function() {
             return [ sel ];
         }
 
+        var i, len;
+
         //Is context a valid FBDOM element
-        if ( context && ! isFBNode(context) ) {
-            console.log('_find() context is not a FBML node: ' + context);
-            return [];
+        if ( context ) {
+            if ( nodes && nodes.length > 0 ) {
+                console.log('_find() could not handle context with nodes', context);
+                throw "_find() could not handle context with nodes"; // @todo
+            }
+            if ( isFBNode(context) ) {
+                nodes = context.getChildNodes(); // context is never part of the result
+            }
+            else if ( typeof(context.length) === 'number' ) { // FBjqRY or array
+                if ( typeof(context.selector) !== 'undefined' ) context = context.nodes;
+                nodes = [];
+                for ( i = 0, len = context.length; i < len; i++ ) {
+                    nodes = nodes.concat( context[i].getChildNodes() );
+                }
+            }
+            else {
+                console.log('_find() unexpected context type', context);
+                throw "_find() unexpected context type"; // @todo
+            }
         }
 
-        var getChildren, match, prevSel,
-            selectors = sel.split(","),
-            allNodes = [],
-            origNodes = nodes;
+        var recurse, match,
+            prevSel, selectors = sel.split(","),
+            allNodes = [], origNodes = nodes;
 
-        for ( var i = 0, len = selectors.length; i < len; i++ ) {
+        for ( i = 0, len = selectors.length; i < len; i++ ) {
             sel = trim(selectors[i]);
             prevSel = "";
-            getChildren = true;
+            recurse = true;
             while ( sel && sel != prevSel ) {
                 if ( prevSel ) {
-                    if ( ! nodes.length ) break;
-                    getChildren = (sel.charAt(0) === ' ');
-                    sel = trim(sel);
+                    if ( ! nodes.length ) break; // done - no nodes
+                    recurse = (sel.charAt(0) === ' ');
+                    if ( recurse ) {
+                        sel = trim(sel);
+                        var nextNodes = [], j, sibling;
+                        switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
+                            case '>':
+                                sel = trim(sel.substr(1)); // ltrim
+                                //hierachy = function(level) { // only 1st level childs
+                                //    return level === 1 ? this.getChildNodes() : null;
+                                //};
+                                for ( j = 0; j < nodes.length; j++ ) {
+                                    nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
+                                }
+                                recurse = false; // only 1st level childs
+                                break;
+                            case '~':
+                                sel = trim(sel.substr(1)); // ltrim
+                                for ( j = 0; j < nodes.length; j++ ) {
+                                    sibling = nodes[j].getNextSibling();
+                                    while ( sibling ) {
+                                        nextNodes.push( sibling );
+                                        sibling = sibling.getNextSibling();
+                                    }
+                                }
+                                recurse = false;
+                                break;
+                            case '+':
+                                sel = trim(sel.substr(1)); // ltrim
+                                for ( j = 0; j < nodes.length; j++ ) {
+                                    sibling = nodes[j].getNextSibling();
+                                    if ( sibling ) {
+                                        nextNodes.push( sibling );
+                                    }
+                                }
+                                recurse = false;
+                                break;
+                            default:
+                                for ( j = 0; j < nodes.length; j++ ) {
+                                    nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
+                                }
+                                // but will recurse childs as recurse stays === true
+                        }
+                        nodes = nextNodes;
+                    }
                 }
                 prevSel = sel;
 
                 //We should start with one of these first 3 cases (id, tag, class)
                 match = idCheck.exec(sel);
                 if ( match ) {
-                    nodes = selectById(nodes, match[1], sel, getChildren);
+                    nodes = selectById(nodes, match[1], sel, recurse);
                     sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
                     continue;
                 }
 
                 match = classCheck.exec(sel);
                 if ( match ) {
-                    nodes = selectByClass(nodes, match[1], sel, getChildren);
+                    nodes = selectByClass(nodes, match[1], sel, recurse);
                     sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
                     continue;
                 }
 
                 match = tagCheck.exec(sel);
                 if ( match ) {
-                    nodes = selectByTag(nodes, match[1], sel, getChildren);
+                    nodes = selectByTag(nodes, match[1], sel, recurse);
                     sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
                     continue;
                 }
@@ -178,7 +273,7 @@ var find = (function() {
                 match = attributeCheck.exec(sel);
                 if ( match ) {
                     match[3] = match[3] || true; //if m[3] does not exist we are just checking if attribute exists
-                    nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, getChildren);
+                    nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, recurse);
                     sel = sel.substr(sel.indexOf("]") + 1);
                     continue;
                 }
@@ -191,7 +286,7 @@ var find = (function() {
                     var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
                     var intValue = value ? parseInt(value, 10) : null;
                     
-                    var _nodes = nodes, _tmp;
+                    var _nodes = nodes, j;
                     // Elements can be considered hidden for several reasons :
                     // * They have a CSS display value of none.
                     // * They are form elements with type="hidden".
@@ -373,8 +468,7 @@ var is = function(expr, nodes) {
 var filter = function(expr, nodes) {
     var fNodes = [], nodeArray = [];
     for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-        var node = nodes[i];
-        nodeArray[0] = node;
+        var node = nodes[i]; nodeArray[0] = node;
         if ( is(expr, nodeArray) ) fNodes.push( node );
     }
     return fNodes;
@@ -417,13 +511,15 @@ FBjqRY.fn = FBjqRY.prototype = {
                     this.nodes = Utility.html( match[1] );
                 }
                 else { // HANDLE: $("#id")
-                    this.nodes = [ document.getElementById(match[3]) ];
+                    this.nodes = [];
+                    var node = document.getElementById( match[3] );
+                    if ( node ) this.nodes[0] = node;
                 }
             }
             else {
-                context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
+                //context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
                 // HANDLE: $(expr, [context]) -- which is just equivalent to: $(context).find(expr)
-                this.nodes = find( [], selector, context );
+                this.nodes = find( null, selector, context );
             }
         }
 
@@ -784,9 +880,10 @@ FBjqRY.fn = FBjqRY.prototype = {
         //        this.getParentNode().removeChild(this);
         //    }
         //});
+        var nodeArray = [];
         for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            if ( ! expr || is(expr, [ node ]) ) {
+            var node = this.nodes[i]; nodeArray[0] = node;
+            if ( ! expr || is(expr, nodeArray) ) {
                 node.getParentNode().removeChild(node);
             }
         }
@@ -863,7 +960,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 
 	add: function( selector ) {
         var selNodes = typeof(selector) === "string" ? 
-            find( [], selector ) /*FBjqRY( selector )*/ :
+            find( null, selector ) /*FBjqRY( selector )*/ :
                 FBjqRY.makeArray( selector )
 		return this.pushStack( FBjqRY.unique( merge(
 			this.get(), // it's  a clone
@@ -920,20 +1017,22 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     next: function(selector) {
-        var siblings = [], len = this.nodes.length;
+        var siblings = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
             var sibling = this.nodes[i].getNextSibling();
-            if ( ! selector || sibling.is(selector) ) siblings.push(sibling);
+            nodeArray[0] = sibling;
+            if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
         }
         //return FBjqRY(FBjqRY.unique(siblings));
         return this.pushStack( FBjqRY.unique(siblings), "next", selector );
     },
     nextAll: function(selector) {
-        var siblings = [], len = this.nodes.length;
+        var siblings = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
             var sibling = this.nodes[i].getNextSibling();
             while ( sibling ) {
-                if ( ! selector || sibling.is(selector) ) siblings.push(sibling);
+                nodeArray[0] = sibling;
+                if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
                 sibling = sibling.getNextSibling();
             }
         }
@@ -941,20 +1040,22 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this.pushStack( FBjqRY.unique(siblings), "nextAll", selector );
     },
     prev: function(selector) {
-        var siblings = [], len = this.nodes.length;
+        var siblings = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
             var sibling = this.nodes[i].getPreviousSibling();
-            if ( ! selector || sibling.is(selector) ) siblings.push(sibling);
+            nodeArray[0] = sibling;
+            if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
         }
         //return FBjqRY(FBjqRY.unique(siblings));
         return this.pushStack( FBjqRY.unique(siblings), "prev", selector );
     },
     prevAll: function(selector) {
-        var siblings = [], len = this.nodes.length;
+        var siblings = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
             var sibling = this.nodes[i].getPreviousSibling();
             while ( sibling ) {
-                if ( !selector || sibling.is(selector) ) siblings.push(sibling);
+                nodeArray[0] = sibling;
+                if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
                 sibling = sibling.getPreviousSibling();
             }
         }
@@ -963,10 +1064,10 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     parent: function(selector) {
-        var parents = [], len = this.nodes.length;
+        var parents = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
-            var node = this.nodes[i].getParentNode();
-            if ( ! selector || is(selector, [ node ]) /* FBjqRY(node).is(expr) */ ) {
+            var node = this.nodes[i].getParentNode(); nodeArray[0] = node;
+            if ( ! selector || is(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
                 parents.push(node);
             }
         }
@@ -974,11 +1075,12 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this.pushStack( FBjqRY.unique(parents), "parent", selector );
     },
     parents: function(selector) {
-        var parents = [], len = this.nodes.length;
+        var parents = [], len = this.nodes.length, nodeArray = [];
         for (var i = 0; i < len; i++) {
             var node = this.nodes[i].getParentNode();
             while ( node ) {
-                if( ! selector || is(selector, [ node ]) /* FBjqRY(node).is(expr) */ ) {
+                 nodeArray[0] = node;
+                if( ! selector || is(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
                     parents.push(node);
                 }
                 node = node.getParentNode();
@@ -1030,11 +1132,11 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     trigger: function(type, data) { //the events we can trigger are limited
-        each(this.nodes, function() {this[type]();});
+        each(this.nodes, function() { this[type](); });
     },
 
     triggerHandler: function(type, data) {
-        if( this.get(0) ){
+        if ( this.get(0) ) {
             //var event = jQuery.Event(type);
             //event.preventDefault();
             //event.stopPropagation();
@@ -1045,7 +1147,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     unbind: function(type, data) {
-        each(this.nodes, function() {this.purgeEventListeners(type);}, [type]);
+        each(this.nodes, function() { this.purgeEventListeners(type); }, [type]);
         return this;
     },
 
@@ -1061,7 +1163,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             var i = 0;
             FBjqRY(this).click(function() {
                 allFuncs[i].apply(this);
-                i = (i+ 1) % length;
+                i = (i + 1) % length;
             });
         });
         return this;
@@ -1072,17 +1174,17 @@ FBjqRY.fn = FBjqRY.prototype = {
     //EFFECTS:
     //========================================
     show: function(speed, cb) {
-        if(FBjqRY.isFunction(speed) && !cb) {
+        if (FBjqRY.isFunction(speed) && !cb) {
             cb = speed;
             speed = null;
         }
 
-        if(!speed) {
+        if ( !speed ) {
             this.stop();
             each(this.nodes, function() {
                 this.setStyle("display", "block").setStyle("opacity", "1.0");
-                if(this.getStyle("height")) {this.setStyle("height", "auto");}
-                if(this.getStyle("width")) {this.setStyle("width", "auto");}
+                if ( this.getStyle("height") ) this.setStyle("height", "auto");
+                if ( this.getStyle("width") ) this.setStyle("width", "auto");
             });
             if(cb) {cb();}
             return this;
@@ -1091,18 +1193,18 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     hide: function(speed, cb) {
-        if(FBjqRY.isFunction(speed) && !cb) {
+        if (FBjqRY.isFunction(speed) && !cb) {
             cb = speed;
             speed = null;
         }
 
-        if(!speed) {
+        if ( !speed ) {
             this.stop();
             //this happens faster than Animation(this).hide();
             each(this.nodes, function() {
                 this.setStyle("display", "none").setStyle("opacity", "0.0");
-                if (this.getStyle("height")) this.setStyle("height", "0px");
-                if (this.getStyle("width")) this.setStyle("width", "0px");
+                if ( this.getStyle("height") ) this.setStyle("height", "0px");
+                if ( this.getStyle("width") ) this.setStyle("width", "0px");
             });
             if ( cb ) cb();
             return this;
@@ -1123,7 +1225,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     fadeIn: function(speed, cb)  {
         each(this.nodes, function() {
             var node = FBjqRY(this);
-            if(node.css("display") == "none" || node.css("visibility") == "hidden") {
+            if (node.css("display") == "none" || node.css("visibility") == "hidden") {
                 node.css("opacity", "0.0").css("display", "block").css("visibility", "visible");
             }
         });
@@ -1133,12 +1235,12 @@ FBjqRY.fn = FBjqRY.prototype = {
     fadeOut: function(speed, cb) {
         var nodes = this.nodes;
         return this.fadeTo(speed, 0.0, function() {
-            each(nodes, function() {FBjqRY(this).css("display", "none");});
+            each(nodes, function() { FBjqRY(this).css("display", "none"); });
         });
     },
 
     fadeTo: function(speed, opacity, cb) {
-        return this.animate({opacity: opacity}, speed, null, cb);
+        return this.animate({ opacity: opacity }, speed, null, cb);
     },
 
     animate: function(params, dur, easing, cb, neitherShowHide) {
@@ -1146,9 +1248,9 @@ FBjqRY.fn = FBjqRY.prototype = {
             if ( typeof(speed) == "string" ) {
                 speed = trim(speed).toLowerCase();
                 switch ( speed ) {
-                    case "fast":speed = 200;break;
-                    case "slow":speed = 600;break;
-                    default:speed = 400;break;
+                    case "fast": speed = 200; break;
+                    case "slow": speed = 600; break;
+                    default: speed = 400; break;
                 }
             }
             return speed ? speed : 400;
@@ -1170,8 +1272,8 @@ FBjqRY.fn = FBjqRY.prototype = {
         };
 
         this.stop();
-        each(this.nodes, function() {animObj(this).go();});
-        if(cb) {setTimeout(cb, dur);}
+        each(this.nodes, function() { animObj(this).go(); });
+        if (cb) setTimeout(cb, dur);
         return this;
     },
 

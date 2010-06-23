@@ -19,7 +19,31 @@
     <span class="class12"></span>
     <span class="class11"></span>
 </div>
-    
+
+<form action="hello">
+    <span title="1"></span>
+    <span title="2"></span>
+    <span title="3" class="class14"></span>
+    <div id="id12"></div>
+    <span title="4"></span>
+    <div></div>
+    <span title="5" class="class14"></span>
+    <div>
+        <span title="6" class="class14"></span>
+        <div></div>
+        <div id="id13"></div>
+        <span title="7">
+            <span title="8"></span>
+        </span>
+        <span title="9" class="class14"></span>
+    </div>
+    <span id="id10" title="10" class="class14"></span>
+    <div class="class14">
+        <span title="11" class="class14"></span>
+        <span title="12" ></span>
+    </div>
+</form>
+
 </fb:js-string>
 
 <script type="text/javascript">
@@ -29,29 +53,81 @@
         document.getRootElement().setInnerFBML(selectors2FBML);
     };
 
-//    selectors2Suite.testNestedTagSelector = function () {
-//        Asserts.assertEqual(4, $('#id11 span').length);
-//        Asserts.assertEqual(7, $('div.class11 span').length);
-//    };
-//    selectors2Suite.testNestedSelectorWithContext1 = function () {
-//        var context = $('#id11').get(0);
-//        Asserts.assertEqual(4, $('div span', context).length);
-//    };
+    selectors2Suite.testNestedTagSelector = function () {
+        Asserts.assertEqual(4, $('#id11 span').length);
+        Asserts.assertEqual(7, $('div.class11 span').length);
+    };
+    selectors2Suite.testNestedSelectorWithContext1 = function () {
+        var context = $('#id11').get(0);
+        Asserts.assertEqual(4, $('div span', context).length);
+    };
     selectors2Suite.testNestedSelectorWithContext2 = function () {
         var context = $('#id11').get(0); // should not match the div.class11 :
         Asserts.assertEqual(3, $('div .class11', context).length);
     };
-//    selectors2Suite.testNestedSelectorWithContext3 = function () {
-//        var context = $('#id11').get(0);
-//        Asserts.assertEqual(2, $('div span.class11', context).length);
-//    };
-//    selectors2Suite.testNestedClassSelector1 = function () {
-//        Asserts.assertEqual(4, $('#id11 .class11').length);
-//    };
-//    selectors2Suite.testNestedClassSelector2 = function () {
-//        Asserts.assertEqual(1, $('#id11 .class12').length);
-//    };
-//    selectors2Suite.testNestedClassSelector3 = function () {
-//        Asserts.assertEqual(0, $('#id11 .class13').length);
-//    };
+    selectors2Suite.testNestedSelectorWithContext3 = function () {
+        var context = $('#id11').get(0);
+        Asserts.assertEqual(2, $('div span.class11', context).length);
+    };
+    selectors2Suite.testNestedClassSelector1 = function () {
+        Asserts.assertEqual(4, $('#id11 .class11').length);
+    };
+    selectors2Suite.testNestedClassSelector2 = function () {
+        Asserts.assertEqual(1, $('#id11 .class12').length);
+    };
+    selectors2Suite.testNestedClassSelector3 = function () {
+        Asserts.assertEqual(0, $('#id11 .class13').length);
+    };
+
+    selectors2Suite.testSiblingTagSelector1 = function () {
+        Asserts.assertEqual(3, $('#id12 ~ span').length);
+    };
+    selectors2Suite.testSiblingTagSelector2 = function () {
+        Asserts.assertEqual(3, $('#id12 ~ div').length);
+    };
+    selectors2Suite.testSiblingTagSelector3 = function () {
+        Asserts.assertEqual(2, $('#id13 ~ span').length);
+    };
+    selectors2Suite.testSiblingTagSelector4 = function () {
+        Asserts.assertEqual(0, $('#id13 ~ div').length);
+    };
+    selectors2Suite.testSiblingClassSelector1 = function () {
+        Asserts.assertEqual(3, $('#id12 ~ .class14').length);
+    };
+    selectors2Suite.testSiblingClassSelector2 = function () {
+        Asserts.assertEqual(0, $('#id12 ~ .class11').length);
+    };
+    
+    selectors2Suite.testSiblingClassTagSelector = function () {
+        //$('.class14 ~ span').each(function() {
+        //    console.log('classTag span', this.getTitle(), this.__instance, this);
+        //});
+        Asserts.assertEqual(6, $('.class14 ~ span').length);
+    };
+    selectors2Suite.testSiblingTagTagSelector = function () {
+        Asserts.assertEqual(11, $('span ~ span').length);
+    };
+    selectors2Suite.testSiblingTagTagSelectorWithContext = function () {
+        Asserts.assertEqual(1, $('form').length);
+        var context = $('form').get(0);
+        Asserts.assertEqual(8, $('span ~ span', context).length);
+    };
+    selectors2Suite.testSiblingClassSelectorWithTag = function () {
+        Asserts.assertEqual(1, $('#id12 ~ div.class14').length);
+    };
+    selectors2Suite.testAdjancedTagSelector1 = function () {
+        Asserts.assertEqual(1, $('#id12 + span').length);
+    };
+    selectors2Suite.testAdjancedTagSelector2 = function () {
+        Asserts.assertEqual(0, $('#id12 + div').length);
+    };
+    selectors2Suite.testAdjancedClassSelector1 = function () {
+        Asserts.assertEqual(4, $('.class14 + div').length);
+    };
+    selectors2Suite.testAdjancedClassSelector2 = function () {
+        Asserts.assertEqual(1, $('span.class14 + span').length);
+    };
+    selectors2Suite.testAdjancedTagTagSelector = function () {
+        Asserts.assertEqual(7, $('span + span').length);
+    };
 </script>
