@@ -18,6 +18,9 @@ var removeAllElements = function() {
 
 (function() {
 
+    Support.log.enabled = true;
+    Support.log.throwErrors = true;
+
     jsUnity.log = function() {
         console.log( arguments[0] );
     };
@@ -56,11 +59,6 @@ var removeAllElements = function() {
         dialogContent = document.getElementById('dialogContent');
         dialogContent.setInnerXHTML(content);
         dialogContent.setStyle('display', 'block');
-
-        //console.log(dialogContent);
-        //console.log(dialogContent.getParentNode());
-        //console.log(dialogContent.getParentNode().getParentNode());
-        //console.log(dialogContent.getParentNode().getParentNode().getParentNode()); // null
     };
 
     var result = jsUnity.result;

@@ -1,0 +1,158 @@
+<fb:js-string var="selectors3FBML">
+
+<div id="id1" title="title1">
+    <span title="title2"></span>
+    <div>
+        <span title="title1"></span>
+    </div>
+</div>
+
+<div title="title2" dir="ltr"></div>
+
+<a href="http://www.example.com"></a>
+<a href="#" name="name1" class="class-1 class2   class3class4"></a>
+
+<span title="name1"></span>
+
+</fb:js-string>
+
+<script type="text/javascript">
+    var selectors3Suite = { suiteName: "selectors3" };
+
+    selectors3Suite.setUp = function () {
+        document.getRootElement().setInnerFBML(selectors3FBML);
+    };
+
+    /*
+    (function() {
+        document.getRootElement().setInnerFBML(selectors3FBML);
+        try {
+            console.log('document.getRootElement() src', document.getRootElement().setSrc('http://bit.ly'));
+            var els = $('a').get();
+            for ( var i = 0; i < els.length; i++ ) {
+                console.log('el1', els[i], els[i].getHref());
+            }
+            for ( var i = 0; i < els.length; i++ ) {
+                console.log('el2', els[i]['getHref']);
+                console.log('el3', els[i]['getHref']());
+            }
+            for ( var i = 0; i < els.length; i++ ) {
+                console.log('elx', FBjqRY( els[i] ).attr('href'));
+            }
+        }
+        catch (e) {
+            console.log('[BUG]', e);
+        }
+    })();
+    */
+   
+    selectors3Suite.testExistingAttributeSelector1 = function () {
+        Asserts.assertEqual(1, $('[id=id1]').length);
+    };
+    selectors3Suite.testExistingAttributeSelector2 = function () {
+        Asserts.assertEqual(1, $('[dir="ltr"]').length);
+    };
+    selectors3Suite.testExistingAttributeSelector3 = function () {
+        Asserts.assertEqual(1, $("[name='name1']").length);
+    };
+    selectors3Suite.testExistingAttributeSelector4 = function () {
+        Asserts.assertEqual(2, $('[title=title1]').length);
+    };
+    selectors3Suite.testExistingAttributeSelector5 = function () {
+        Asserts.assertEqual(2, $('[title=title2]').length);
+    };
+    selectors3Suite.testExistingAttributeSelector6 = function () {
+        // NOTE: it's normalized by the FBML parser :
+        Asserts.assertEqual(0, $("[href=#]").length);
+        // FBML changes this to the canvas page url :
+        //Asserts.assertEqual(1, $("[href=http://apps.facebook.com/fbjqry_dev/]").length);
+    };
+    selectors3Suite.testExistingAttributeSelector7 = function () {
+        // NOTE: it's normalized by the FBML parser :
+        Asserts.assertEqual(0, $('[href="http://www.example.com"]').length);
+        Asserts.assertEqual(1, $('[href="http://www.example.com/"]').length);
+    };
+    selectors3Suite.testExistingAttributeSelectorWithContext = function () {
+        var context = document.getElementById('id1');
+        Asserts.assertEqual(1, $('[title=title2]', context).length);
+    };
+    selectors3Suite.testExistingAttributeSelectorWithTag = function () {
+        Asserts.assertEqual(1, $('div[title=title2]').length);
+    };
+    selectors3Suite.testExistingAttributeNestedSelectorWithTag = function () {
+        Asserts.assertEqual(1, $('div span[title=title1]').length);
+    };
+    selectors3Suite.testMissingAttributeSelector1 = function () {
+        Asserts.assertEqual(0, $('[dir=rtl]').length);
+    };
+    selectors3Suite.testMissingAttributeSelector2 = function () {
+        Asserts.assertEqual(0, $('[href="http://www.other.com/"]').length);
+    };
+
+    selectors3Suite.testMissingHasAttributeSelector = function () {
+        Asserts.assertEqual(0, $('[action]').length);
+    };
+    selectors3Suite.testExistingHasAttributeSelector1 = function () {
+        Asserts.assertEqual(5, $('[title]').length);
+    };
+    selectors3Suite.testExistingHasAttributeSelector2 = function () {
+        Asserts.assertEqual(2, $('[href]').length);
+    };
+
+    
+    selectors3Suite.testAttributeEndsWithSelector = function () {
+        Asserts.assertEqual(3, $('[title$=e1]').length);
+    };
+    selectors3Suite.testAttributeEndsWithSelectorWithTag = function () {
+        Asserts.assertEqual(2, $('span[title$=e1]').length);
+    };
+    
+    selectors3Suite.testAttributeStartsWithSelector = function () {
+        Asserts.assertEqual(4, $('[title^=title]').length);
+    };
+    selectors3Suite.testAttributeStartsWithSelectorWithContext = function () {
+        var context = $('#id1');
+        Asserts.assertEqual(2, $('[title^=title]', context).length);
+    };
+
+    selectors3Suite.testAttributeNotEqualSelector1 = function () {
+        Asserts.assertEqual(7, $('[title!=title2]').length);
+    };
+    selectors3Suite.testAttributeNotEqualSelector2 = function () {
+        Asserts.assertEqual(9, $('[title!=title]').length);
+    };
+
+    selectors3Suite.testAttributeContainsSelector1 = function () {
+        Asserts.assertEqual(4, $('[title*=itle]').length);
+    };
+    selectors3Suite.testAttributeContainsSelector2 = function () {
+        Asserts.assertEqual(5, $('[title*="e"]').length);
+    };
+
+    selectors3Suite.testAttributeContainsWordSelector1 = function () {
+        Asserts.assertEqual(1, $('[class~=class2]').length);
+    };
+    selectors3Suite.testAttributeContainsWordSelector2 = function () {
+        Asserts.assertEqual(0, $('[class~=class3]').length);
+    };
+    selectors3Suite.testAttributeContainsWordSelector3 = function () {
+        Asserts.assertEqual(1, $('a[class~=class-1]').length);
+    };
+
+    selectors3Suite.testAttributeContainsPrefixSelector1 = function () {
+        Asserts.assertEqual(1, $('[class|=class]').length);
+    };
+    selectors3Suite.testAttributeContainsPrefixSelector2 = function () {
+        Asserts.assertEqual(0, $('[title|=title]').length);
+    };
+    selectors3Suite.testAttributeContainsPrefixSelector3 = function () {
+        Asserts.assertEqual(2, $('[title|=title1]').length);
+    };
+
+    selectors3Suite.testComposedAttributeSelector1 = function () {
+        Asserts.assertEqual(1, $('[dir=ltr][title="title2"]').length);
+    };
+    selectors3Suite.testComposedAttributeSelector2 = function () {
+        Asserts.assertEqual(1, $('[title][dir!="rtl"][id^=\'i\']').length);
+    };
+</script>

@@ -1,6 +1,3 @@
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//NOTE: must include Utility.js before include this library
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //A wrapper for FBJS to make it feel more like jQuery
 //About name:
@@ -19,447 +16,28 @@ var FBjqRY = function(selector, context) {
 //We can wrap everything else
 (function() {
 
-var encodeURIComponent = Utility.encodeURIComponent;
+var encodeURIComponent = Support.encodeURIComponent;
 
-var extend = Utility.extend;
-var each = Utility.each;
-var map = Utility.map;
-var grep = Utility.grep;
-var merge = Utility.merge;
-var indexOf = Utility.indexOf;
-var unique = Utility.unique;
-var trim = Utility.trim;
+var extend = Support.extend;
+var each = Support.each;
+var map = Support.map;
+var grep = Support.grep;
+var merge = Support.merge;
+var indexOf = Support.indexOf;
+var unique = Support.unique;
+var trim = Support.trim;
 
-var slice = Utility.array.slice;
+var slice = Support.array.slice;
 
-var isFunction = Utility.isFunction;
-var isArray = Utility.isArray;
-//var isString = Utility.isString;
+var isFunction = Support.isFunction;
+var isArray = Support.isArray;
+//var isString = Support.isString;
 
-var isFBNode = Utility.isFBNode;
-var sameFBNode = Utility.sameFBNode;
-var getFBNodeId = Utility.getFBNodeId;
+var isFBNode = Support.isFBNode;
+var sameFBNode = Support.sameFBNode;
+var getFBNodeId = Support.getFBNodeId;
 
-//function to notify programmers when expected functionality is missing
-function notSupported(errStr) {
-    if ( console && console.log ) {
-      if (errStr) console.log(errStr);
-      else {
-        console.log("The method you are trying to use is not yet supported by FBjqRY or FBJS");
-      }
-    }
-}
-
-var find = (function() {
-    var idCheck = /^#(\w+)/,
-        classCheck = /^\.([\w\-]+)/,
-        tagCheck = /^([A-Za-z_\*]{1}\w*)/,
-        attributeCheck = /^\[(\w+)(!|\^|\$|\*)?=?"?'?([^\]]+)?'?"?\]/,
-        pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
-        pseudoCheck = /^:(\w+)/;
-
-    function filter(nodes, fn, recurse, level) {
-        var retNodes = [];
-        if ( ! nodes || ! nodes.length ) return retNodes;
-        //if ( typeof(level) === 'undefined' ) level = 0;
-
-        for ( var i = 0, len = nodes.length; i < len; i++ ) {
-            if ( fn.call(nodes[i]) ) retNodes.push( nodes[i] );
-            if ( recurse ) { // hierarchy
-                /*
-                var relevantNodes;
-                if ( hierarchy === true ) {
-                    relevantNodes = nodes[i].getChildNodes();
-                }
-                else { // function :
-                    relevantNodes = hierarchy.call(nodes[i], level);
-                }
-                if ( relevantNodes && relevantNodes.length ) {
-                    retNodes = retNodes.concat( 
-                        filter(relevantNodes, fn, hierarchy, ++level)
-                    );
-                }
-                */
-                retNodes = retNodes.concat(
-                    filter(nodes[i].getChildNodes(), fn, recurse)
-                );
-            }
-        }
-        return retNodes;
-    }
-
-    function selectById(nodes, id, sel, recurse) {
-        //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
-            nodes = [];
-            var node = document.getElementById(id);
-            if ( node ) nodes[0] = node;
-        }
-        else {
-            nodes = filter( nodes,
-                function() { return this.getId() == id; },
-                recurse
-            );
-        }
-        return nodes;
-    }
-
-    function selectByClass(nodes, cssClass, sel, recurse) {
-        //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
-            nodes = [ document.getRootElement() ];
-        }
-        return filter( nodes,
-            function() { return this.hasClassName(cssClass); },
-            recurse
-        );
-    }
-
-    function selectByTag(nodes, tag, sel, recurse) {
-        //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
-            nodes = document.getRootElement().getElementsByTagName(tag);
-        }
-        else { // @todo optimize !
-//            if ( hierarchy === true ) { // optimization for the "most" case :
-//                var tagNodes = [];
-//                //console.log('selectByTag() nodes: ', nodes);
-//                for (var i = 0, len = nodes.length; i < len; i++) {
-//                    tagNodes = tagNodes.concat( nodes[i].getElementsByTagName(tag) );
-//                }
-//                //console.log('selectByTag() len: ', tagNodes.length);
-//                nodes = tagNodes;
-//            }
-//            else {
-                tag = tag.toUpperCase();
-                nodes = filter( nodes,
-                    function() { return tag === '*' || this.getTagName() == tag; },
-                    recurse
-                );
-//            }
-        }
-        return nodes;
-    }
-
-    function selectByAttribute(nodes, attr, matchType, value, t, getChildren) {
-        var matchFunc = null;
-        switch ( matchType ) {
-            case "!": matchFunc = function(a,b) { return a != b; }; break;
-            case "^": matchFunc = function(a,b) { return a.indexOf(b) === 0; }; break;
-            case "$": matchFunc = function(a,b) { return a.indexOf(b) + b.length == a.length; }; break;
-            case "*": matchFunc = function(a,b) { return a.indexOf(b) >= 0; }; break;
-            default:
-                if ( value === true ) matchFunc = function(a,b) {return !!a; };
-                else matchFunc = function(a,b) { return a == b; };
-                break;
-        }
-        return filter( nodes,
-            function() { return matchFunc( FBjqRY(this).attr(attr), value ); }, [attr, value],
-            getChildren
-        );
-    }
-
-    return function(nodes, sel, context) { // the find function
-        if ( typeof(sel) !== "string" ) {
-            if ( sel.length || sel.length === 0 ) return sel;
-            return [ sel ];
-        }
-
-        var i, len;
-
-        //Is context a valid FBDOM element
-        if ( context ) {
-            if ( nodes && nodes.length > 0 ) {
-                console.log('_find() could not handle context with nodes', context);
-                throw "_find() could not handle context with nodes"; // @todo
-            }
-            if ( isFBNode(context) ) {
-                nodes = context.getChildNodes(); // context is never part of the result
-            }
-            else if ( typeof(context.length) === 'number' ) { // FBjqRY or array
-                if ( typeof(context.selector) !== 'undefined' ) context = context.nodes;
-                nodes = [];
-                for ( i = 0, len = context.length; i < len; i++ ) {
-                    nodes = nodes.concat( context[i].getChildNodes() );
-                }
-            }
-            else {
-                console.log('_find() unexpected context type', context);
-                throw "_find() unexpected context type"; // @todo
-            }
-        }
-
-        var recurse, match,
-            prevSel, selectors = sel.split(","),
-            allNodes = [], origNodes = nodes;
-
-        for ( i = 0, len = selectors.length; i < len; i++ ) {
-            sel = trim(selectors[i]);
-            prevSel = "";
-            recurse = true;
-            while ( sel && sel != prevSel ) {
-                if ( prevSel ) {
-                    if ( ! nodes.length ) break; // done - no nodes
-                    recurse = (sel.charAt(0) === ' ');
-                    if ( recurse ) {
-                        sel = trim(sel);
-                        var nextNodes = [], j, sibling;
-                        switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
-                            case '>':
-                                sel = trim(sel.substr(1)); // ltrim
-                                //hierachy = function(level) { // only 1st level childs
-                                //    return level === 1 ? this.getChildNodes() : null;
-                                //};
-                                for ( j = 0; j < nodes.length; j++ ) {
-                                    nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
-                                }
-                                recurse = false; // only 1st level childs
-                                break;
-                            case '~':
-                                sel = trim(sel.substr(1)); // ltrim
-                                for ( j = 0; j < nodes.length; j++ ) {
-                                    sibling = nodes[j].getNextSibling();
-                                    while ( sibling ) {
-                                        nextNodes.push( sibling );
-                                        sibling = sibling.getNextSibling();
-                                    }
-                                }
-                                recurse = false;
-                                break;
-                            case '+':
-                                sel = trim(sel.substr(1)); // ltrim
-                                for ( j = 0; j < nodes.length; j++ ) {
-                                    sibling = nodes[j].getNextSibling();
-                                    if ( sibling ) {
-                                        nextNodes.push( sibling );
-                                    }
-                                }
-                                recurse = false;
-                                break;
-                            default:
-                                for ( j = 0; j < nodes.length; j++ ) {
-                                    nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
-                                }
-                                // but will recurse childs as recurse stays === true
-                        }
-                        nodes = nextNodes;
-                    }
-                }
-                prevSel = sel;
-
-                //We should start with one of these first 3 cases (id, tag, class)
-                match = idCheck.exec(sel);
-                if ( match ) {
-                    nodes = selectById(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
-                    continue;
-                }
-
-                match = classCheck.exec(sel);
-                if ( match ) {
-                    nodes = selectByClass(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
-                    continue;
-                }
-
-                match = tagCheck.exec(sel);
-                if ( match ) {
-                    nodes = selectByTag(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
-                    continue;
-                }
-
-                //The remaining is subfiltering on nodes
-                match = attributeCheck.exec(sel);
-                if ( match ) {
-                    match[3] = match[3] || true; //if m[3] does not exist we are just checking if attribute exists
-                    nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, recurse);
-                    sel = sel.substr(sel.indexOf("]") + 1);
-                    continue;
-                }
-
-                match = pseudoCheckParen.exec(sel);
-                if ( ! match ) match = pseudoCheck.exec(sel);
-                if ( match ) {
-                    var matchStr = match[0];
-                    var pseudo = match[1];
-                    var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
-                    var intValue = value ? parseInt(value, 10) : null;
-                    
-                    var _nodes = nodes, j;
-                    // Elements can be considered hidden for several reasons :
-                    // * They have a CSS display value of none.
-                    // * They are form elements with type="hidden".
-                    // * Their width and height are explicitly set to 0.
-                    // * An ancestor element is hidden, so the element is not shown on the page.
-                    var _isHidden = function(node) {
-                        if ( node.getTagName().toLowerCase() === 'input' ) {
-                            var type = node.getType();
-                            if ( type && type.toLowerCase() === 'hidden' ) return true;
-                        }
-                        while ( node ) {
-                            if ( node.getStyle('display') === 'none' ) return true;
-                            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
-                            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
-                        }
-                        return false;
-                    };
-                    var _isInputType = function(node, type) {
-                        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
-                        return node.getType() && node.getType().toLowerCase() === type;
-                    };
-
-                    switch ( pseudo ) {
-                        case "first":
-                            nodes = [ nodes[0] ]; break;
-                        case "last":
-                            nodes = [ nodes[nodes.length - 1] ]; break;
-                        case "eq":
-                            nodes = [ nodes[intValue] ]; break;
-                        case "lt":
-                            nodes = nodes.splice(0, intValue); break;
-                        case "gt":
-                            nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
-                        case "even":
-                            nodes = grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
-                        case "odd":
-                            nodes = grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
-                        case "contains":
-                            nodes = null;
-                            notSupported(":contains pseudo selector not supported (cannot read text from FB nodes)");
-                            break;
-                        case "hidden":
-                            nodes = grep(nodes, _isHidden); break;
-                        case "visible":
-                            nodes = grep(nodes, function(node) { return ! _isHidden(node); }); break;
-                        case "has":
-                            nodes = grep(nodes, function(node) {
-                                var matches = find([ node ], value);
-                                return matches.length > 0;
-                            });
-                            break;
-                        case "not":
-                            nodes = grep(nodes, function(node) {
-                                var notMatches = find([ node ], value);
-                                // if smt is matched return false :
-                                return notMatches.length == 0;
-                            });
-                            break;
-                        case "nth-child":
-                            nodes = [];
-                            each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
-                            });
-                            break;
-                        case "first-child":
-                            nodes = [];
-                            each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[0] ) nodes.push( childs[0] );
-                            });
-                            break;
-                        case "last-child":
-                            nodes = [];
-                            each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                var length = childs && childs.length;
-                                if ( length ) nodes.push( childs[length - 1] );
-                            });
-                            break;
-                        case "only-child":
-                            nodes = grep(nodes, function(node) {
-                                var parentChilds = node.getParentNode().getChildNodes();
-                                return parentChilds.length === 1;
-                            });
-                            break;
-                        case "parent": // all elements that are the parent of another element :
-                            nodes = grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return childNodes && childNodes.length > 0;
-                            });
-                            break;
-                        case "empty": // all elements that have no children :
-                            nodes = grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return ! childNodes || childNodes.length === 0;
-                            });
-                            break;
-                        case "disabled":
-                            nodes = grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return !! disabled; // @todo disabled === 'disabled'
-                            });
-                            break;
-                        case "enabled":
-                            nodes = grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return ! disabled;
-                            });
-                            break;
-                        case "selected":
-                            nodes = grep(nodes, function(node) {
-                                var selected = node.getSelected();
-                                return !! selected; // @todo selected === 'selected'
-                            });
-                            break;
-                        case "input": // all input, textarea, select and button elements
-                            nodes = grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName === 'input' || tagName === 'textarea' 
-                                    || tagName === 'select' || tagName === 'button';
-                            });
-                            break;
-                        case "text":
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'text') });
-                            break;
-                        case "password":
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'password') });
-                            break;
-                        case "radio":
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'radio') });
-                            break;
-                        case "file":
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'file') });
-                            break;
-                        case "image": // all image inputs
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'image') });
-                            break;
-                        case "reset":
-                            nodes = grep(nodes, function(node) { return _isInputType(node, 'reset') });
-                            break;
-                        case "submit":
-                            nodes = grep(nodes, function(node) {
-                                var type = node.getType(), tagName = node.getTagName().toLowerCase();
-                                return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
-                                       (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
-                            });
-                            break;
-                        case "header":
-                            nodes = grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName.length === 2 && tagName.charAt(0) === 'h';
-                            });
-                            break;
-                    }
-
-                    sel = sel.substr(matchStr.length);
-                    continue;
-                }
-            }
-            if ( sel ) {
-                nodes = [];
-                console.log("We could not parse the remaining selector '" + sel + "'");
-            }
-            else {
-                allNodes = allNodes.concat(nodes);
-                nodes = origNodes;
-            }
-        }
-
-        return unique(allNodes);
-    };
-})();
+var find = Support.findNodes;
 
 var is = function(expr, nodes) {
     return !!expr && find(nodes, expr).length > 0; //(this.find(expr).length > 0);
@@ -508,7 +86,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             var match = quickExpr.exec(selector);
             if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
                 if ( match[1] ) { // HANDLE: $(html) -> $(array)
-                    this.nodes = Utility.html( match[1] );
+                    this.nodes = Support.html( match[1] );
                 }
                 else { // HANDLE: $("#id")
                     this.nodes = [];
@@ -611,7 +189,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     //====================================
     attr: function(name, value) {
         //if (typeof value != 'undefined') {
-        //    each(this.nodes, function() {Utility.attr(this, name, value);});
+        //    each(this.nodes, function() {Support.attr(this, name, value);});
         //    return this;
         //}
         //
@@ -620,7 +198,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         // Look for the case where we're accessing a style value
         if ( typeof(name) === 'string' ) {
             if ( typeof(value) === 'undefined' ) {
-                return node && Utility.attr(node, name);
+                return node && Support.attr(node, name);
             }
             else {
                 options = {};
@@ -632,9 +210,9 @@ FBjqRY.fn = FBjqRY.prototype = {
             for ( name in options ) {
                 var value = options[name];
                 if ( FBjqRY.isFunction(value) ) value = value.call(this, i);
-                Utility.attr(node, name, value);
+                Support.attr(node, name, value);
             }
-            //for ( name in options ) Utility.attr(this, name, options[name]);
+            //for ( name in options ) Support.attr(this, name, options[name]);
         });
     },
 
@@ -664,13 +242,13 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     html: function(html) {
         if ( typeof(html) !== 'undefined' ) {
-            //each(this.nodes, function() { Utility.html(html, this); });
+            //each(this.nodes, function() { Support.html(html, this); });
             for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                Utility.html( html, this.nodes[i] );
+                Support.html( html, this.nodes[i] );
             }
             return this;
         }
-        return notSupported("html() getter not supported in FBJS");
+        return Support.error("html() getter not supported in FBJS");
     },
 
     fbml: function(fbml) {
@@ -681,7 +259,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             }
             return this;
         }
-        return notSupported("fbml() getter not supported in FBJS");
+        return Support.error("fbml() getter not supported in FBJS");
     },
 
     text: function(text) {
@@ -692,7 +270,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             }
             return this;
         }
-        return notSupported("text() getter not supported in FBJS");
+        return Support.error("text() getter not supported in FBJS");
     },
 
     val: function(val) {
@@ -728,7 +306,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     css: function(name, value) {
         if (typeof name === 'string' && typeof value !== 'undefined') {
             if (name == 'float') name = 'cssFloat';
-            name = Utility.camelCase(name);
+            name = Support.camelCase(name);
             if (typeof(value) == 'number') value = value + "px";
             each(this.nodes, function() {this.setStyle(name, value);} );
             return this;
@@ -740,7 +318,7 @@ FBjqRY.fn = FBjqRY.prototype = {
                 if ( name.hasOwnProperty(o) ) {
                     value = name[o];
                     if (typeof(value) === 'number') value = value + "px";
-                    values[Utility.camelCase(o)] = value;
+                    values[Support.camelCase(o)] = value;
                 }
             }
             each(this.nodes, function() {this.setStyle(values);});
@@ -1095,11 +673,9 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     andSelf: function() { // @todo
-        console.log('andSelf() prevObject not implemented !');
         return this.add( this.prevObject );
     },
     end: function() { // @todo
-        console.log('end() prevObject not implemented !');
         return this.prevObject || FBjqRY( [] );
     },
 
@@ -1368,7 +944,7 @@ FBjqRY.extend({
         ajax.ondone = options.success;
         ajax.onerror = function() {
             var retryCount = options.retryCount || 0;
-            console.error("AJAX error occurred! Retrying...");
+            Support.log("ajax() error occurred, retrying ...");
             if ( retryCount-- > 0 ) {
                 options.retryCount = retryCount;
                 FBjqRY.ajax(options);
@@ -1436,7 +1012,7 @@ FBjqRY.extend({
 	},
     
     getScript: function(url, cb) {
-        notSupported("We can't pull in scripts dynamically using FBJS");
+        return Support.error("getScript() not supported in FBJS");
     },
 
 	ajaxSetup: function( settings ) {

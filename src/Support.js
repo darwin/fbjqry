@@ -7,12 +7,12 @@
 
  // Usage:
  // inject into an existing FBDOM node
- Utility.html(htmlString, FBNode);
+ Support.html(htmlString, FBNode);
 
  // return array of parsed nodes
- var nodes = Utility.html(htmlString);
+ var nodes = Support.html(htmlString);
 
- Utility.html is the exposed function for HTMLtoDOM
+ Support.html is the exposed function for HTMLtoDOM
 */
 
 /*
@@ -22,10 +22,10 @@
 
   // Usage:
   // return a js object
-  Utility.json(jsonString);
+  Support.json(jsonString);
 */
 
-var Utility = {};  // expose variable globally
+var Support = {};  // expose variable globally
 
 (function() {
 
@@ -33,10 +33,24 @@ var Utility = {};  // expose variable globally
 /** Helpers */
 // ============================================================================
 //IE console work-arounds
-if (typeof console === 'undefined') { console = {}; }
-if (typeof console.error !== 'function') {  console.error = function() {}; }
+//if (typeof console === 'undefined') { console = {}; }
+//if (typeof console.error !== 'function') {  console.error = function() {}; }
+var consoleLog = (typeof console !== 'undefined') && console.log;
+Support.log = function(msg, e) {
+    if ( Support.log.enabled && consoleLog ) {
+        e ? consoleLog(msg, e) : consoleLog(msg);
+    }
+    if ( e && Support.log.throwErrors ) throw e;
+}
+Support.error = function(msg) {
+    try { throw msg; }
+    catch (e) {
+        Support.log('[ERROR]', e);
+    }
+    return undefined;
+}
 
-Utility.memo = function(fn, cache) { // function return value memoization
+Support.memo = function(fn, cache) { // function return value memoization
     cache = cache || {};
     return function(p) {
         if( p && cache[p] ) { return cache[p]; }
@@ -46,7 +60,7 @@ Utility.memo = function(fn, cache) { // function return value memoization
 };
 
 // copied from facebooker
-Utility.encodeURIComponent = function(str) {
+Support.encodeURIComponent = function(str) {
     if ( typeof(str) === "string" ) {
         return str.replace(/=/g,'%3D').replace(/&/g,'%26');
     }
@@ -62,18 +76,18 @@ Utility.encodeURIComponent = function(str) {
 /** String functions */
 // ============================================================================
 var rtrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g; // Used for trimming whitespace
-//var trim = Utility.trim = function(s) { return s.replace(/^\s+|\s+$/g, ""); };
-var trim = Utility.trim = function(str) {
+//var trim = Support.trim = function(s) { return s.replace(/^\s+|\s+$/g, ""); };
+var trim = Support.trim = function(str) {
     return (str || "").replace( rtrim, "" );
 };
-var camelCase = Utility.camelCase = Utility.memo(function(str) {
+var camelCase = Support.camelCase = Support.memo(function(str) {
     return str.replace(/\-(\w)/g, function(all, letter){ return letter.toUpperCase(); });
 });
 
 // ============================================================================
 /** Object functions */
 // ============================================================================
-var object = Utility.object = {}; // we can't access Array.prototype
+var object = Support.object = {}; // we can't access Array.prototype
 
 //current version is slightly modified from jQuery version
 /*
@@ -88,20 +102,20 @@ isFunction: function( fn ) {
 // aren't supported. They return false on IE (#2968).
 
 var toString = object.toString;
-var isFunction = Utility.isFunction = function(obj) { // @todo
+var isFunction = Support.isFunction = function(obj) { // @todo
     return toString.call(obj) === "[object Function]";
 };
 
-Utility.isArray = function(obj) {
+Support.isArray = function(obj) {
     return toString.call(obj) === "[object Array]";
 };
 /*
-Utility.isString = function(obj) {
+Support.isString = function(obj) {
     //return object.toString() === object;
     return toString.call(obj) === "[object String]";
 }; */
 
-Utility.each = function(obj, cb, args) {
+Support.each = function(obj, cb, args) {
     if ( !obj || !obj.length ) return obj; // return [];
 
     var i, len = obj.length;
@@ -127,7 +141,7 @@ Utility.each = function(obj, cb, args) {
     return obj;
 };
 
-Utility.extend = function() {
+Support.extend = function() {
 	// copy reference to target object
 	var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options;
 
@@ -160,7 +174,7 @@ Utility.extend = function() {
 
 				// Recurse if we're merging object values
 				if ( deep && copy && typeof copy === "object" && ! isFBNode(copy) ) {
-					target[ name ] = Utility.extend( deep,
+					target[ name ] = Support.extend( deep,
 						// Never move original objects, clone them
 						src || ( copy.length != null ? [ ] : { } )
 					, copy );
@@ -178,14 +192,14 @@ Utility.extend = function() {
 // ============================================================================
 /** FBNode helpers */
 // ============================================================================
-var isFBNode = Utility.isFBNode = function(node) {
+var isFBNode = Support.isFBNode = function(node) {
     return node && (node.__instance || node.__instance === 0);
 };
 
 // NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
 // having the same elements matched with a different __instance identifier !
 var nextId = 1;
-var getFBNodeId = Utility.getFBNodeId = function(node) {
+var getFBNodeId = Support.getFBNodeId = function(node) {
     // __instance is a unique identifier for FBDOM nodes
     //return node && node.__instance;
     if ( node ) {
@@ -198,13 +212,13 @@ var getFBNodeId = Utility.getFBNodeId = function(node) {
     }
     return node;
 };
-var sameFBNode = Utility.sameFBNode = function(node1, node2) {
+var sameFBNode = Support.sameFBNode = function(node1, node2) {
     // __instance is a unique identifier for FBDOM nodes
     //return node1.__instance == node2.__instance;
     return getFBNodeId(node1) === getFBNodeId(node2);
 };
 
-Utility.attr = (function() {
+Support.attr = (function() {
     var validAttrs = (function() {
         var validAttrs = {},
             attrAry = ("accessKey,action,checked,className,cols,colSpan,dir,disabled,href,id," +
@@ -234,27 +248,42 @@ Utility.attr = (function() {
         var orig = attr;
         attr = validAttrs[attr.toLowerCase()];
         if ( ! attr ) {
-           console.error("The attribute " + orig + " is not currently supported in FBJS!");
+           Support.log("Support.attr() attribute name '" + orig + "' is not supported");
            return undefined;
         }
-
+        
         var method = (typeof v !== 'undefined') ? "set" : "get";
         method += attr.charAt(0).toUpperCase() + attr.substr(1);
         if ( val || val === "" || val === 0 ) {
-           if (method == "setStyle") setStyle(node, val);
-           else node[method](val);
-           return node;
+            try {
+               if (method === "setStyle") setStyle(node, val);
+               else node[method](val); // e.g. setTitle(val)
+            }
+            catch (e) { // e.g. when setting an invalid url parameter using setSrc()
+                return Support.error("Support.attr() setter node[" + method + "](" + val + ") failed: " + e);
+            }
+            return node;
         }
-        return node[method]();
+
+        val = undefined;
+        try {
+            val = node[method]();  // e.g. getTitle()
+        }
+        catch (e) {
+            // some nodes for some attrs e.g. getHref throw an error :
+            // "TypeError: b is undefined" instead of returning correctly
+            Support.log("Support.attr() getter node[" + method + "]() failed: " + e);
+        }
+        return val;
     };
 })();
 
 // ============================================================================
 /** Array functions */
 // ============================================================================
-Utility.array = []; // we can't access Array.prototype
+Support.array = []; // we can't access Array.prototype
 
-Utility.map = function( array, callback ) {
+Support.map = function( array, callback ) {
     var ret = [];
 
     // Go through the array, translating each of the items to their
@@ -266,7 +295,7 @@ Utility.map = function( array, callback ) {
     return ret.concat.apply( [], ret );
 };
 
-Utility.grep = function( array, callback, inv ) {
+Support.grep = function( array, callback, inv ) {
     var ret = [];
 
     // Go through the array, only saving the items
@@ -279,7 +308,7 @@ Utility.grep = function( array, callback, inv ) {
     return ret;
 };
 
-Utility.unique = function(array) {
+Support.unique = function(array) {
     //if ( !array || !array.length ) return [];
     /*
     var indexFn = function(elem) { return elem; };
@@ -318,13 +347,13 @@ Utility.unique = function(array) {
         }
     }
     catch (e) {
-        console.log("Support.unique()", e);
+        Support.log("Support.unique() returning original array", e);
         ret = array;
     }
     return ret;
 };
 
-Utility.indexOf = function(elem, array) {
+Support.indexOf = function(elem, array) {
     var cmpFn;
     if ( isFBNode(elem) ) {
         cmpFn = function(v) { return isFBNode(v) && sameFBNode(elem, v); };
@@ -340,7 +369,7 @@ Utility.indexOf = function(elem, array) {
     return -1;
 };
 
-Utility.merge = function( first, second ) {
+Support.merge = function( first, second ) {
     var i = first.length, j = 0;
 
     if ( typeof(second.length) === "number" ) {
@@ -361,7 +390,7 @@ Utility.merge = function( first, second ) {
 // ============================================================================
 /** JSON parser */
 // ============================================================================
-Utility.json = (function() { //Modified json parser begins here :
+Support.json = (function() { //Modified json parser begins here :
     var number  = '(?:-?\\b(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\\b)';
     var oneChar = '(?:[^\\0-\\x08\\x0a-\\x1f\"\\\\]|\\\\(?:[\"/\\\\bfnrt]|u[0-9A-Fa-f]{4}))';
     var string  = '(?:\"' + oneChar + '*\")';
@@ -393,7 +422,7 @@ Utility.json = (function() { //Modified json parser begins here :
         } else if ('[' === tok) {
             result = [];
         } else {
-            console.error('unsupported initial json token: ' + tok);
+            return Support.error("Support.json() unsupported initial json token: '" + tok + "'");
         }
 
         var key;
@@ -458,7 +487,9 @@ Utility.json = (function() { //Modified json parser begins here :
               break;
           }
         }
-        if (stack.length) { console.error('Could not fully process json object'); }
+        if ( stack.length ) {
+            return Support.error("Support.json() could not fully process json object");
+        }
 
         if (opt_reviver) {
           var walk = function (holder, key) {
@@ -494,9 +525,9 @@ Utility.json = (function() { //Modified json parser begins here :
 // ============================================================================
 /** HTML parser */
 // ============================================================================
-Utility.html = ( function() { //Modified htmlparser begins here:
+Support.html = ( function() { //Modified htmlparser begins here:
 
-    var each = Utility.each;
+    var each = Support.each;
     var makeMap = function(str) {
         var obj = {}, items = str.split(",");
         for (var i=0, len=items.length; i < len; i++) {
@@ -690,7 +721,9 @@ Utility.html = ( function() { //Modified htmlparser begins here:
                 parseEndTag("", stack.last());
             }
 
-            if(html == last) { throw "Parse Error: " + html; }
+            if ( html == last ) {
+                return Support.error("Support.html() parse error: " + html);
+            }
             last = html;
         }
 
@@ -701,7 +734,7 @@ Utility.html = ( function() { //Modified htmlparser begins here:
     handler = {
         start: function(tagName, attrs, unary) {
             var el = document.createElement(tagName);
-            each(attrs, function() { Utility.attr(el, this.name, this.value); }, [el]);
+            each(attrs, function() { Support.attr(el, this.name, this.value); }, [el]);
 
             if (curParentNode && curParentNode.appendChild) {
                 curParentNode.appendChild(el);
@@ -745,6 +778,6 @@ Utility.html = ( function() { //Modified htmlparser begins here:
         each(children, function() { doc.appendChild(this); }, [ doc ]);
         return doc;
     };
-})(); // -- END Utility.html
+})(); // -- END Support.html
 
 })(); // -- END Utility function wrapper
