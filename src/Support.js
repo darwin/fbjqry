@@ -109,12 +109,18 @@ var isFunction = Support.isFunction = function(obj) { // @todo
 Support.isArray = function(obj) {
     return toString.call(obj) === "[object Array]";
 };
-/*
+/**
+ * NOTE: this method is important as FBML might "prerender" JS strings
+ * that contain HTML (to be used with setInnerXHTML etc.) !
+ *
+ * typeof(variable) for such strings might return 'object' !
+ */
 Support.isString = function(obj) {
     //return object.toString() === object;
     return toString.call(obj) === "[object String]";
-}; */
+};
 
+/*
 Support.each = function(obj, cb, args) {
     if ( !obj || !obj.length ) return obj; // return [];
 
@@ -139,6 +145,35 @@ Support.each = function(obj, cb, args) {
         }
     }
     return obj;
+}; */
+Support.each = function( object, callback, args ) { // args is for internal usage only
+    var name, i, length = object.length;
+
+    if ( args ) {
+        if ( length === undefined ) {
+            for ( name in object )
+                if ( callback.apply( object[ name ], args ) === false )
+                    break;
+        } else {
+            for ( i = 0; i < length; )
+                if ( callback.apply( object[ i++ ], args ) === false )
+                    break;
+        }
+    // A special, fast, case for the most common use of each
+    } else {
+        if ( length === undefined ) {
+            for ( name in object )
+                if ( callback.call( object[ name ], name, object[ name ] ) === false )
+                    break;
+        } else {
+            i = 0;
+            for ( var value = object[0];
+                  i < length && callback.call( value, i, value ) !== false;
+                  value = object[++i] ) { }
+        }
+    }
+
+    return object;
 };
 
 Support.extend = function() {
@@ -203,6 +238,7 @@ var getFBNodeId = Support.getFBNodeId = function(node) {
     // __instance is a unique identifier for FBDOM nodes
     //return node && node.__instance;
     if ( node ) {
+        if ( ! node.getId ) return undefined;
         var nodeId = node.getId();
         if ( ! nodeId ) {
             nodeId = '_generated-' + nextId++;
@@ -221,13 +257,19 @@ var sameFBNode = Support.sameFBNode = function(node1, node2) {
 Support.attr = (function() {
     var validAttrs = (function() {
         var validAttrs = {},
-            attrAry = ("accessKey,action,checked,className,cols,colSpan,dir,disabled,href,id," +
+            // node attributes :
+            attrs = ("accessKey,action,checked,className,cols,colSpan,dir,disabled,href,id," +
                        "maxLength,method,name,readOnly,rows,rowSpan,selected,selectedIndex," +
-                       "selection,src,style,tabIndex,target,title,type,value").split(",");
-        for (var i=0, length = attrAry.length; i < length; i++) {
-           validAttrs[ attrAry[i].toLowerCase() ] = attrAry[i];
+                       "selection,src,style,tabIndex,target,title,type,value");
+            // node accessors (getters) :
+            attrs += ",tagName,parentNode,nextSibling,previousSibling,firstChild,lastChild";
+            attrs = attrs.split(",");
+        for (var i = 0, len = attrs.length; i < len; i++) {
+           validAttrs[ attrs[i].toLowerCase() ] = attrs[i];
         }
-        validAttrs["class"] = "className";
+        // name aliases :
+        validAttrs[ "class".toLowerCase() ] = "className";
+        validAttrs[ "nodeName".toLowerCase() ] = "tagName";
         return validAttrs;
     })();
 
@@ -251,10 +293,12 @@ Support.attr = (function() {
            Support.log("Support.attr() attribute name '" + orig + "' is not supported");
            return undefined;
         }
-        
-        var method = (typeof v !== 'undefined') ? "set" : "get";
+
+        var setter = (typeof val !== 'undefined');
+        var method = setter ? "set" : "get";
         method += attr.charAt(0).toUpperCase() + attr.substr(1);
-        if ( val || val === "" || val === 0 ) {
+        //if ( val || val === "" || val === 0 ) {
+        if ( setter ) {
             try {
                if (method === "setStyle") setStyle(node, val);
                else node[method](val); // e.g. setTitle(val)
@@ -264,7 +308,7 @@ Support.attr = (function() {
             }
             return node;
         }
-
+        // else getter :
         val = undefined;
         try {
             val = node[method]();  // e.g. getTitle()
@@ -369,7 +413,7 @@ Support.indexOf = function(elem, array) {
     return -1;
 };
 
-Support.merge = function( first, second ) {
+Support.merge = function(first, second) {
     var i = first.length, j = 0;
 
     if ( typeof(second.length) === "number" ) {
@@ -521,10 +565,87 @@ Support.json = (function() { //Modified json parser begins here :
         return result;
       };
 })();
-    
+
+// ============================================================================
+/** A helper around setInnerXHTML (FBJS beta feature) */
+// ============================================================================
+Support.xhtml = function( elems, context ) { // based on jQuery.clean 1.3.2
+    context = context || document;
+    if ( typeof context.createElement === "undefined" ) context = document;
+
+    if ( typeof elems === 'string' ) { // support single string
+        elems = [ elems ];
+    }
+
+    // If a single string is passed in and it's a single tag
+    // just do a createElement and skip the rest
+    if ( elems.length === 1 && Support.isString( elems[0] ) ) {
+        var match = /^<(\w+)\s*\/?>$/.exec( elems[0] );
+        if ( match ) return [ context.createElement( match[1] ) ];
+    }
+
+    var ret = [], div = context.createElement("div");
+
+    Support.each(elems, function() {
+        var elem = this;
+
+        if ( typeof elem === "number" ) elem += '';
+        if ( ! elem ) return;
+
+        // Convert html string into DOM nodes
+        if ( Support.isString(elem) ) {
+            // Fix "XHTML"-style tags in all browsers
+            elem = elem.replace(/(<(\w+)[^>]*?)\/>/g, function(all, front, tag){
+                return tag.match(/^(abbr|br|col|img|input|link|meta|param|hr|area|embed)$/i) ?
+                    all : front + "></" + tag + ">";
+            });
+
+            // Trim whitespace, otherwise indexOf won't work as expected
+            var tags = elem.replace(/^\s+/, "").substring(0, 10).toLowerCase();
+            var wrap = // @todo not sure if this is needed FBJS might handle it it's own way ...
+                // option or optgroup
+                ! tags.indexOf("<opt") &&
+                [ 1, "<select multiple='multiple'>", "</select>" ] ||
+
+                ! tags.indexOf("<leg") &&
+                [ 1, "<fieldset>", "</fieldset>" ] ||
+
+                tags.match(/^<(thead|tbody|tfoot|colg|cap)/) &&
+                [ 1, "<table>", "</table>" ] ||
+
+                ! tags.indexOf("<tr") &&
+                [ 2, "<table><tbody>", "</tbody></table>" ] ||
+
+                // <thead> matched above
+                (! tags.indexOf("<td") || !tags.indexOf("<th")) &&
+                [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ] ||
+
+                ! tags.indexOf("<col") &&
+                [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ] ||
+
+                [ 0, "", "" ];
+
+            // Go to html and back, then peel off extra wrappers
+            div.setInnerXHTML( wrap[1] + elem + wrap[2] );
+
+            // Move to the right depth
+            while ( wrap[0]-- ) div = div.getLastChild();
+
+            elem = div.getChildNodes();
+        }
+
+        if ( Support.isFBNode(elem) ) ret.push( elem );
+        else ret = Support.merge( ret, elem );
+
+    });
+
+    return ret;
+};
+
 // ============================================================================
 /** HTML parser */
 // ============================================================================
+/*
 Support.html = ( function() { //Modified htmlparser begins here:
 
     var each = Support.each;
@@ -664,14 +785,14 @@ Support.html = ( function() { //Modified htmlparser begins here:
                 if(html.indexOf("<!--") === 0) {
                     index = html.indexOf("-->");
                     if(index >= 0) {
-                        if(handler.comment) { handler.comment(html.substring(4, index)); }
-                        html = html.substring(index + 3);
+                        if(handler.comment) { handler.comment(html.substr(4, index)); }
+                        html = html.substr(index + 3);
                         chars = tbodyCheck = false;
                     }
                 } else if(html.indexOf("</") === 0) { // end tag
                     match = html.match(endTag);
                     if(match) {
-                        html = html.substring(match[0].length);
+                        html = html.substr( match[0].length );
                         match[0].replace(endTag, parseEndTag);
                         chars = tbodyCheck = false;
                     }
@@ -685,7 +806,7 @@ Support.html = ( function() { //Modified htmlparser begins here:
                             html = '<tbody>' + html;
                             match = html.match(startTag);
                         }
-                        html = html.substring(match[0].length);
+                        html = html.substr( match[0].length );
                         match[0].replace(startTag, parseStartTag);
                         chars = false;
                         tbodyCheck = match[1].toLowerCase() == 'table';
@@ -699,7 +820,7 @@ Support.html = ( function() { //Modified htmlparser begins here:
 
                     //handle non tag-related '<' entities
                     while(index >= 0) {
-                        testStr = html.substring(index);
+                        testStr = html.substr(index);
                         match = testStr.match(startTag);
                         if(match) { break; }
                         match = testStr.match(endTag);
@@ -709,12 +830,12 @@ Support.html = ( function() { //Modified htmlparser begins here:
                         index = html.indexOf("<", index + 1);
                     }
 
-                    var text = index < 0 ? html : html.substring(0, index);
+                    var text = index < 0 ? html : html.substr(0, index);
                     if (trim(text)) {
                         text = entityReplace(text);
                         handler.chars(text);
                     }
-                    html = index < 0 ? "" : html.substring(index);
+                    html = index < 0 ? "" : html.substr(index);
                 }
             } else {
                 html = html.replace(new RegExp("(.*)<\/" + stack.last() + "[^>]*>"), replaceFn);
@@ -779,5 +900,5 @@ Support.html = ( function() { //Modified htmlparser begins here:
         return doc;
     };
 })(); // -- END Support.html
-
+*/
 })(); // -- END Utility function wrapper

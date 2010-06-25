@@ -1,6 +1,12 @@
 
 // assertion functions shortcut :
 var Asserts = jsUnity.assertions;
+Asserts.assertEqualNode = function(expected, actual, message) {
+    if ( ! Support.sameFBNode(expected, actual) ) {
+        throw fmt("?: (?) is not equal to node (?)",
+            message || "assertEqualNode", actual, expected);
+    }
+};
 
 /**
  * Removes all elements (nodes) from the canvas.

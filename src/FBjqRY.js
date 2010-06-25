@@ -31,7 +31,7 @@ var slice = Support.array.slice;
 
 var isFunction = Support.isFunction;
 var isArray = Support.isArray;
-//var isString = Support.isString;
+var isString = Support.isString;
 
 var isFBNode = Support.isFBNode;
 var sameFBNode = Support.sameFBNode;
@@ -52,18 +52,47 @@ var filter = function(expr, nodes) {
     return fNodes;
 };
 
+/**
+ * Helper for the following manipulation functions :
+ * - appendTo: "append"
+ * - prependTo: "prepend"
+ * - insertBefore: "before"
+ * - insertAfter: "after"
+ * - replaceAll: "replaceWith"
+ * @param fn the delegate function
+ * @param selector the selector
+ * @return FBjqRY object
+ */
+var delegateManipulation = function(name, fn, selector) {
+    var ret = [], insert = FBjqRY(selector).nodes;
+
+    for ( var i = 0, len = insert.length; i < len; i++ ) {
+        var elems = (i > 0 ? this.clone(true) : this).get();
+        fn.apply( FBjqRY( insert[i] ), elems );
+        ret = ret.concat( elems );
+    }
+
+    return this.pushStack( ret, name, selector );
+};
+
 var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
+    //quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#([\w-]+)$/;
     //isSimple  = /^.[^:#\[\.]*$/, undefined;
 
 FBjqRY.fn = FBjqRY.prototype = {
 
-    version: "0.2.0-SNAPSHOT",
+    version: "0.3.0-SNAPSHOT",
     
     //CORE
     //====================================
 
     init: function(selector, context) {
         //selector = selector || document; // makes no sense document is a stub only !
+        if ( typeof(selector) === 'undefined' ) { // @todo probably non sense to have it ...
+            this.context = document;
+            this.length = 0;
+            return this;
+        }
         //ready state shortcut handler -- no need for ready event because FBJS delays execution
         if ( isFunction(selector) ) return this.ready(selector);
         //Are we dealing with an FBjqRY object?
@@ -82,11 +111,11 @@ FBjqRY.fn = FBjqRY.prototype = {
             this.context = selector;
             return this;
         }
-        else {
+        else if ( typeof(selector) !== 'undefined' ) {
             var match = quickExpr.exec(selector);
             if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
                 if ( match[1] ) { // HANDLE: $(html) -> $(array)
-                    this.nodes = Support.html( match[1] );
+                    this.nodes = Support.xhtml( match[1] ); // Support.html( match[1] );
                 }
                 else { // HANDLE: $("#id")
                     this.nodes = [];
@@ -102,13 +131,12 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
 
         this.selector = selector;
-        this.context = context;
+        this.context = context || document; // @todo does the document make any sense with FBJS ?!
         this.length = this.nodes.length;
         return this;
     },
 
-    // Start with an empty selector
-    selector: "",
+    selector: "", // start with an empty selector
 
     size: function() { return this.length; },
 
@@ -118,25 +146,24 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 	// Get the Nth element in the matched element set OR
 	// Get the whole matched element set as a clean array
-	get: function( num ) {
-        // Return a 'clean' array or just the object :
-		return typeof(num) === 'undefined' ? slice.call( this.nodes ) : this.nodes[ num ];
+	get: function(i) {
+        // Return a 'clean' array or just the element :
+		return typeof(i) === 'undefined' ? slice.call( this.nodes ) : this.nodes[i];
 	},
     index: function(elem) {
+        // If it receives a jQuery object, the first element is used
+        if ( typeof(elem.selector) !== 'undefined' ) elem = elem.get(0);
         for (var i = this.nodes.length - 1; i >= 0; i--) {
             if ( sameFBNode(elem, this.nodes[i]) ) break;
         }
         return i; // not found == -1
     },
-    eq: function(pos) {
-        this.nodes = [ this.nodes[pos] ];
-        this.length = 1;
-        return this;
-    },
-    /*
-    eq: function( i ) {
+    eq: function(i) {
+        //this.nodes = [ this.nodes[i] ];
+        //this.length = 1;
+        //return this;
         return this.slice( i, +i + 1 );
-    }, */
+    },
     slice: function() {
         return this.pushStack( 
             slice.apply( this.nodes, arguments ),
@@ -188,16 +215,11 @@ FBjqRY.fn = FBjqRY.prototype = {
     //ATTRIBUTES
     //====================================
     attr: function(name, value) {
-        //if (typeof value != 'undefined') {
-        //    each(this.nodes, function() {Support.attr(this, name, value);});
-        //    return this;
-        //}
-        //
         var options = name;
-        var node = this.nodes[0];
-        // Look for the case where we're accessing a style value
+        // Look for the case where we're accessing a value
         if ( typeof(name) === 'string' ) {
             if ( typeof(value) === 'undefined' ) {
+                var node = this.nodes[0];
                 return node && Support.attr(node, name);
             }
             else {
@@ -205,14 +227,13 @@ FBjqRY.fn = FBjqRY.prototype = {
                 options[ name ] = value;
             }
         }
-        // Check to see if we're setting style values
+        // Check to see if we're setting values
         return this.each( function(i) {
             for ( name in options ) {
                 var value = options[name];
                 if ( FBjqRY.isFunction(value) ) value = value.call(this, i);
-                Support.attr(node, name, value);
+                Support.attr(this, name, value);
             }
-            //for ( name in options ) Support.attr(this, name, options[name]);
         });
     },
 
@@ -361,6 +382,9 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
         return this;
     },
+    appendTo: function(content) {
+        return delegateManipulation.call(this, 'appendTo', this.append, content);
+    },
     //appendTo: function(nodes) { return FBjqRY(nodes).append(this); },
 
     prepend: function(content) {
@@ -375,6 +399,9 @@ FBjqRY.fn = FBjqRY.prototype = {
             for ( var j = 0; j < content.length; j++ ) node.insertBefore( content[j] );
         }
         return this;
+    },
+    prependTo: function(content) {
+        return delegateManipulation.call(this, 'prependTo', this.prepend, content);
     },
     //prependTo: function(nodes) { return FBjqRY(nodes).prepend(this); },
 
@@ -394,6 +421,9 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
         return this;
     },
+    insertAfter: function(content) {
+        return delegateManipulation.call(this, 'insertAfter', this.after, content);
+    },
 
     before: function(content) {
         content = FBjqRY(content).get();
@@ -410,6 +440,16 @@ FBjqRY.fn = FBjqRY.prototype = {
                 node.getParentNode().insertBefore( content[j], node );
         }
         return this;
+    },
+    insertBefore: function(content) {
+        return delegateManipulation.call(this, 'insertBefore', this.before, content);
+    },
+
+    replaceWith: function(content) {
+        return this.after(content).remove();
+    },
+    replaceAll: function(content) {
+        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, content);
     },
 
     wrapAll: function(html) {
@@ -442,10 +482,6 @@ FBjqRY.fn = FBjqRY.prototype = {
 			FBjqRY(this).wrapAll(html);
 		});
 	},
-
-    replaceWith: function(content) {
-        return this.after(content).remove();
-    },
 
     empty: function() {
         this.children().remove();
@@ -513,11 +549,11 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this.pushStack( find(this.nodes, expr), "find", expr );
     },
 
-    is: function(expr) {
-        return is(expr, this.nodes);
+    is: function( selector ) {
+        return is(selector, this.nodes);
     },
 
-    not: function(selector) { // @todo TEST
+    not: function( selector ) { // @todo TEST
         //filter out specified nodes
         var notNodes;
         if ( typeof(selector.selector) !== 'undefined' ) notNodes = selector.nodes;
@@ -529,19 +565,22 @@ FBjqRY.fn = FBjqRY.prototype = {
                 var idx = indexOf( notNodes[i], nodes );
                 if ( idx != -1 ) nodes.splice(idx, 1); // remove element
             }
-            return this.pushStack( nodes, "not", selector );
         }
         else { // expr assumed to be a selector :
-            return this.not( find(this.nodes, selector) );
+            notNodes = find(this.nodes, selector);
         }
+        
+        return this.pushStack( nodes, "not", selector );
     },
 
 	add: function( selector ) {
-        var selNodes = typeof(selector) === "string" ? 
-            find( null, selector ) /*FBjqRY( selector )*/ :
-                FBjqRY.makeArray( selector )
+        var selNodes = Support.isString(selector) ?
+            //find( null, selector ) :
+            FBjqRY( selector ).nodes : // selector might be a html string !
+                FBjqRY.makeArray( selector );
+
 		return this.pushStack( FBjqRY.unique( merge(
-			this.get(), // it's  a clone
+			this.get(), // it's a clone
 			selNodes
 		)));
 	},
@@ -883,6 +922,7 @@ FBjqRY.fn = FBjqRY.prototype = {
     }
 };
 
+/*
 each({
     appendTo: "append",
     prependTo: "prepend",
@@ -890,15 +930,15 @@ each({
     insertAfter: "after",
     replaceAll: "replaceWith"
 }, function(name, original) {
-    /*
-	FBjqRY.fn[ name ] = function() {
-        var args = arguments;
-        return this.each(function() {
-                for ( var i = 0, len = args.length; i < len; i++ )
-                        FBjqRY( args[i] )[ original ]( this );
-        });
-	}; */
-	FBjqRY.fn[name] = function(selector) {
+//	FBjqRY.fn[ name ] = function() {
+//        var args = arguments;
+//        return this.each(function() {
+//                for ( var i = 0, len = args.length; i < len; i++ )
+//                        FBjqRY( args[i] )[ original ]( this );
+//        });
+//	};
+    FBjqRY.fn[name] = FBjqRY.prototype[name] = function(selector) {
+	//FBjqRY.fn[name] = function(selector) {
         var ret = [], insert = FBjqRY(selector).nodes;
 
         for ( var i = 0, len = insert.length; i < len; i++ ) {
@@ -910,6 +950,7 @@ each({
         return this.pushStack( ret, name, selector );
 	};
 });
+*/
 
 //Add all common event handler methods
 var validEvents = ("blur,change,click,dblclick,error,focus,keydown,keypress,keyup,load,"  +
@@ -1107,35 +1148,26 @@ FBjqRY.extend({
 
         return ret.concat.apply([], ret);
     }, */
-    
-    makeArray: function( array, results ) { // results is for internal usage only
-        var ret = results || [];
-        
-        if ( array !== null ) {
-            //var len = array.length;
-            //TODO: not sure if this will work since FB extends array. TEST.
-            //the window, strings and functions also have 'length'
-            /*
-            if (len === null || array.split || array.setInterval || array.call) {
-                ret[0] = array;
-            } else {
-                while (len) {ret[--len] = array[len];}
-            }
-            */
-            // The window, strings (and functions) also have 'length'
-            // The extra typeof function check is to prevent crashes
-            // in Safari 2 (See: #3039)
-            if ( array.length == null || typeof array === "string" || isFunction(array) ||
-                    (typeof array !== "function" && array.setInterval) ) {
-                ret.push(array);
-            }
-            else {
-                FBjqRY.merge( ret, array );
-            }
-        }
 
-        return ret;
-    },
+	makeArray: function( array, results ) { // results is for internal usage only
+		var ret = results || [];
+
+		if( array != null ) {
+			var i = array.length;
+			// The window, strings (and functions) also have 'length'
+			if( i == null || Support.isString(array) || Support.isFunction(array) || array.setInterval ) {
+				ret[0] = array;
+            } else {
+                if ( typeof(array.selector) !== 'undefined' ) {
+                    array = array.nodes;
+                }
+                FBjqRY.merge( ret, array ); // while ( i ) ret[--i] = array[i];
+            }
+		}
+
+		return ret;
+	},
+
     /*
     inArray: function(value, array) { // array.indexOf
         if ( array.indexOf ) return array.indexOf( value );
@@ -1489,7 +1521,7 @@ FBjqRY.fn.extend({
     },
     queue: function(type, data) {
         if ( typeof type !== "string" ) {
-            data = type;type = "fx";
+            data = type; type = "fx";
         }
 
         if ( typeof(data) === 'undefined' ) return FBjqRY.queue( this.get(0), type );
