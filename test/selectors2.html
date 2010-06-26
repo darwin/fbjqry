@@ -92,10 +92,10 @@
         Asserts.assertEqual(0, $('#id13 ~ div').length);
     };
     selectors2Suite.testSiblingClassSelector1 = function () {
-        Asserts.assertEqual(3, $('#id12 ~ .class14').length);
+        Asserts.assertEqual(3, $('div#id12 ~ .class14').length);
     };
     selectors2Suite.testSiblingClassSelector2 = function () {
-        Asserts.assertEqual(0, $('#id12 ~ .class11').length);
+        Asserts.assertEqual(0, $('div#id12 ~ .class11').length);
     };
     
     selectors2Suite.testSiblingClassTagSelector = function () {

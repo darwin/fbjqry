@@ -1,0 +1,216 @@
+<fb:js-string var="attributesFBML">
+
+<div id="main">
+    <span id="span1"></span>
+    <div>
+        <span id="span2"></span>
+        <span id="span3"></span>
+        <div>
+            <span id="span4"></span>
+        </div>
+    </div>
+    <span id="span5"></span>
+</div>
+<span id="span6"></span>
+
+<form id="form" action="formaction" style="display: none;">
+    <input id="check" type="checkbox" name="check-name" value="ON" />
+    <input id="radio" type="radio" name="radio-name" value="" checked="checked" />
+    <input id="text" type="text" name="text-name" value="TEST" maxlength="10" />
+    <textarea id="area" title="Title!" class="text area" name="area-name" cols="6" rows="5" readonly />
+    <select id="select" name="select-name">
+        <option id="option1">option1</option>
+        <option id="option2" selected>option2</option>
+        <option id="option3">option3</option>
+    </select>
+</form>
+<a href="http://example.com" id="anchor"></a>
+
+</fb:js-string>
+
+<script type="text/javascript">
+    var attributesSuite = { suiteName: "attributes" };
+
+    attributesSuite.setUp = function () {
+        document.getRootElement().setInnerFBML(attributesFBML);
+    };
+
+    attributesSuite.testAttr1 = function () {
+        var equals = function(actual, expected, message) {
+            Asserts.assertEqual(expected, actual, message);
+        };
+        var ok = function(actual, message) {
+            Asserts.assertTrue(actual, message);
+        };
+
+        equals( jQuery('#text').attr('value'), "TEST", 'Check for value attribute' );
+        var j = jQuery('#text');
+        Asserts.assertIdentical( j.attr('value', 'TEST'), j, 'Check value setter returns jQuery object' );
+        // @todo support defaultValue ?!
+        //equals( jQuery('#text').attr('value', "Test2").attr('defaultValue'), "Test", 'Check for defaultValue attribute' );
+        equals( jQuery('#text').attr('type'), "text", 'Check for type attribute' );
+        equals( jQuery('#radio').attr('type'), "radio", 'Check for type attribute' );
+        equals( jQuery('#check').attr('type'), "checkbox", 'Check for type attribute' );
+        equals( jQuery('#check').attr('value'), "ON", 'Check for value attribute' );
+
+        equals( jQuery('#area').attr('title'), "Title!", 'Check for title attribute' );
+        equals( jQuery('#area').attr('readonly'), true, 'Check for readonly attribute' );
+        equals( jQuery('#text').attr('readonly'), false, 'Check for readonly attribute' );
+        equals( jQuery('#area').attr('class'), "text area", 'Check for class attribute' );
+        equals( jQuery('#text').attr('name'), "text-name", 'Check for name attribute' );
+        //equals( jQuery('#form').attr('action'), "formaction", 'Check for action attribute' );
+        ok( jQuery('#form').attr('action').indexOf("formaction") >= 0, 'Check for action attribute' );
+
+        equals( jQuery("<option/>").attr("selected"), false, "Check selected attribute on disconnected element." );
+
+        equals( jQuery('#option1').attr('selected'), false, 'Check for selected attribute' );
+        equals( jQuery('#option2').attr('selected'), true, 'Check for selected attribute' );
+        equals( jQuery('#select').attr('selectedIndex'), 1, 'Check for selectedIndex attribute' );
+
+        var select = document.getElementById('select');
+        select.setSelectedIndex(2);
+        equals( jQuery('#option2').attr('selected'), false, 'Check for selected attribute' );
+        equals( jQuery('#option3').attr('selected'), true, 'Check for selected attribute' );
+        equals( jQuery('#select').attr('selectedIndex'), 2, 'Check for selectedIndex attribute' );
+
+        jQuery('#select').attr('selectedIndex', 0);
+        equals( jQuery('#option1').attr('selected'), true, 'Check for selected attribute' );
+
+        // Related to [5574] and [5683]
+//        var body = document.body, $body = jQuery(body);
+//
+//        ok( $body.attr('foo') === undefined, 'Make sure that a non existent attribute returns undefined' );
+//        ok( $body.attr('nextSibling') === null, 'Make sure a null expando returns null' );
+//
+//        body.setAttribute('foo', 'baz');
+//        equals( $body.attr('foo'), 'baz', 'Make sure the dom attribute is retrieved when no expando is found' );
+//
+//        body.foo = 'bar';
+//        equals( $body.attr('foo'), 'bar', 'Make sure the expando is preferred over the dom attribute' );
+//
+//        $body.attr('foo','cool');
+//        equals( $body.attr('foo'), 'cool', 'Make sure that setting works well when both expando and dom attribute are available' );
+//
+//        body.foo = undefined;
+//        ok( $body.attr('foo') === undefined, 'Make sure the expando is preferred over the dom attribute, even if undefined' );
+//
+//        body.removeAttribute('foo'); // Cleanup
+    };
+
+    attributesSuite.testAttr2 = function () {
+        var equals = function(actual, expected, message) {
+            Asserts.assertEqual(expected, actual, message);
+        };
+
+        equals( jQuery('#main').attr('nodeName').toUpperCase(), 'DIV', 'Check for nodeName attribute' );
+        equals( jQuery('#main').attr('tagName').toUpperCase(), 'DIV', 'Check for tagName attribute' );
+    };
+    attributesSuite.testAttr3 = function () {
+        var equals = function(actual, expected, message) {
+            Asserts.assertEqual(expected, actual, message);
+        };
+
+        equals( jQuery('#anchor').attr('href'), 'http://example.com/', 'Check for href attribute' );
+
+        jQuery("#anchor").attr('href', 'http://bit.ly');
+        // @todo fails :
+        equals( jQuery('#anchor').attr('href'), "http://bit.ly/", 'Check modified href attribute' );
+
+        // NOTE: not supportted by FBJS - changes it relative to canvas :
+        jQuery("#anchor").attr('href', '#5');
+        //equals( jQuery('#anchor').attr('href'), "#5", 'Check for non-absolute href (an anchor)' );
+    };
+    attributesSuite.testAttrFunctionSetter = function () {
+        var equals = function(actual, expected, message) {
+            Asserts.assertEqual(expected, actual, message);
+        };
+
+        equals( jQuery('#text').attr('value', function() { return this.getId(); }).get(0).getValue(), "text", "Set value from id" );
+        equals( jQuery('#text').attr('title', function(i) { return i; }).attr('title'), "0", "Set value with an index");
+
+    };
+    attributesSuite.testAttrObjectSetter = function () {
+        var pass = true;
+        jQuery("span").attr({ title: 'foo', className: 'bar' });
+        jQuery("span").each( function() {
+            //console.log(this.getTitle(), this.getClassName());
+            if ( this.getTitle() != "foo" && this.getClassName() != "bar" ) pass = false;
+        });
+        Asserts.assertTrue( pass, "Set Multiple Attributes" );
+    };
+    attributesSuite.testAttrSetter = function () {
+        var equals = function(actual, expected, message) {
+            Asserts.assertEqual(expected, actual, message);
+        };
+        var ok = function(actual, message) {
+            Asserts.assertTrue(actual, message);
+        };
+
+        equals( jQuery('#text').attr('value', function() { return this.getId(); }).get(0).getValue(), "text", "Set value from id" );
+
+        var div = jQuery("div").attr("title", "bar");
+        var fail = false;
+        for ( var i = 0; i < div.size(); i++ ) {
+            if ( div.get(i).getTitle() != "bar" ) { fail = i; break; }
+        }
+        equals( fail, false, "Set Attribute, the #"+ fail +" element didn't get the attribute 'foo'" );
+
+        // @todo Support.attr() attribute name 'width' is not supported ?
+        //ok( jQuery("#main").attr( { "width": null } ), "Try to set an attribute to nothing" );
+
+        //jQuery("#main").attr('name', 'something');
+        //equals( jQuery("#name").attr('name'), 'something', 'Set name attribute' );
+        jQuery("#check").attr('checked', true);
+        equals( document.getElementById('check').getChecked(), true, 'Set checked attribute' );
+        jQuery("#check").attr('checked', false);
+        equals( document.getElementById('check').getChecked(), false, 'Set checked attribute' );
+        jQuery("#text").attr('readonly', true);
+        equals( document.getElementById('text').getReadOnly(), true, 'Set readonly attribute' );
+        jQuery("#text").attr('readonly', false);
+        equals( document.getElementById('text').getReadOnly(), false, 'Set readonly attribute' );
+        //jQuery("#name").attr('maxlength', '5');
+        //equals( document.getElementById('name').maxLength, '5', 'Set maxlength attribute' );
+        //jQuery("#name").attr('maxLength', '10');
+        //equals( document.getElementById('name').maxLength, '10', 'Set maxlength attribute' );
+
+        //jQuery("#name").attr('someAttr', '0');
+        //equals( jQuery("#name").attr('someAttr'), '0', 'Set attribute to a string of "0"' );
+        //jQuery("#name").attr('someAttr', 0);
+        //equals( jQuery("#name").attr('someAttr'), 0, 'Set attribute to the number 0' );
+        //jQuery("#name").attr('someAttr', 1);
+        //equals( jQuery("#name").attr('someAttr'), 1, 'Set attribute to the number 1' );
+
+        // using contents will get comments regular, text, and comment nodes
+        //var j = jQuery("#nonnodes").contents();
+        //j.attr("name", "attrvalue");
+        //equals( j.attr("name"), "attrvalue", "Check node,textnode,comment for attr" );
+        //j.removeAttr("name");
+
+        var type = jQuery("#check").attr('type');
+        var thrown = false;
+        try { jQuery("#check").attr('type','hidden'); }
+        catch (e) { thrown = true; }
+
+        // @todo implement throwing error on changing as jQuery 1.3.2 did ?!
+        //ok( thrown, "Exception thrown when trying to change type property" );
+        //equals( type, jQuery("#check").attr('type'), "Verify that you can't change the type of an input element" );
+
+        var check = document.createElement("input");
+        var notThrown = true;
+        try { jQuery(check).attr('type','checkbox'); }
+        catch (e) { notThrown = false; }
+
+        ok( notThrown, "Exception thrown when trying to change type property" );
+        equals( "checkbox", jQuery(check).attr('type'), "Verify that you can change the type of an input element that isn't in the DOM" );
+
+        var check = jQuery("<input />");
+        var notThrown = true;
+        try { check.attr('type','checkbox'); }
+        catch (e) { notThrown = false; }
+
+        ok( notThrown, "Exception thrown when trying to change type property" );
+        equals( "checkbox", check.attr('type'), "Verify that you can change the type of an input element that isn't in the DOM" );
+    };
+
+    
+</script>

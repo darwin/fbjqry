@@ -13,12 +13,14 @@ var FBjqRY = function(selector, context) {
     return new FBjqRY.prototype.init(selector, context);
 };
 
+// @todo isPlainObject not implemented !
+// @todo isXMLDoc not implemented !
+
 //We can wrap everything else
 (function() {
 
-var encodeURIComponent = Support.encodeURIComponent;
+//var encodeURIComponent = Support.encodeURIComponent;
 
-var extend = Support.extend;
 var each = Support.each;
 var map = Support.map;
 var grep = Support.grep;
@@ -29,9 +31,10 @@ var trim = Support.trim;
 
 var slice = Support.array.slice;
 
-var isFunction = Support.isFunction;
-var isArray = Support.isArray;
+//var isFunction = Support.isFunction;
+//var isArray = Support.isArray;
 var isString = Support.isString;
+//var isEmptyObject = Support.isEmptyObject;
 
 var isFBNode = Support.isFBNode;
 var sameFBNode = Support.sameFBNode;
@@ -94,7 +97,7 @@ FBjqRY.fn = FBjqRY.prototype = {
             return this;
         }
         //ready state shortcut handler -- no need for ready event because FBJS delays execution
-        if ( isFunction(selector) ) return this.ready(selector);
+        if ( FBjqRY.isFunction(selector) ) return this.ready(selector);
         //Are we dealing with an FBjqRY object?
         else if ( typeof(selector.selector) !== 'undefined' ) {
             var nodes = selector.get();
@@ -139,6 +142,15 @@ FBjqRY.fn = FBjqRY.prototype = {
     selector: "", // start with an empty selector
 
     size: function() { return this.length; },
+    
+	toArray: function() { 
+        //return slice.call( this, 0 ); // won't work with FBJS
+        var array = [];
+        for ( var i = 0, len = this.length; i < len; i++ ) {
+            array[i] = this.nodes[i];
+        }
+        return array;
+    },
 
     each: function(fn) {
         each(this.nodes, fn);
@@ -153,28 +165,25 @@ FBjqRY.fn = FBjqRY.prototype = {
     index: function(elem) {
         // If it receives a jQuery object, the first element is used
         if ( typeof(elem.selector) !== 'undefined' ) elem = elem.get(0);
-        for (var i = this.nodes.length - 1; i >= 0; i--) {
+        for ( var i = this.nodes.length - 1; i >= 0; i-- ) {
             if ( sameFBNode(elem, this.nodes[i]) ) break;
         }
         return i; // not found == -1
     },
-    eq: function(i) {
-        //this.nodes = [ this.nodes[i] ];
-        //this.length = 1;
-        //return this;
-        return this.slice( i, +i + 1 );
-    },
+
     slice: function() {
         return this.pushStack( 
             slice.apply( this.nodes, arguments ),
             "slice", slice.call(arguments).join(",")
         );
     },
-    /*
-    slice: function(start, end) {
-        var nodes = end ? this.nodes.slice(start, end) : this.nodes.slice(start);
-        return FBjqRY(nodes);
-    }, */
+    
+	eq: function( i ) {
+		return i === -1 ? this.slice( i ) : this.slice( i, +i + 1 );
+    },
+	first: function() { return this.eq( 0 ); },
+	last: function() { return this.eq( -1 ); },
+    
 	map: function( callback ) {
 		return this.pushStack( map(this.nodes, function(elem, i){
 			return callback.call( elem, i, elem );
@@ -325,14 +334,14 @@ FBjqRY.fn = FBjqRY.prototype = {
     //CSS:
     //========================================
     css: function(name, value) {
-        if (typeof name === 'string' && typeof value !== 'undefined') {
+        if ( typeof name === 'string' && typeof value !== 'undefined' ) {
             if (name == 'float') name = 'cssFloat';
             name = Support.camelCase(name);
             if (typeof(value) == 'number') value = value + "px";
-            each(this.nodes, function() {this.setStyle(name, value);} );
+            each(this.nodes, function() { this.setStyle(name, value); });
             return this;
         }
-        if (typeof name === 'object') {
+        if ( typeof name === 'object' ) {
             if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
             var values = {};
             for ( var o in name ) {
@@ -342,10 +351,10 @@ FBjqRY.fn = FBjqRY.prototype = {
                     values[Support.camelCase(o)] = value;
                 }
             }
-            each(this.nodes, function() {this.setStyle(values);});
+            each(this.nodes, function() { this.setStyle(values); });
             return this;
         }
-        return this.nodes[0].getStyle(name);
+        return this.nodes[0].getStyle( Support.camelCase(name) );
     },
 
     offset: function() {
@@ -557,7 +566,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         //filter out specified nodes
         var notNodes;
         if ( typeof(selector.selector) !== 'undefined' ) notNodes = selector.nodes;
-        else if ( isArray(selector) ) notNodes = selector;
+        else if ( FBjqRY.isArray(selector) ) notNodes = selector;
 
         if ( notNodes ) {
             var nodes = this.get(); // is a copy already
@@ -965,7 +974,108 @@ for ( var i = validEvents.length - 1; i >= 0; i-- ) {
 
 FBjqRY.fn.init.prototype = FBjqRY.fn;
 
-FBjqRY.extend = FBjqRY.fn.extend = extend;
+//FBjqRY.extend = FBjqRY.fn.extend = extend;
+/* // 1.4.2 version - requires isPlainObject
+FBjqRY.extend = FBjqRY.fn.extend = function() {
+	// copy reference to target object
+	var target = arguments[0] || {}, i = 1, length = arguments.length,
+        deep = false, options, name, src, copy;
+
+	// Handle a deep copy situation
+	if ( typeof target === "boolean" ) {
+		deep = target;
+		target = arguments[1] || {};
+		// skip the boolean and the target
+		i = 2;
+	}
+
+	// Handle case when target is a string or something (possible in deep copy)
+	if ( typeof target !== "object" && ! Support.isFunction(target) ) {
+		target = {};
+	}
+
+	// extend jQuery itself if only one argument is passed
+	if ( length === i ) { target = this; --i; }
+
+	for ( ; i < length; i++ ) {
+		// Only deal with non-null/undefined values
+		if ( (options = arguments[ i ]) != null ) {
+			// Extend the base object
+			for ( name in options ) {
+				src = target[ name ];
+				copy = options[ name ];
+
+				// Prevent never-ending loop
+				if ( target === copy ) {
+					continue;
+				}
+
+				// Recurse if we're merging object literal values or arrays
+				if ( deep && copy && ( isPlainObject(copy) || isArray(copy) ) ) {
+					var clone = src && ( isPlainObject(src) || isArray(src) ) ? src
+						: isArray(copy) ? [] : {};
+
+					// Never move original objects, clone them
+					target[ name ] = FBjqRY.extend( deep, clone, copy );
+
+				// Don't bring in undefined values
+				} else if ( copy !== undefined ) {
+					target[ name ] = copy;
+				}
+			}
+		}
+	}
+
+	// Return the modified object
+	return target;
+}; */
+FBjqRY.extend = FBjqRY.fn.extend = function() {
+	// copy reference to target object
+	var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options;
+
+	// Handle a deep copy situation
+	if ( typeof target === "boolean" ) {
+		deep = target;
+		target = arguments[1] || {};
+		// skip the boolean and the target
+		i = 2;
+	}
+
+	// Handle case when target is a string or something (possible in deep copy)
+	if ( typeof target !== "object" && ! FBjqRY.isFunction(target) ) target = {};
+
+	// extend jQuery itself if only one argument is passed
+	if ( length == i ) {
+		target = this;
+		--i;
+	}
+
+	for ( ; i < length; i++ ) {
+		// Only deal with non-null/undefined values
+		if ( (options = arguments[ i ]) != null )
+			// Extend the base object
+			for ( var name in options ) {
+				var src = target[ name ], copy = options[ name ];
+
+				// Prevent never-ending loop
+				if ( target === copy ) continue;
+
+				// Recurse if we're merging object values
+				if ( deep && copy && typeof copy === "object" && ! isFBNode(copy) ) {
+					target[ name ] = FBjqRY.extend( deep,
+						// Never move original objects, clone them
+						src || ( copy.length != null ? [ ] : { } )
+					, copy );
+                }
+				// Don't bring in undefined values
+				else if ( typeof copy !== 'undefined' ) target[ name ] = copy;
+
+			}
+    }
+
+	// Return the modified object
+	return target;
+};
 
 FBjqRY.extend({
     //AJAX:
@@ -973,7 +1083,7 @@ FBjqRY.extend({
     ajax: function(options) {
 		// Extend the settings, but re-extend 's' so that it can be
 		// checked again later (in the test suite, specifically)
-		options = extend(true, {}, FBjqRY.ajaxSettings, options);
+		options = FBjqRY.extend(true, {}, FBjqRY.ajaxSettings, options);
 
 		// convert data if not already a string
 		//if ( options.data && options.processData && typeof options.data !== "string" ) {
@@ -1057,7 +1167,7 @@ FBjqRY.extend({
     },
 
 	ajaxSetup: function( settings ) {
-		extend( FBjqRY.ajaxSettings, settings );
+		FBjqRY.extend( FBjqRY.ajaxSettings, settings );
 	},
 	ajaxSettings: {
 		url: null, //location.href,
@@ -1123,15 +1233,16 @@ FBjqRY.extend({
     //UTILITIES:
     //========================================
 
-    isFunction: isFunction,
-    isArray: isArray,
+    isFunction: Support.isFunction,
+    isArray: Support.isArray,
+    isEmptyObject: Support.isEmptyObject,
 
-    trim: trim,
+    trim: Support.trim,
     
-    each: each,
-    map: map,
-    grep: grep,
-    merge: merge,
+    each: Support.each,
+    map: Support.map,
+    grep: Support.grep,
+    merge: Support.merge,
     
     /*
     map: function( elems, callback ) {
@@ -1155,7 +1266,7 @@ FBjqRY.extend({
 		if( array != null ) {
 			var i = array.length;
 			// The window, strings (and functions) also have 'length'
-			if( i == null || Support.isString(array) || Support.isFunction(array) || array.setInterval ) {
+			if( i == null || isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
 				ret[0] = array;
             } else {
                 if ( typeof(array.selector) !== 'undefined' ) {
@@ -1186,11 +1297,60 @@ FBjqRY.extend({
     inArray: indexOf,
     indexOf: indexOf,
 
-    unique: function(ary) {
+    unique: function(array) {
         // @todo ?
         // swap to jQuery version if we ever implement "data" method
-        return unique(ary);
-    }
+        return unique(array);
+    },
+
+	parseJSON: function(data) {
+		if ( ! isString(data) || ! data ) return null;
+
+		// Make sure leading/trailing whitespace is removed (IE can't handle it)
+		//data = jQuery.trim( data );
+
+		// Make sure the incoming data is actual JSON
+		// Logic borrowed from http://json.org/json2.js
+		if ( /^[\],:{}\s]*$/.test(data.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, "@")
+			.replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, "]")
+			.replace(/(?:^|:|,)(?:\s*\[)+/g, "")) ) {
+
+			return Support.json(data);
+
+		} else {
+			FBjqRY.error( "Invalid JSON: " + data ); // @ todo error function !
+		}
+	},
+
+	// A global GUID counter for objects
+	guid: 1,
+	proxy: function( fn, proxy, thisObject ) {
+		if ( arguments.length === 2 ) {
+			if ( typeof proxy === "string" ) {
+				thisObject = fn;
+				fn = thisObject[ proxy ];
+				proxy = undefined;
+			}
+            else if ( proxy && !jQuery.isFunction( proxy ) ) {
+				thisObject = proxy;
+				proxy = undefined;
+			}
+		}
+
+		if ( ! proxy && fn ) {
+			proxy = function() {
+				return fn.apply( thisObject || this, arguments );
+			};
+		}
+
+		// Set the guid of unique handler to the same of original handler, so it can be removed
+		if ( fn ) {
+			proxy.guid = fn.guid = fn.guid || proxy.guid || jQuery.guid++;
+		}
+
+		// So proxy can be declared as an argument
+		return proxy;
+	}
 });
 
 // ============================================================================

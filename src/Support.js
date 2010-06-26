@@ -76,9 +76,11 @@ Support.encodeURIComponent = function(str) {
 /** String functions */
 // ============================================================================
 var rtrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g; // Used for trimming whitespace
+var emptyString = '';
 //var trim = Support.trim = function(s) { return s.replace(/^\s+|\s+$/g, ""); };
 var trim = Support.trim = function(str) {
-    return (str || "").replace( rtrim, "" );
+    if ( str != null && typeof(str) !== 'string' ) str = str.toString();
+    return ( str || emptyString ).replace( rtrim, emptyString );
 };
 var camelCase = Support.camelCase = Support.memo(function(str) {
     return str.replace(/\-(\w)/g, function(all, letter){ return letter.toUpperCase(); });
@@ -120,6 +122,11 @@ Support.isString = function(obj) {
     return toString.call(obj) === "[object String]";
 };
 
+Support.isEmptyObject = function(obj) {
+    for ( var n in obj ) return false;
+    return true;
+};
+
 /*
 Support.each = function(obj, cb, args) {
     if ( !obj || !obj.length ) return obj; // return [];
@@ -148,9 +155,10 @@ Support.each = function(obj, cb, args) {
 }; */
 Support.each = function( object, callback, args ) { // args is for internal usage only
     var name, i, length = object.length;
+    var isObj = length === undefined || isFunction(object);
 
     if ( args ) {
-        if ( length === undefined ) {
+        if ( isObj ) { // length === undefined
             for ( name in object )
                 if ( callback.apply( object[ name ], args ) === false )
                     break;
@@ -161,7 +169,7 @@ Support.each = function( object, callback, args ) { // args is for internal usag
         }
     // A special, fast, case for the most common use of each
     } else {
-        if ( length === undefined ) {
+        if ( isObj ) { // length === undefined
             for ( name in object )
                 if ( callback.call( object[ name ], name, object[ name ] ) === false )
                     break;
@@ -172,56 +180,8 @@ Support.each = function( object, callback, args ) { // args is for internal usag
                   value = object[++i] ) { }
         }
     }
-
+    
     return object;
-};
-
-Support.extend = function() {
-	// copy reference to target object
-	var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options;
-
-	// Handle a deep copy situation
-	if ( typeof target === "boolean" ) {
-		deep = target;
-		target = arguments[1] || {};
-		// skip the boolean and the target
-		i = 2;
-	}
-
-	// Handle case when target is a string or something (possible in deep copy)
-	if ( typeof target !== "object" && ! isFunction(target) ) target = {};
-
-	// extend jQuery itself if only one argument is passed
-	if ( length == i ) {
-		target = this;
-		--i;
-	}
-
-	for ( ; i < length; i++ ) {
-		// Only deal with non-null/undefined values
-		if ( (options = arguments[ i ]) != null )
-			// Extend the base object
-			for ( var name in options ) {
-				var src = target[ name ], copy = options[ name ];
-
-				// Prevent never-ending loop
-				if ( target === copy ) continue;
-
-				// Recurse if we're merging object values
-				if ( deep && copy && typeof copy === "object" && ! isFBNode(copy) ) {
-					target[ name ] = Support.extend( deep,
-						// Never move original objects, clone them
-						src || ( copy.length != null ? [ ] : { } )
-					, copy );
-                }
-				// Don't bring in undefined values
-				else if ( typeof copy !== 'undefined' ) target[ name ] = copy;
-
-			}
-    }
-
-	// Return the modified object
-	return target;
 };
 
 // ============================================================================

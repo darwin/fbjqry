@@ -8,13 +8,22 @@
  * http://www.opensource.org/licenses/mit-license.php
  *
  * Copyright (c) 2010 Karol Bucek - FBJS compatible
+ * 
+ * Further Extensions to jsUnity 0.6 :
+ * - beside the default jsUnity.log where all output is directed there's a
+ *   separate jsUnity.result function that gets called after each and every
+ *   test with the following arguments: (passed, name, [ e ])
+ * - added start/done callback function for which are called at the start/end
+ *   of jsUnity.run
+ * - added startSuite/doneSuite callback function which are called before/after
+ *   tests in a suite are run (once for every suite) with a suite name argument
  */
 
 jsUnity = (function () {
 
     var slice = [].slice;
 
-    function fmt(str) {
+    function format(str) {
         var a = slice.call(arguments, 1);
         return str.replace(/\?/g, function () { return a.shift(); });
     }
@@ -48,132 +57,132 @@ jsUnity = (function () {
             catch (e) {
                 return;
             }
-            throw fmt("?: (?) does not raise an exception or not a function",
+            throw format("?: (?) does not raise an exception or not a function",
                 message || "assertException", fn);
         },
 
         assertTrue: function (actual, message) {
             if (!actual) {
-                throw fmt("?: (?) does not evaluate to true",
+                throw format("?: (?) does not evaluate to true",
                     message || "assertTrue", actual);
             }
         },
         
         assertFalse: function (actual, message) {
             if (actual) {
-                throw fmt("?: (?) does not evaluate to false",
+                throw format("?: (?) does not evaluate to false",
                     message || "assertFalse", actual);
             }
         },
         
         assertIdentical: function (expected, actual, message) {
             if (expected !== actual) {
-                throw fmt("?: (?) is not identical to (?)",
+                throw format("?: (?) is not identical to (?)",
                     message || "assertIdentical", actual, expected);
             }
         },
 
         assertNotIdentical: function (expected, actual, message) {
             if (expected === actual) {
-                throw fmt("?: (?) is identical to (?)",
+                throw format("?: (?) is identical to (?)",
                     message || "assertNotIdentical", actual, expected);
             }
         },
 
         assertEqual: function (expected, actual, message) {
             if (hash(expected) != hash(actual)) {
-                throw fmt("?: (?) is not equal to (?)",
+                throw format("?: (?) is not equal to (?)",
                     message || "assertEqual", actual, expected);
             }
         },
         
         assertNotEqual: function (expected, actual, message) {
             if (hash(expected) == hash(actual)) {
-                throw fmt("?: (?) is equal to (?)",
+                throw format("?: (?) is equal to (?)",
                     message || "assertNotEqual", actual, expected);
             }
         },
         
         assertMatch: function (re, actual, message) {
             if (!re.test(actual)) {
-                throw fmt("?: (?) does not match (?)",
+                throw format("?: (?) does not match (?)",
                     message || "assertMatch", actual, re);
             }
         },
         
         assertNotMatch: function (re, actual, message) {
             if (re.test(actual)) {
-                throw fmt("?: (?) matches (?)",
+                throw format("?: (?) matches (?)",
                     message || "assertNotMatch", actual, re);
             }
         },
         
         assertTypeOf: function (typ, actual, message) {
             if (typeof actual !== typ) {
-                throw fmt("?: (?) is not of type (?)",
+                throw format("?: (?) is not of type (?)",
                     message || "assertTypeOf", actual, typ);
             }
         },
 
         assertNotTypeOf: function (typ, actual, message) {
             if (typeof actual === typ) {
-                throw fmt("?: (?) is of type (?)",
+                throw format("?: (?) is of type (?)",
                     message || "assertNotTypeOf", actual, typ);
             }
         },
         
         assertInstanceOf: function (cls, actual, message) {
             if (!(actual instanceof cls)) {
-                throw fmt("?: (?) is not an instance of (?)",
+                throw format("?: (?) is not an instance of (?)",
                     message || "assertInstanceOf", actual, cls);
             }
         },
 
         assertNotInstanceOf: function (cls, actual, message) {
             if (actual instanceof cls) {
-                throw fmt("?: (?) is an instance of (?)",
+                throw format("?: (?) is an instance of (?)",
                     message || "assertNotInstanceOf", actual, cls);
             }
         },
 
         assertNull: function (actual, message) {
             if (actual !== null) {
-                throw fmt("?: (?) is not null",
+                throw format("?: (?) is not null",
                     message || "assertNull", actual);
             }
         },
         
         assertNotNull: function (actual, message) {
             if (actual === null) {
-                throw fmt("?: (?) is null",
+                throw format("?: (?) is null",
                     message || "assertNotNull", actual);
             }
         },
         
         assertUndefined: function (actual, message) {
             if (typeof(actual) !== 'undefined') {
-                throw fmt("?: (?) is not undefined",
+                throw format("?: (?) is not undefined",
                     message || "assertUndefined", actual);
             }
         },
         
         assertNotUndefined: function (actual, message) {
             if (typeof(actual) === 'undefined') {
-                throw fmt("?: (?) is undefined",
+                throw format("?: (?) is undefined",
                     message || "assertNotUndefined", actual);
             }
         },
         
         assertNaN: function (actual, message) {
             if (!isNaN(actual)) {
-                throw fmt("?: (?) is not NaN",
+                throw format("?: (?) is not NaN",
                     message || "assertNaN", actual);
             }
         },
         
         assertNotNaN: function (actual, message) {
             if (isNaN(actual)) {
-                throw fmt("?: (?) is NaN",
+                throw format("?: (?) is NaN",
                     message || "assertNotNaN", actual);
             }
         },
@@ -317,6 +326,8 @@ jsUnity = (function () {
                 scope[fn] = jsUnity.assertions[fn];
             }
         },
+
+        format: format, // export format helper for custom assetrions
 
         log: function () {},
 

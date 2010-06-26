@@ -3,7 +3,7 @@
 var Asserts = jsUnity.assertions;
 Asserts.assertEqualNode = function(expected, actual, message) {
     if ( ! Support.sameFBNode(expected, actual) ) {
-        throw fmt("?: (?) is not equal to node (?)",
+        throw jsUnity.format("?: (?) is not equal to node (?)",
             message || "assertEqualNode", actual, expected);
     }
 };
