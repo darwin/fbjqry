@@ -289,12 +289,17 @@ FBjqRY.fn = FBjqRY.prototype = {
             var node, className, trim = FBjqRY.trim;
             for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
                 node = this.nodes[i];
-                node.removeClassName(value || '');
+                if ( value ) { // remove
+                    node.removeClassName(value);
 
-                className = node.getClassName();
-                var trimmedClass = trim( className );
-                if ( className.length !== trimmedClass.length ) {
-                    node.setClassName( trimmedClass );
+                    className = node.getClassName();
+                    var trimmedClass = trim( className );
+                    if ( className.length !== trimmedClass.length ) {
+                        node.setClassName( trimmedClass );
+                    }
+                }
+                else { // remove all classes :
+                    node.setClassName('');
                 }
             }
         }
@@ -305,7 +310,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 		if ( FBjqRY.isFunction(value) ) {
 			return this.each(function(i) {
 				var self = FBjqRY(this);
-				self.toggleClass( value.call(this, i, self.attr("class"), state) );
+				self.toggleClass( value.call(this, i, self.attr("class"), state), state );
 			});
 		}
 

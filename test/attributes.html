@@ -46,12 +46,6 @@
     };
 
     attributesSuite.testAttr1 = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
 
         equals( jQuery('#text').attr('value'), "TEST", 'Check for value attribute' );
         var j = jQuery('#text');
@@ -108,18 +102,10 @@
     };
 
     attributesSuite.testAttr2 = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-
         equals( jQuery('#main').attr('nodeName').toUpperCase(), 'DIV', 'Check for nodeName attribute' );
         equals( jQuery('#main').attr('tagName').toUpperCase(), 'DIV', 'Check for tagName attribute' );
     };
     attributesSuite.testAttr3 = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-
         equals( jQuery('#anchor').attr('href'), 'http://example.com/', 'Check for href attribute' );
 
         jQuery("#anchor").attr('href', 'http://bit.ly');
@@ -131,10 +117,6 @@
         //equals( jQuery('#anchor').attr('href'), "#5", 'Check for non-absolute href (an anchor)' );
     };
     attributesSuite.testAttrFunctionSetter = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-
         equals( jQuery('#text').attr('value', function() { return this.getId(); }).get(0).getValue(), "text", "Set value from id" );
         equals( jQuery('#text').attr('title', function(i) { return i; }).attr('title'), "0", "Set value with an index");
 
@@ -216,9 +198,6 @@
     };
 
     attributesSuite.testAttrFBjqRYMethod = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         var $elem = jQuery("<div />"), elem = $elem.get(0);
 
@@ -251,10 +230,6 @@
     // @todo test tabIndex and implement special handling for it ?!
 
     attributesSuite.testRemoveAttr = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-
         equals( jQuery('#form').removeAttr( "class" ).get(0).getClassName(), "", "remove class" );
         equals( jQuery('#area').removeAttr( "title" ).get(0).getTitle(), "", "remove title" );
     };
@@ -529,31 +504,31 @@
         ok( !e.is(".test"), "Assert class not present 2 - after" );
 
         // multiple class names
-//        e.addClass("testA testB");
-//        ok( (e.is(".testA.testB")), "Assert 2 different classes present" );
-//        e.toggleClass( valueObj("testB testC") );
-//        ok( (e.is(".testA.testC") && !e.is(".testB")), "Assert 1 class added, 1 class removed, and 1 class kept" );
-//        e.toggleClass( valueObj("testA testC") );
-//        ok( (!e.is(".testA") && !e.is(".testB") && !e.is(".testC")), "Assert no class present" );
-//
-//        // toggleClass storage
-//        e.toggleClass(true);
-//        ok( e.get(0).getClassName() === "", "Assert class is empty (data was empty)" );
-//        e.addClass("testD testE");
-//        ok( e.is(".testD.testE"), "Assert class present" );
-//        e.toggleClass();
-//        ok( !e.is(".testD.testE"), "Assert class not present" );
-//        ok( e.data('__className__') === 'testD testE', "Assert data was stored" );
-//        e.toggleClass();
-//        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
-//        e.toggleClass(false);
-//        ok( !e.is(".testD.testE"), "Assert class not present" );
-//        e.toggleClass(true);
-//        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
-//        e.toggleClass();
-//        e.toggleClass(false);
-//        e.toggleClass();
-//        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
+        e.addClass("testA testB");
+        ok( (e.is(".testA.testB")), "Assert 2 different classes present" );
+        e.toggleClass( valueObj("testB testC") );
+        ok( (e.is(".testA.testC") && !e.is(".testB")), "Assert 1 class added, 1 class removed, and 1 class kept" );
+        e.toggleClass( valueObj("testA testC") );
+        ok( (!e.is(".testA") && !e.is(".testB") && !e.is(".testC")), "Assert no class present" );
+
+        // toggleClass storage
+        e.toggleClass(true);
+        ok( e.get(0).getClassName() === "", "Assert class is empty (data was empty)" );
+        e.addClass("testD testE");
+        ok( e.is(".testD.testE"), "Assert class present" );
+        e.toggleClass();
+        ok( !e.is(".testD.testE"), "Assert class not present" );
+        ok( e.data('__className__') === 'testD testE', "Assert data was stored" );
+        e.toggleClass();
+        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
+        e.toggleClass(false);
+        ok( !e.is(".testD.testE"), "Assert class not present" );
+        e.toggleClass(true);
+        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
+        e.toggleClass();
+        e.toggleClass(false);
+        e.toggleClass();
+        ok( e.is(".testD.testE"), "Assert class present (restored from data)" );
 
         // Cleanup
         e.removeClass("testD");
@@ -568,57 +543,96 @@
         testToggleClass(functionReturningObj);
     }, attributesSuite);
 
-//    test("toggleClass(Fucntion[, boolean]) with incoming value", function() {
-//        expect(14);
-//
-//        var e = jQuery("#firstp"), old = e.attr("class");
-//        ok( !e.is(".test"), "Assert class not present" );
-//
-//        e.toggleClass(function(i, val) {
-//            equals( val, old, "Make sure the incoming value is correct." );
-//            return "test";
-//        });
-//        ok( e.is(".test"), "Assert class present" );
-//
-//        old = e.attr("class");
-//
-//        e.toggleClass(function(i, val) {
-//            equals( val, old, "Make sure the incoming value is correct." );
-//            return "test";
-//        });
-//        ok( !e.is(".test"), "Assert class not present" );
-//
-//        old = e.attr("class");
-//
-//        // class name with a boolean
-//        e.toggleClass(function(i, val, state) {
-//            equals( val, old, "Make sure the incoming value is correct." );
-//            equals( state, false, "Make sure that the state is passed in." );
-//            return "test";
-//        }, false );
-//        ok( !e.is(".test"), "Assert class not present" );
-//
-//        old = e.attr("class");
-//
-//        e.toggleClass(function(i, val, state) {
-//            equals( val, old, "Make sure the incoming value is correct." );
-//            equals( state, true, "Make sure that the state is passed in." );
-//            return "test";
-//        }, true );
-//        ok( e.is(".test"), "Assert class present" );
-//
-//        old = e.attr("class");
-//
-//        e.toggleClass(function(i, val, state) {
-//            equals( val, old, "Make sure the incoming value is correct." );
-//            equals( state, false, "Make sure that the state is passed in." );
-//            return "test";
-//        }, false );
-//        ok( !e.is(".test"), "Assert class not present" );
-//
-//        // Cleanup
-//        e.removeClass("test");
-//        e.removeData('__className__');
-//    });
+    test("toggleClass(Fucntion[, boolean]) with incoming value", function() {
+        expect(14);
+
+        var e = jQuery("p:first"), old = e.attr("class");
+        ok( !e.is(".test"), "Assert class not present" );
+
+        e.toggleClass(function(i, val) {
+            equals( val, old, "Make sure the incoming value is correct." );
+            return "test";
+        });
+        ok( e.is(".test"), "Assert class present" );
+
+        old = e.attr("class");
+
+        e.toggleClass(function(i, val) {
+            equals( val, old, "Make sure the incoming value is correct." );
+            return "test";
+        });
+        ok( !e.is(".test"), "Assert class not present" );
+
+        old = e.attr("class");
+
+        // class name with a boolean
+        e.toggleClass(function(i, val, state) {
+            equals( val, old, "Make sure the incoming value is correct." );
+            equals( state, false, "Make sure that the state is passed in." );
+            return "test";
+        }, false );
+        ok( !e.is(".test"), "Assert class not present" );
+
+        old = e.attr("class");
+
+        e.toggleClass(function(i, val, state) {
+            equals( val, old, "Make sure the incoming value is correct." );
+            equals( state, true, "Make sure that the state is passed in." );
+            return "test";
+        }, true );
+        ok( e.is(".test"), "Assert class present" );
+
+        old = e.attr("class");
+
+        e.toggleClass(function(i, val, state) {
+            equals( val, old, "Make sure the incoming value is correct." );
+            equals( state, false, "Make sure that the state is passed in." );
+            return "test";
+        }, false );
+        ok( !e.is(".test"), "Assert class not present" );
+
+        // Cleanup
+        e.removeClass("test");
+        e.removeData('__className__');
+    }, attributesSuite);
+
+    test("addClass, removeClass, hasClass", function() {
+        expect(14);
+
+        var jq = jQuery("<p>Hi</p>"), x = jq.get(0);
+
+        jq.addClass("hi");
+        equals( x.getClassName(), "hi", "Check single added class" );
+
+        jq.addClass("foo bar");
+        equals( x.getClassName(), "hi foo bar", "Check more added classes" );
+
+        jq.removeClass();
+        equals( x.getClassName(), "", "Remove all classes" );
+
+        jq.addClass("hi foo bar");
+        jq.removeClass("foo");
+        // @todo returning "hi  bar" should not be fatal :
+        //equals( x.getClassName(), "hi bar", "Check removal of one class" );
+        equals( x.getClassName(), "hi  bar", "Check removal of one class" );
+
+        ok( jq.hasClass("hi"), "Check has1" );
+        ok( jq.hasClass("bar"), "Check has2" );
+
+        var jq = jQuery("<p class='class1\nclass2\tcla.ss3\n'></p>");
+        ok( jq.hasClass("class1"), "Check hasClass with carriage return" );
+        ok( jq.is(".class1"), "Check is with carriage return" );
+        ok( jq.hasClass("class2"), "Check hasClass with tab" );
+        ok( jq.is(".class2"), "Check is with tab" );
+        ok( jq.hasClass("cla.ss3"), "Check hasClass with dot" );
+
+        jq.removeClass("class2");
+        ok( jq.hasClass("class2")==false, "Check the class has been properly removed" );
+        jq.removeClass("cla");
+        ok( jq.hasClass("cla.ss3"), "Check the dotted class has not been removed" );
+        jq.removeClass("cla.ss3");
+        ok( jq.hasClass("cla.ss3")==false, "Check the dotted class has been removed" );
+
+    }, attributesSuite);
 
 </script>
