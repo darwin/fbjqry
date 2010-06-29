@@ -37,7 +37,7 @@ Support.findNodes = (function() {
 
     function selectById(nodes, id, sel, recurse) {
         //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
+        if ( nodes == null ) {
             nodes = [];
             var node = document.getElementById(id);
             if ( node ) nodes[0] = node;
@@ -53,7 +53,7 @@ Support.findNodes = (function() {
 
     function selectByClass(nodes, cssClass, sel, recurse) {
         //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
+        if ( nodes == null ) {
             nodes = [ document.getRootElement() ];
         }
         return filterNodes( nodes,
@@ -64,7 +64,7 @@ Support.findNodes = (function() {
 
     function selectByTag(nodes, tag, sel, recurse) {
         //if ( nodes.length === 0 ) {
-        if ( ! nodes ) {
+        if ( nodes == null ) {
             nodes = document.getRootElement().getElementsByTagName(tag);
         }
         else { // @todo optimize !
@@ -90,7 +90,7 @@ Support.findNodes = (function() {
 
     function selectByAttribute(nodes, name, type, value, sel, recurse) {
         //console.log('selectByAttribute() name, type, value, recurse: ', name, type, value, recurse);
-        if ( ! nodes ) {
+        if ( nodes == null ) {
             nodes = [ document.getRootElement() ];
         }
         var matchFunc = null;
@@ -153,9 +153,8 @@ Support.findNodes = (function() {
             sel = Support.trim(selectors[i]);
             prevSel = "";
             recurse = true;
-            while ( sel && sel != prevSel ) {
+            while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
-                    if ( ! nodes.length ) break; // done - no nodes
                     recurse = (sel.charAt(0) === ' ');
                     if ( recurse ) {
                         sel = Support.trim(sel);
@@ -204,21 +203,21 @@ Support.findNodes = (function() {
                 match = idCheck.exec(sel);
                 if ( match ) {
                     nodes = selectById(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
+                    sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
                 match = classCheck.exec(sel);
                 if ( match ) {
                     nodes = selectByClass(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
+                    sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
                 match = tagCheck.exec(sel);
                 if ( match ) {
                     nodes = selectByTag(nodes, match[1], sel, recurse);
-                    sel = sel.substr(sel.indexOf(match[1]) + match[1].length);
+                    sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
@@ -227,7 +226,7 @@ Support.findNodes = (function() {
                 if ( match ) {
                     match[3] = match[3] || true; //if m[3] does not exist we are just checking if attribute exists
                     nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, recurse);
-                    sel = sel.substr(sel.indexOf("]") + 1);
+                    sel = sel.substr( sel.indexOf("]") + 1 );
                     continue;
                 }
 
@@ -239,7 +238,7 @@ Support.findNodes = (function() {
                     var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
                     var intValue = value ? parseInt(value, 10) : null;
 
-                    var _nodes = nodes, j;
+                    var _nodes = nodes;
                     // Elements can be considered hidden for several reasons :
                     // * They have a CSS display value of none.
                     // * They are form elements with type="hidden".

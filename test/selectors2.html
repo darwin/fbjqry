@@ -9,12 +9,12 @@
             <div>
                 <span class="class11"></span>
             </div>
-            <h6 class="class11"></h6>
+            <h6 class="class11 class14"></h6>
         </div>
     </div>
 </div>
 
-<div class="class11 class12">
+<div class="class11 class12 class14">
     <span class="class13"></span>
     <span class="class12"></span>
     <span class="class11"></span>
@@ -79,6 +79,22 @@
         Asserts.assertEqual(0, $('#id11 .class13').length);
     };
 
+    selectors2Suite.testDoubleNestedClassSelector1 = function () {
+        Asserts.assertEqual(1, $('#id11 .class11.class14').length);
+    };
+    selectors2Suite.testDoubleNestedClassSelector2 = function () {
+        Asserts.assertEqual(2, $('.class11.class14').length);
+    };
+    selectors2Suite.testDoubleNestedClassSelector3 = function () {
+        Asserts.assertEqual(1, $('.class14.class11.class12').length);
+    };
+    selectors2Suite.testDoubleNestedClassSelector4 = function () {
+        Asserts.assertEqual(0, $('.class13.class11.class12').length);
+    };
+    selectors2Suite.testDoubleNestedClassSelector5 = function () {
+        Asserts.assertEqual(0, $('#id11 .class11.class12').length);
+    };
+
     selectors2Suite.testSiblingTagSelector1 = function () {
         Asserts.assertEqual(3, $('#id12 ~ span').length);
     };
@@ -130,4 +146,5 @@
     selectors2Suite.testAdjancedTagTagSelector = function () {
         Asserts.assertEqual(7, $('span + span').length);
     };
+
 </script>

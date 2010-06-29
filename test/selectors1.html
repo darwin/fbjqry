@@ -89,7 +89,17 @@
         Asserts.assertEqual(1, context.length, "non-unique context");
         Asserts.assertEqual(0, $('span', context).length);
     };
-    
+    selectors1Suite.testExistingTagNameWithClass = function () {
+        Asserts.assertEqual(1, $('A.class2').length);
+    };
+
+    selectors1Suite.testNestedExistingTagNameWithContextAndClass = function () {
+        Asserts.assertEqual(1, $('#id1 SPAN.class1').length);
+    };
+    selectors1Suite.testNestedMissingTagNameWithContextAndClass = function () {
+        Asserts.assertEqual(0, $('#id2 SPAN.class1').length);
+    };
+
     selectors1Suite.testAllTagName = function () {
         Asserts.assertEqual(10, $('*').length);
     };
@@ -97,4 +107,6 @@
         var context = document.getElementById('id1');
         Asserts.assertEqual(5, $('*', context).length);
     };
+
+
 </script>

@@ -1,8 +1,8 @@
 <fb:js-string var="selectors3FBML">
 
 <div id="id1" title="title1">
-    <span title="title2"></span>
-    <div>
+    <span title="title2" class="class2 class0"></span>
+    <div class="class0">
         <span title="title1"></span>
     </div>
 </div>
@@ -130,7 +130,7 @@
     };
 
     selectors3Suite.testAttributeContainsWordSelector1 = function () {
-        Asserts.assertEqual(1, $('[class~=class2]').length);
+        Asserts.assertEqual(2, $('[class~=class2]').length);
     };
     selectors3Suite.testAttributeContainsWordSelector2 = function () {
         Asserts.assertEqual(0, $('[class~=class3]').length);
@@ -154,5 +154,16 @@
     };
     selectors3Suite.testComposedAttributeSelector2 = function () {
         Asserts.assertEqual(1, $('[title][dir!="rtl"][id^=\'i\']').length);
+    };
+    selectors3Suite.testComposedAttributeClassSelector = function () {
+        Asserts.assertEqual(1, $('[name="name1"].class2').length);
+    };
+
+    selectors3Suite.testComposedAttributeClassSelectorWithContext = function () {
+        var context = document.getElementById('id1')
+        Asserts.assertEqual(1, $('[title="title2"].class0', context).length);
+
+        var $result = $('#id1 .class0[title="title2"]');
+        Asserts.assertEqual('SPAN', $result.get(0).getTagName());
     };
 </script>
