@@ -40,12 +40,23 @@ var removeAllElements = function() {
         currentSuite = null;
     };
 
+    // extension used by qUnit test emulation :
+    jsUnity.currentSuite = function() {
+        return currentSuite;
+    };
+    var incrementAssertionCount = function() {
+       var count = currentSuite.assertionCount || 0;
+       currentSuite.assertionCount = ++count;
+    };
+
     jsUnity.done = function () {
         var content = '<div class="testResults">';
+        var totalAssertionCount = 0;
         for ( var name in suiteResults ) {
             if ( suiteResults.hasOwnProperty(name) ) {
                 content += '<h1 class="suiteName">' + name + '</h1>'; // suite name
                 var testResults = suiteResults[name];
+                if ( testResults.assertionCount ) totalAssertionCount += testResults.assertionCount;
                 for ( var i = 0; i < testResults.length; i++ ) {
                     var result = testResults[i];
                     content += '<div class="' + (result.passed ? 'passed' : 'failed') + '">';
@@ -65,6 +76,8 @@ var removeAllElements = function() {
         dialogContent = document.getElementById('dialogContent');
         dialogContent.setInnerXHTML(content);
         dialogContent.setStyle('display', 'block');
+
+        if ( totalAssertionCount ) jsUnity.log('' + totalAssertionCount + ' assertions passed');
     };
 
     var result = jsUnity.result;
@@ -73,5 +86,32 @@ var removeAllElements = function() {
         if ( e ) console.log(name, e);
         // keep the test result for the "green - red" test bar :
         currentSuite.push({ name: name, passed: passed, e: e });
+        // count the assetrions in a given suite :
+        //incrementAssertionCount();
     };
 })();
+
+// qUnit compatibility :
+
+function test(name, fn, suite) {
+    suite['testQUnit_' + name + ''] = fn;
+}
+function expect(count) { // @todo not used !
+    jsUnity.currentSuite().count = count;
+}
+function reset() {
+    var tearDown = jsUnity.currentSuite().tearDown;
+    if (tearDown) setUp();
+    var setUp = jsUnity.currentSuite().setUp;
+    if (setUp) setUp();
+}
+
+function equals(actual, expected, message) {
+    Asserts.assertEqual(expected, actual, message);
+}
+function same(actual, expected, message) {
+    Asserts.assertEqual(expected, actual, message);
+}
+function ok(actual, message) {
+    Asserts.assertTrue(actual, message);
+}

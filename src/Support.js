@@ -214,6 +214,46 @@ var sameFBNode = Support.sameFBNode = function(node1, node2) {
     return getFBNodeId(node1) === getFBNodeId(node2);
 };
 
+Support.style = function(node, name, value) { // supports multiple nodes as well
+    var i, len = node.length;
+    
+    if ( Support.isString(name) && typeof value !== 'undefined' ) {
+        if (name == 'float') name = 'cssFloat';
+        name = Support.camelCase(name);
+        if (typeof(value) == 'number') value = value + "px";
+
+        if ( len ) {
+            for ( i = 0; i < len; i++ ) node[i].setStyle(name, value);
+        }
+        else {
+            node.setStyle(name, value);
+        }
+        return false;
+    }
+    
+    if ( typeof name === 'object' ) {
+        if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
+        var values = {};
+        for ( var o in name ) {
+            //if ( name.hasOwnProperty(o) ) {
+                value = name[o];
+                if (typeof(value) === 'number') value = value + "px";
+                values[Support.camelCase(o)] = value;
+            //}
+        }
+
+        if ( len ) {
+            for ( i = 0; i < len; i++ ) node[i].setStyle(values);
+        }
+        else {
+            node.setStyle(values);
+        }
+        return false;
+    }
+
+    return ( len ? node[0] : node ).getStyle( Support.camelCase(name) );
+}
+
 Support.attr = (function() {
     var validAttrs = (function() {
         var validAttrs = {},
@@ -225,58 +265,83 @@ Support.attr = (function() {
             attrs += ",tagName,parentNode,nextSibling,previousSibling,firstChild,lastChild";
             attrs = attrs.split(",");
         for (var i = 0, len = attrs.length; i < len; i++) {
-           validAttrs[ attrs[i].toLowerCase() ] = attrs[i];
+            var attr = attrs[i];
+            validAttrs[ attr.toLowerCase() ] = 'set' +
+                attr.charAt(0).toUpperCase() + attr.substr(1);
         }
         // name aliases :
-        validAttrs[ "class".toLowerCase() ] = "className";
-        validAttrs[ "nodeName".toLowerCase() ] = "tagName";
+        validAttrs[ "class" ] = "setClassName";
+        validAttrs[ "nodeName".toLowerCase() ] = "setTagName";
+        // html/text setters :
+        validAttrs[ "html" ] = "setInnerXHTML";
+        validAttrs[ "fbml" ] = "setInnerFBML";
+        validAttrs[ "text" ] = "setTextValue";
+        // css/style setters :
+        validAttrs[ "css" ] = "setStyle";
+        validAttrs[ "style" ] = "setStyle";
+        // height/width helpers :
+        validAttrs[ "height" ] = "setHeight";
+        validAttrs[ "width" ] = "setWidth";
         return validAttrs;
     })();
 
     var setStyle = function(node, val) { // a special case for the set style attr method
-        var styles = val.split(";");
-        for ( var i = 0, len = styles.length; i < len; i++ ) {
-            var s = styles[i].split(":");
-            if ( s.length == 2 ) {
-                var name = camelCase(trim(s[0].toLowerCase()));
-                if (name == 'float') name = 'cssFloat';
-                var value = trim(s[1]);
-                node.setStyle( name, value );
+        if ( typeof(val) === 'string' ) {
+            var styles = val.split(";");
+            for ( var i = 0, len = styles.length; i < len; i++ ) {
+                var s = styles[i].split(":");
+                if ( s.length == 2 ) {
+                    var name = camelCase(trim(s[0].toLowerCase()));
+                    if (name == 'float') name = 'cssFloat';
+                    var value = trim(s[1]);
+                    node.setStyle( name, value );
+                }
             }
+        }
+        else {
+            Support.style(node, val);
         }
     };
 
     return function(node, attr, val) {
-        var orig = attr;
-        attr = validAttrs[attr.toLowerCase()];
-        if ( ! attr ) {
-           Support.log("Support.attr() attribute name '" + orig + "' is not supported");
+        var setAttr = validAttrs[ attr.toLowerCase() ];
+        if ( ! setAttr ) {
+           Support.log("Support.attr() attribute name '" + attr + "' is not supported");
            return undefined;
         }
 
-        var setter = (typeof val !== 'undefined');
-        var method = setter ? "set" : "get";
-        method += attr.charAt(0).toUpperCase() + attr.substr(1);
-        //if ( val || val === "" || val === 0 ) {
-        if ( setter ) {
+        if ( typeof val !== 'undefined' ) { // setter :
             try {
-               if (method === "setStyle") setStyle(node, val);
-               else node[method](val); // e.g. setTitle(val)
+               if (setAttr === "setStyle") setStyle(node, val);
+               else if (setAttr === "setWidth") Support.style(node, 'width', val);
+               else if (setAttr === "setHeight") Support.style(node, 'height', val);
+               //else if (setAttr === "setInnerXHTML") Support.xhtml(val, node);
+               else node[setAttr](val); // e.g. setTitle(val)
             }
             catch (e) { // e.g. when setting an invalid url parameter using setSrc()
-                return Support.error("Support.attr() setter node[" + method + "](" + val + ") failed: " + e);
+                return Support.error("Support.attr() setter node[" + setAttr + "](" + val + ") failed: " + e);
             }
             return node;
         }
         // else getter :
+        var getAttr = 'g' + setAttr.substr(1); // setStyle -> getStyle
+        if ( ! node[getAttr] ) {
+            return Support.error("Support.attr() getter " + getAttr + " not supported !");
+        }
         val = undefined;
         try {
-            val = node[method]();  // e.g. getTitle()
+            if (getAttr === "getStyle") throw "unsupported use css('styleProperty') to get style values";
+            else if (getAttr === "getWidth") val = Support.style(node, 'width');
+            else if (getAttr === "getHeight") val = Support.style(node, 'height');
+            else {
+                val = node[getAttr]();  // e.g. getTitle()
+                //if ( typeof(val) === 'undefined' ) val = '';
+            }
         }
         catch (e) {
             // some nodes for some attrs e.g. getHref throw an error :
             // "TypeError: b is undefined" instead of returning correctly
-            Support.log("Support.attr() getter node[" + method + "]() failed: " + e);
+            Support.log("Support.attr() getter node[" + getAttr + "]() failed: " + e);
         }
         return val;
     };

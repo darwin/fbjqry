@@ -19,7 +19,7 @@ var FBjqRY = function(selector, context) {
 //We can wrap everything else
 (function() {
 
-//var encodeURIComponent = Support.encodeURIComponent;
+var encodeURIComponent = Support.encodeURIComponent;
 
 var each = Support.each;
 var map = Support.map;
@@ -245,27 +245,102 @@ FBjqRY.fn = FBjqRY.prototype = {
             }
         });
     },
+	removeAttr: function(name) {
+		return this.each(function() {
+			//jQuery.attr( this, name, "" );
+            Support.attr(this, name, '');
+		});
+	},
 
-    addClass: function(cssClass) {
-        //each(this.nodes, function() {this.addClassName(cssClass);});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            this.nodes[i].addClassName(cssClass);
+    addClass: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.addClass( value.call(this, i, self.attr("class")) );
+			});
+		}
+
+        if ( value && typeof value === "string" ) {
+            var node, className, trim = FBjqRY.trim;
+            value = trim( value );
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                node = this.nodes[i];
+                node.addClassName(value);
+                
+                className = node.getClassName();
+                var trimmedClass = trim( className );
+                if ( className.length !== trimmedClass.length ) {
+                    node.setClassName( trimmedClass );
+                }
+            }
         }
         return this;
     },
 
-    removeClass: function(cssClass) {
-        //each(this.nodes, function() {this.removeClassName(cssClass);});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            this.nodes[i].removeClassName(cssClass);
+    removeClass: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.removeClass( value.call(this, i, self.attr("class")) );
+			});
+		}
+
+        if ( (value && typeof value === "string") || value === undefined ) {
+            var node, className, trim = FBjqRY.trim;
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                node = this.nodes[i];
+                node.removeClassName(value || '');
+
+                className = node.getClassName();
+                var trimmedClass = trim( className );
+                if ( className.length !== trimmedClass.length ) {
+                    node.setClassName( trimmedClass );
+                }
+            }
         }
         return this;
     },
 
-    toggleClass: function(cssClass) {
-        //each(this.nodes, function() { this.toggleClassName(cssClass); });
+    toggleClass: function(value, state) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.toggleClass( value.call(this, i, self.attr("class"), state) );
+			});
+		}
+
+        var type = typeof(value), className;
         for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            this.nodes[i].toggleClassName(cssClass);
+            var node = this.nodes[i];
+            if ( type === 'string' ) {
+                //node.toggleClassName(value);
+				// toggle individual class names :
+				var c = 0, classNames = value.split(/\s+/),
+                    stateBool = typeof(state) === 'boolean';
+                    
+				while ( (className = classNames[ c++ ]) ) {
+					// check each className given, space seperated list
+                    if ( stateBool ) {
+                        node[state ? 'addClassName' : 'removeClassName'](className)
+                    }
+                    else {
+                        node.toggleClassName(className);
+                    }
+				}
+            }
+			else if ( type === "undefined" || type === "boolean" ) {
+                className = node.getClassName();
+				if ( className ) {
+					// store className if set
+					FBjqRY.data( node, "__className__", className );
+				}
+				// toggle whole className
+                if (className || value === false) className = "";
+                else {
+                    className = FBjqRY.data( node, "__className__" ) || "";
+                }
+				node.setClassName( className );
+			}
         }
         return this;
     },
@@ -303,15 +378,82 @@ FBjqRY.fn = FBjqRY.prototype = {
         return Support.error("text() getter not supported in FBJS");
     },
 
-    val: function(val) {
-        if( typeof(val) !== 'undefined' ) {
-            //each(this.nodes, function() { this.setValue(val); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                this.nodes[i].setValue(val);
+    val: function(value) {
+        var i, len, node, values;
+        if( typeof(value) !== 'undefined' ) {
+            var isFunction = FBjqRY.isFunction(value);
+            
+            for ( i = 0, len = this.nodes.length; i < len; i++ ) {
+                node = this.nodes[i]; var val = value, nodeVal;
+                
+                if ( isFunction ) {
+                    nodeVal = FBjqRY(node).val();
+                    val = value.call(node, i, nodeVal);
+                }
+                // Typecast each time if the value is a Function and the appended
+                // value is therefore different each time.
+                if ( typeof val === "number" ) val += "";
+                
+                if ( FBjqRY.isArray(val) && /radio|checkbox/.test( node.getType() ) ) {
+                    nodeVal = FBjqRY(node).val();
+                    node.setChecked( FBjqRY.inArray( nodeVal, val ) >= 0 );
+                }
+                else if ( node.getTagName().toUpperCase() === "SELECT" ) {
+                    values = FBjqRY.makeArray(val);
+
+                    FBjqRY("option", node).each(function() {
+                        var optVal = FBjqRY(this).val();
+                        this.setSelected( FBjqRY.inArray( optVal, values ) >= 0 );
+                    });
+
+                    if ( ! values.length ) node.setSelectedIndex(-1);
+                }
+                else {
+                    node.setValue(val);
+                }
             }
             return this;
         }
-        return this.nodes[0].getValue();
+
+        node = this.nodes[0];
+        if ( node ) {
+            var nodeName = node.getTagName().toUpperCase();
+            // NOTE: can't read text from FB nodes !
+            //if ( nodeName === 'OPTION' ) {
+            //    value = node.getValue() || node.getTextValue();
+            //}
+            // We need to handle select boxes special
+            if ( nodeName === "SELECT" ) {
+                var index = node.getSelectedIndex(),
+                    options = FBjqRY('option', node).nodes,
+                    one = node.getType() === "select-one";
+
+                // Nothing was selected
+                if ( index < 0 ) return null;
+
+                values = [];
+                // Loop through all the selected options
+                for ( i = one ? index : 0, max = one ? index + 1 : options.length; i < max; i++ ) {
+                    var option = options[ i ];
+                    if ( option.getSelected() ) {
+                        // We don't need an array for one selects
+                        if ( one ) {
+                            value = option.getValue();
+                            break;
+                        }
+                        // Multi-Selects return an array
+                        values.push( option.getValue() );
+                    }
+                }
+                if ( ! one ) return values;
+            }
+            else {
+                value = node.getValue();
+            }
+
+            return value ? value : '';
+        }
+        return undefined; // no node
     },
 
     //added for our own uses
@@ -334,27 +476,29 @@ FBjqRY.fn = FBjqRY.prototype = {
     //CSS:
     //========================================
     css: function(name, value) {
-        if ( typeof name === 'string' && typeof value !== 'undefined' ) {
-            if (name == 'float') name = 'cssFloat';
-            name = Support.camelCase(name);
-            if (typeof(value) == 'number') value = value + "px";
-            each(this.nodes, function() { this.setStyle(name, value); });
-            return this;
-        }
-        if ( typeof name === 'object' ) {
-            if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
-            var values = {};
-            for ( var o in name ) {
-                if ( name.hasOwnProperty(o) ) {
-                    value = name[o];
-                    if (typeof(value) === 'number') value = value + "px";
-                    values[Support.camelCase(o)] = value;
-                }
-            }
-            each(this.nodes, function() { this.setStyle(values); });
-            return this;
-        }
-        return this.nodes[0].getStyle( Support.camelCase(name) );
+//        if ( typeof name === 'string' && typeof value !== 'undefined' ) {
+//            if (name == 'float') name = 'cssFloat';
+//            name = Support.camelCase(name);
+//            if (typeof(value) == 'number') value = value + "px";
+//            each(this.nodes, function() { this.setStyle(name, value); });
+//            return this;
+//        }
+//        if ( typeof name === 'object' ) {
+//            if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
+//            var values = {};
+//            for ( var o in name ) {
+//                if ( name.hasOwnProperty(o) ) {
+//                    value = name[o];
+//                    if (typeof(value) === 'number') value = value + "px";
+//                    values[Support.camelCase(o)] = value;
+//                }
+//            }
+//            each(this.nodes, function() { this.setStyle(values); });
+//            return this;
+//        }
+//        return this.nodes[0].getStyle( Support.camelCase(name) );
+        var ret = Support.style(this.nodes, name, value);
+        return ret === false ? this : ret; // false returned for setters
     },
 
     offset: function() {
@@ -366,12 +510,16 @@ FBjqRY.fn = FBjqRY.prototype = {
     },
 
     height: function(h) {
-        if (typeof h === 'undefined') return this.nodes[0].getOffsetHeight();
+        if (typeof h === 'undefined') {
+            return this.nodes[0].getOffsetHeight();
+        }
         return this.css("height", h);
     },
 
     width: function(w) {
-        if (typeof w === 'undefined') return this.nodes[0].getOffsetWidth();
+        if (typeof w === 'undefined') {
+            return this.nodes[0].getOffsetWidth();
+        }
         return this.css("width", w);
     },
 
@@ -534,13 +682,13 @@ FBjqRY.fn = FBjqRY.prototype = {
     filter: function(selector) {
         var fn = selector;
         if ( typeof(fn) === "string" ) {
-            fn = function(node) { return is(selector, [ node ]); };
+            fn = function() { return is(selector, [ this ]); };
         } 
         // else it should already be a function
         var nodes = [];
         for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
             var node = this.nodes[i];
-            if ( fn( node ) ) nodes.push( node );
+            if ( fn.call( node, i ) ) nodes.push( node );
         }
 
         return this.pushStack( nodes, "filter", selector );
@@ -910,6 +1058,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     //AJAX:
     //========================================
+    /*
     serialize: function() {
         return this.serializeArray().join("&");
     },
@@ -928,7 +1077,37 @@ FBjqRY.fn = FBjqRY.prototype = {
     serializeHash: function() {
         // nodes[0] must be a form
         return this.nodes[0].serialize();
-    }
+    } */
+	serialize: function() {
+		return FBjqRY.param( this.serializeArray() );
+	},
+	serializeArray: function() {
+		//return this.map( function() {
+		//	return this.elements ? jQuery.makeArray(this.elements) : this;
+		//})
+        return this
+		.filter(function() {
+			return this.getName() && ! this.getDisabled() &&
+				( this.getChecked() || /select|textarea/i.test(this.getTagName()) ||
+					/text|hidden|password|search/i.test(this.getType()) );
+		})
+		.map(function() {
+			var val = FBjqRY(this).val();
+            if (val == null) return null;
+            var name = this.getName();
+            
+            if ( FBjqRY.isArray(val) ) {
+                var ret = [];
+                for ( var i = 0; i < val.length; i++ ) {
+                    ret.push( { name: name, value: val[i] } );
+                }
+                return ret;
+            }
+            else {
+                return { name: name, value: val };
+            }
+		}).get();
+	}
 };
 
 /*
@@ -1198,37 +1377,31 @@ FBjqRY.extend({
     
 	// Serialize an array of form elements or a set of
 	// key/values into a query string
-    /*
 	param: function( a ) {
-		var s = [ ];
-
+		var s = [];
 		function add( key, value ){
-			s[ s.length ] = encodeURIComponent(key) + '=' + encodeURIComponent(value);
-		};
+			s.push( encodeURIComponent(key) + '=' + encodeURIComponent(value) );
+		}
 
-		// If an array was passed in, assume that it is an array
-		// of form elements
-		if ( jQuery.isArray(a) || a.jquery )
+        if ( typeof(a.selector) !== 'undefined' ) a = a.nodes;
+		// If an array was passed in, assume that it is an array of form elements
+		if ( FBjqRY.isArray(a) ) {
 			// Serialize the form elements
-			jQuery.each( a, function(){
-				add( this.name, this.value );
-			});
-
+			FBjqRY.each( a, function() { add( this.name, this.value ); });
+        }
 		// Otherwise, assume that it's an object of key/value pairs
-		else
+		else {
 			// Serialize the key/values
 			for ( var j in a )
 				// If the value is an array then the key names need to be repeated
-				if ( jQuery.isArray(a[j]) )
-					jQuery.each( a[j], function(){
-						add( j, this );
-					});
-				else
-					add( j, jQuery.isFunction(a[j]) ? a[j]() : a[j] );
-
+				if ( FBjqRY.isArray( a[j] ) ) {
+					jQuery.each( a[j], function(){ add( j, this ); });
+                }
+				else add( j, FBjqRY.isFunction(a[j]) ? a[j]() : a[j] );
+        }
 		// Return the resulting serialization
 		return s.join("&").replace(/%20/g, "+");
-	}, */
+	},
 
     //UTILITIES:
     //========================================
@@ -1322,6 +1495,10 @@ FBjqRY.extend({
 		}
 	},
 
+	nodeName: function(elem, name) {
+		return elem.getTagName && elem.getTagName().toUpperCase() === name.toUpperCase();
+	},
+
 	// A global GUID counter for objects
 	guid: 1,
 	proxy: function( fn, proxy, thisObject ) {
@@ -1351,6 +1528,7 @@ FBjqRY.extend({
 		// So proxy can be declared as an argument
 		return proxy;
 	}
+
 });
 
 // ============================================================================
