@@ -1,0 +1,256 @@
+<fb:js-string var="cssFBML">
+
+<div id="hiddendiv" style="display: none;">
+    <span></span>
+    <div>
+        <span></span>
+        <span id="inthediv"></span>
+    </div>
+</div>
+
+<div id="nothiddendiv">
+    <div id="nothiddendivchild">
+        not hidden div
+    </div>
+</div>
+
+<div id="floatTest">floating test</div>
+
+<!--
+<form id="form" action="formaction" style="">
+    <input id="check" type="checkbox" name="check-name" value="ON" />
+    <input id="radio" type="radio" name="radio-name" value="" checked="checked" />
+    <input id="text" type="text" name="text-name" value="TEST" maxlength="10" />
+    <textarea id="area" title="Title!" class="text area" name="area-name" cols="6" rows="5" readonly />
+    <select id="select" name="select-name">
+        <option id="option1">option1</option>
+        <option id="option2" selected>option2</option>
+        <option id="option3">option3</option>
+    </select>
+</form>
+<a href="http://example.com" id="anchor"></a>-->
+
+</fb:js-string>
+
+<script type="text/javascript">
+    var cssSuite = { suiteName: "css" };
+
+    cssSuite.setUp = function () {
+        document.getRootElement().setInnerFBML(cssFBML);
+    };
+
+    cssSuite.testCss1 = function () {
+        equals( jQuery('#hiddendiv').css("display"), 'none', 'Check for css property "display"');
+
+        ok( jQuery('#nothiddendiv').is(':visible'), 'Modifying CSS display: Assert element is visible');
+        jQuery('#nothiddendiv').css({ display: 'none' });
+        ok( !jQuery('#nothiddendiv').is(':visible'), 'Modified CSS display: Assert element is hidden');
+        jQuery('#nothiddendiv').css({ display: 'block' });
+        ok( jQuery('#nothiddendiv').is(':visible'), 'Modified CSS display: Assert element is visible');
+
+        jQuery('#floatTest').css({styleFloat: 'right'});
+        equals( jQuery('#floatTest').css('styleFloat'), 'right', 'Modified CSS float using "styleFloat": Assert float is right');
+        jQuery('#floatTest').css({cssFloat: 'left'});
+        equals( jQuery('#floatTest').css('cssFloat'), 'left', 'Modified CSS float using "cssFloat": Assert float is left');
+        jQuery('#floatTest').css({'float': 'right'});
+        equals( jQuery('#floatTest').css('float'), 'right', 'Modified CSS float using "float": Assert float is right');
+        jQuery('#floatTest').css({'font-size': '30px'});
+        equals( jQuery('#floatTest').css('font-size'), '30px', 'Modified CSS font-size: Assert font-size is 30px');
+
+        jQuery.each("0,0.25,0.5,0.75,1".split(','), function(i, n) {
+            jQuery('#nothiddendiv').css({opacity: n});
+            equals( jQuery('#nothiddendiv').css('opacity'), parseFloat(n), "Assert opacity is " + parseFloat(n) + " as a String" );
+            jQuery('#nothiddendiv').css({opacity: parseFloat(n)});
+            equals( jQuery('#nothiddendiv').css('opacity'), parseFloat(n), "Assert opacity is " + parseFloat(n) + " as a Number" );
+        });
+        jQuery('#nothiddendiv').css({opacity: ''});
+        equals( jQuery('#nothiddendiv').css('opacity'), '1', "Assert opacity is 1 when set to an empty String" );
+    };
+    
+    cssSuite.testCss2 = function () {
+        ok( jQuery('#nothiddendiv').is(':visible'), 'Modifying CSS display: Assert element is visible');
+        jQuery('#nothiddendiv').css("display", 'none');
+        ok( !jQuery('#nothiddendiv').is(':visible'), 'Modified CSS display: Assert element is hidden');
+        jQuery('#nothiddendiv').css("display", 'block');
+        ok( jQuery('#nothiddendiv').is(':visible'), 'Modified CSS display: Assert element is visible');
+
+        jQuery('#floatTest').css('styleFloat', 'left');
+        equals( jQuery('#floatTest').css('styleFloat'), 'left', 'Modified CSS float using "styleFloat": Assert float is left');
+        jQuery('#floatTest').css('cssFloat', 'right');
+        equals( jQuery('#floatTest').css('cssFloat'), 'right', 'Modified CSS float using "cssFloat": Assert float is right');
+        jQuery('#floatTest').css('float', 'left');
+        equals( jQuery('#floatTest').css('float'), 'left', 'Modified CSS float using "float": Assert float is left');
+        jQuery('#floatTest').css('font-size', '20px');
+        equals( jQuery('#floatTest').css('font-size'), '20px', 'Modified CSS font-size: Assert font-size is 20px');
+
+        jQuery.each("0,0.25,0.5,0.75,1".split(','), function(i, n) {
+            jQuery('#nothiddendiv').css('opacity', n);
+            equals( jQuery('#nothiddendiv').css('opacity'), parseFloat(n), "Assert opacity is " + parseFloat(n) + " as a String" );
+            jQuery('#nothiddendiv').css('opacity', parseFloat(n));
+            equals( jQuery('#nothiddendiv').css('opacity'), parseFloat(n), "Assert opacity is " + parseFloat(n) + " as a Number" );
+        });
+        jQuery('#nothiddendiv').css('opacity', '');
+        equals( jQuery('#nothiddendiv').css('opacity'), '1', "Assert opacity is 1 when set to an empty String" );
+    };
+
+    cssSuite.testWidth = function () {
+        var $div = jQuery("#nothiddendiv");
+        //console.log('offsetW: ', $div.get(0).getOffsetWidth());
+        //console.log('clientW: ', $div.get(0).getClientWidth());
+        //console.log('styleW: ', $div.get(0).getStyle('width'));
+
+        $div.width(30);
+        equals($div.width(), 30, "Test set to 30 correctly");
+
+        //console.log('offsetW: ', $div.get(0).getOffsetWidth());
+        //console.log('clientW: ', $div.get(0).getClientWidth());
+        //console.log('styleW: ', $div.get(0).getStyle('width'));
+
+        $div.hide();
+
+        //console.log('offsetW: ', $div.get(0).getOffsetWidth());
+        //console.log('clientW: ', $div.get(0).getClientWidth());
+        //console.log('styleW: ', $div.get(0).getStyle('width'));
+
+        equals($div.width(), 30, "Test hidden div");
+        $div.show();
+        $div.width(-1); // handle negative numbers by ignoring #1599
+        equals($div.width(), 30, "Test negative width ignored");
+
+        $div.css("padding", "20px");
+        equals($div.width(), 30, "Test padding specified with pixels");
+        $div.css("border", "2px solid #fff");
+        equals($div.width(), 30, "Test border specified with pixels");
+
+        $div.css({ display: "", border: "", padding: "" });
+
+        jQuery("#nothiddendivchild").css({ padding: "3px", border: "2px solid #fff" });
+        equals(jQuery("#nothiddendivchild").width(), 20, "Test child width with border and padding");
+        jQuery("#nothiddendiv, #nothiddendivchild").css({ border: "", padding: "", width: "" });
+    };
+
+    test("css(String, Function)", function() {
+        expect(3);
+
+        var sizes = ["10px", "20px", "30px"];
+
+        jQuery("<div id='cssFunctionTest'>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+               "</div>").appendTo( document.getRootElement() );
+
+        var index = 0;
+
+        jQuery("#cssFunctionTest div").css("font-size", function() {
+            var size = sizes[index];
+            index++;
+            return size;
+        });
+
+        index = 0;
+
+        jQuery("#cssFunctionTest div").each(function() {
+            var computedSize = jQuery(this).css("font-size");
+            var expectedSize = sizes[index];
+            equals( computedSize, expectedSize, "Div #" + index + " should be " + expectedSize );
+            index++;
+        });
+
+        jQuery("#cssFunctionTest").remove();
+    }, cssSuite);
+
+    test("css(String, Function) with incoming value", function() {
+        expect(3);
+
+        var sizes = ["10px", "20px", "30px"];
+
+        jQuery("<div id='cssFunctionTest'>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+               "</div>").appendTo( document.getRootElement() );
+
+        var index = 0;
+
+        jQuery("#cssFunctionTest div").css("font-size", function() {
+            var size = sizes[index];
+            index++;
+            return size;
+        });
+
+        index = 0;
+
+        jQuery("#cssFunctionTest div").css("font-size", function(i, computedSize) {
+            var expectedSize = sizes[index]
+            equals( computedSize, expectedSize, "Div #" + index + " should be " + expectedSize );
+            index++;
+            return computedSize;
+        });
+
+        jQuery("#cssFunctionTest").remove();
+    }, cssSuite);
+
+    test("css(Object) where values are Functions", function() {
+        expect(3);
+
+        var sizes = ["10px", "20px", "30px"];
+
+        jQuery("<div id='cssFunctionTest'>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+               "</div>").appendTo( document.getRootElement() );
+
+        var index = 0;
+
+        jQuery("#cssFunctionTest div").css({fontSize: function() {
+            var size = sizes[index];
+            index++;
+            return size;
+        }});
+
+        index = 0;
+
+        jQuery("#cssFunctionTest div").each(function() {
+            var computedSize = jQuery(this).css("font-size")
+            var expectedSize = sizes[index]
+            equals( computedSize, expectedSize, "Div #" + index + " should be " + expectedSize );
+            index++;
+        });
+
+        jQuery("#cssFunctionTest").remove();
+    }, cssSuite);
+
+    test("css(Object) where values are Functions with incoming values", function() {
+        expect(3);
+
+        var sizes = ["10px", "20px", "30px"];
+
+        jQuery("<div id='cssFunctionTest'>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+                     "<div class='cssFunction'></div>" +
+               "</div>").appendTo( document.getRootElement() );
+
+        var index = 0;
+
+        jQuery("#cssFunctionTest div").css({fontSize: function() {
+            var size = sizes[index];
+            index++;
+            return size;
+        }});
+
+        index = 0;
+
+        jQuery("#cssFunctionTest div").css({"font-size": function(i, computedSize) {
+            var expectedSize = sizes[index]
+            equals( computedSize, expectedSize, "Div #" + index + " should be " + expectedSize );
+            index++;
+            return computedSize;
+        }});
+
+        jQuery("#cssFunctionTest").remove();
+    }, cssSuite);
+
+</script>

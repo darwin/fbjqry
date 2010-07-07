@@ -214,45 +214,66 @@ var sameFBNode = Support.sameFBNode = function(node1, node2) {
     return getFBNodeId(node1) === getFBNodeId(node2);
 };
 
-Support.style = function(node, name, value) { // supports multiple nodes as well
-    var i, len = node.length;
+Support.style = function(node, name, value) { // supports multiple nodes
+    var i, len = node.length, val;
     
-    if ( Support.isString(name) && typeof value !== 'undefined' ) {
-        if (name == 'float') name = 'cssFloat';
+    if ( Support.isString(name) && typeof(value) !== 'undefined' ) {
         name = Support.camelCase(name);
-        if (typeof(value) == 'number') value = value + "px";
+        if (name === 'float' || name === 'styleFloat') name = 'cssFloat';
 
+        if (typeof(value) === 'number') value = value + "px";
         if ( len ) {
-            for ( i = 0; i < len; i++ ) node[i].setStyle(name, value);
+            for ( i = 0; i < len; i++ ) {
+                val = value;
+                if ( Support.isFunction(value) ) {
+                    val = value(i, node[i].getStyle(name));
+                }
+                node[i].setStyle(name, val);
+            }
         }
-        else {
+        else { // only used from Support.attr
             node.setStyle(name, value);
         }
-        return false;
+        //return false;
     }
-    
-    if ( typeof name === 'object' ) {
-        if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
+    else if ( typeof(name) === 'object' ) {
+        //if ( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
+
         var values = {};
-        for ( var o in name ) {
-            //if ( name.hasOwnProperty(o) ) {
-                value = name[o];
+        for ( var n in name ) {
+            if ( name.hasOwnProperty(n) ) {
+                value = name[n];
+                
+                n = Support.camelCase(n);
+                if (n === 'float' || n === 'styleFloat') n = 'cssFloat';
+
                 if (typeof(value) === 'number') value = value + "px";
-                values[Support.camelCase(o)] = value;
-            //}
+
+                ///values[ n ] = value;
+                if ( len ) {
+                    for ( i = 0; i < len; i++ ) {
+                        val = value;
+                        if ( Support.isFunction(value) ) {
+                            val= value(i, node[i].getStyle(n));
+                        }
+                        node[i].setStyle(n, val);
+                    }
+                }
+                else { // only used from Support.attr
+                    node.setStyle(n, value);
+                }
+            }
         }
 
-        if ( len ) {
-            for ( i = 0; i < len; i++ ) node[i].setStyle(values);
-        }
-        else {
-            node.setStyle(values);
-        }
-        return false;
+        ///if ( len ) {
+        ///    for ( i = 0; i < len; i++ ) node[i].setStyle(values);
+        //}
+        ///else {
+        ///    node.setStyle(values);
+        ///}
+        //return false;
     }
-
-    return ( len ? node[0] : node ).getStyle( Support.camelCase(name) );
-}
+};
 
 Support.attr = (function() {
     var validAttrs = (function() {
@@ -291,10 +312,9 @@ Support.attr = (function() {
             for ( var i = 0, len = styles.length; i < len; i++ ) {
                 var s = styles[i].split(":");
                 if ( s.length == 2 ) {
-                    var name = camelCase(trim(s[0].toLowerCase()));
-                    if (name == 'float') name = 'cssFloat';
-                    var value = trim(s[1]);
-                    node.setStyle( name, value );
+                    var name = trim( s[0].toLowerCase() );
+                    var value = trim( s[1] );
+                    Support.style(node, name, value);
                 }
             }
         }

@@ -78,6 +78,24 @@ var delegateManipulation = function(name, fn, selector) {
     return this.pushStack( ret, name, selector );
 };
 
+var elemdisplay = {}; // helper for show()/hide()
+
+var fxAttrs = [
+    // height animations
+    [ "height", "marginTop", "marginBottom", "paddingTop", "paddingBottom" ],
+    // width animations
+    [ "width", "marginLeft", "marginRight", "paddingLeft", "paddingRight" ],
+    // opacity animations
+    [ "opacity" ]
+];
+function genFx( type, num ){
+	var obj = {};
+	FBjqRY.each( fxAttrs.concat.apply( [], fxAttrs.slice(0,num) ), function() {
+		obj[ this ] = type;
+	});
+	return obj;
+}
+
 var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
     //quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#([\w-]+)$/;
     //isSimple  = /^.[^:#\[\.]*$/, undefined;
@@ -480,31 +498,20 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     //CSS:
     //========================================
-    css: function(name, value) {
-//        if ( typeof name === 'string' && typeof value !== 'undefined' ) {
-//            if (name == 'float') name = 'cssFloat';
-//            name = Support.camelCase(name);
-//            if (typeof(value) == 'number') value = value + "px";
-//            each(this.nodes, function() { this.setStyle(name, value); });
-//            return this;
-//        }
-//        if ( typeof name === 'object' ) {
-//            if( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
-//            var values = {};
-//            for ( var o in name ) {
-//                if ( name.hasOwnProperty(o) ) {
-//                    value = name[o];
-//                    if (typeof(value) === 'number') value = value + "px";
-//                    values[Support.camelCase(o)] = value;
-//                }
-//            }
-//            each(this.nodes, function() { this.setStyle(values); });
-//            return this;
-//        }
-//        return this.nodes[0].getStyle( Support.camelCase(name) );
-        var ret = Support.style(this.nodes, name, value);
-        return ret === false ? this : ret; // false returned for setters
-    },
+	css: function( key, value ) {
+		// ignore negative width and height values
+		if ( (key == 'width' || key == 'height') && parseFloat(value) < 0 ) {
+			value = undefined;
+        }
+        if ( Support.isString(key) && typeof(value) === 'undefined' ) {
+            var node = this.nodes[0];
+            return node && FBjqRY.curCSS(node, key); // getter
+        }
+        else {
+            Support.style(this.nodes, key, value); // setter
+            return this;
+        }
+	},
 
     offset: function() {
         var node = this.nodes[0];
@@ -514,19 +521,19 @@ FBjqRY.fn = FBjqRY.prototype = {
         };
     },
 
-    height: function(h) {
-        if (typeof h === 'undefined') {
-            return this.nodes[0].getOffsetHeight();
-        }
-        return this.css("height", h);
-    },
-
-    width: function(w) {
-        if (typeof w === 'undefined') {
-            return this.nodes[0].getOffsetWidth();
-        }
-        return this.css("width", w);
-    },
+//    height: function(h) {
+//        if (typeof h === 'undefined') {
+//            return this.nodes[0].getOffsetHeight();
+//        }
+//        return this.css("height", h);
+//    },
+//
+//    width: function(w) {
+//        if (typeof w === 'undefined') {
+//            return this.nodes[0].getOffsetWidth();
+//        }
+//        return this.css("width", w);
+//    },
 
     //MANIPULATION:
     //========================================
@@ -950,44 +957,82 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     //EFFECTS:
     //========================================
-    show: function(speed, cb) {
-        if (FBjqRY.isFunction(speed) && !cb) {
-            cb = speed;
+	show: function(speed, callback){
+        if (FBjqRY.isFunction(speed) && ! callback) {
+            callback = speed;
             speed = null;
         }
+        
+		if ( speed ) {
+			return this.animate( genFx("show", 3), speed, callback); // @todo genFx
+		}
+        else {
+            var i, len = this.length, node;
+			for ( i = 0; i < len; i++ ){
+                node = this.nodes[i];
+				var old = FBjqRY.data(node, "olddisplay");
+				node.setStyle('display', old || "");
 
-        if ( !speed ) {
-            this.stop();
-            each(this.nodes, function() {
-                this.setStyle("display", "block").setStyle("opacity", "1.0");
-                if ( this.getStyle("height") ) this.setStyle("height", "auto");
-                if ( this.getStyle("width") ) this.setStyle("width", "auto");
-            });
-            if(cb) {cb();}
-            return this;
-        }
-        return this.animate({height: 'auto', width: 'auto', opacity: '1.0'}, speed, null, cb, 1);
-    },
+				if ( jQuery.css(node, "display") === "none" ) {
+					var tagName = node.getTagName(), display;
 
-    hide: function(speed, cb) {
-        if (FBjqRY.isFunction(speed) && !cb) {
-            cb = speed;
+					if ( elemdisplay[ tagName ] ) {
+						display = elemdisplay[ tagName ];
+					}
+                    else {
+                        var body = document.getRootElement();
+						var elem = FBjqRY("<" + tagName + " />").appendTo(body);
+
+						display = elem.css("display");
+						if ( display === "none" ) display = "block";
+
+						elem.remove();
+
+						elemdisplay[ tagName ] = display;
+					}
+					FBjqRY.data(node, "olddisplay", display);
+				}
+			}
+
+			// Set the display of the elements in a second loop
+			// to avoid the constant reflow
+			for ( i = 0; i < len; i++ ) {
+                node = this.nodes[i];
+                node.setStyle('display', FBjqRY.data(node, "olddisplay") || "");
+			}
+
+			return this;
+		}
+	},
+	hide: function(speed,callback) {
+        if (FBjqRY.isFunction(speed) && ! callback) {
+            callback = speed;
             speed = null;
         }
+        
+		if ( speed ) {
+			return this.animate( genFx("hide", 3), speed, callback); // @todo genFx
+		}
+        else {
+            var i, len = this.length, node;
+			for ( i = 0; i < len; i++ ) {
+                node = this.nodes[i];
+				var old = FBjqRY.data(node, "olddisplay");
+				if ( ! old && old !== "none" ) {
+                    FBjqRY.data(node, "olddisplay", FBjqRY.css(node, "display"));
+                }
+			}
 
-        if ( !speed ) {
-            this.stop();
-            //this happens faster than Animation(this).hide();
-            each(this.nodes, function() {
-                this.setStyle("display", "none").setStyle("opacity", "0.0");
-                if ( this.getStyle("height") ) this.setStyle("height", "0px");
-                if ( this.getStyle("width") ) this.setStyle("width", "0px");
-            });
-            if ( cb ) cb();
-            return this;
-        }
-        return this.animate({height: '0px', width: '0px', opacity: '0.0'}, speed, null, cb, 2);
-    },
+			// Set the display of the elements in a second loop
+			// to avoid the constant reflow
+			for ( i = 0; i < len; i++ ) {
+                node = this.nodes[i];
+                node.setStyle('display', 'none');
+			}
+
+			return this;
+		}
+	},
 
     slideDown: function(speed, cb) {
         return this.animate({height: 'auto'}, speed, null, cb, 1);
@@ -1503,6 +1548,101 @@ FBjqRY.extend({
 	nodeName: function(elem, name) {
 		return elem.getTagName && elem.getTagName().toUpperCase() === name.toUpperCase();
 	},
+    
+	css: function( elem, name, force, extra ) {
+		if ( name === "width" || name === "height" ) {
+            var props = { position: "absolute", visibility: "hidden", display:"block" },
+                which = name === "width" ? [ "Left", "Right" ] : [ "Top", "Bottom" ];
+            var val;
+			function getWH() {
+				val = name === "width" ? elem.getOffsetWidth() : elem.getOffsetHeight();
+				if ( extra === "border" ) return;
+
+				FBjqRY.each( which, function() {
+					if ( !extra ) {
+						val -= parseFloat(FBjqRY.curCSS( elem, "padding" + this, true)) || 0;
+					}
+					if ( extra === "margin" ) {
+						val += parseFloat(FBjqRY.curCSS( elem, "margin" + this, true)) || 0;
+					}
+                    else {
+						val -= parseFloat(FBjqRY.curCSS( elem, "border" + this + "Width", true)) || 0;
+					}
+				});
+			}
+
+			if (elem.getOffsetWidth() !== 0) getWH();
+			else FBjqRY.swap( elem, props, getWH );
+
+			return Math.max(0, Math.round(val));
+		}
+
+		return FBjqRY.curCSS( elem, name, force );
+	},
+
+	curCSS: function( elem, name, force ) {
+		var ret;
+		// We need to handle opacity special in IE
+		if ( name == 'opacity' /* && ! FBjqRY.support.opacity*/ ) {
+			ret = elem.getStyle('opacity');
+			return ret == "" ? "1" : ret;
+		}
+		// Make sure we're using the right name for getting the float value
+		if ( name.match( /float/i ) ) {
+            name = 'cssFloat'; //FBjqRY.support.cssFloat ? "cssFloat" : "styleFloat";
+        }
+        
+		//if ( ! force && elem.getStyle && elem.getStyle(name) ) {
+        //    ret = elem.getStyle(name);
+        //}
+		//else
+        if ( elem.getStyle ) {
+			ret = elem.getStyle( Support.camelCase(name) );
+
+			// From the awesome hack by Dean Edwards
+			// http://erik.eae.net/archives/2007/07/27/18.54.15/#comment-102291
+
+			// If we're not dealing with a regular pixel number
+			// but a number that has a weird ending, we need to convert it to pixels
+            /*
+			if ( !/^\d+(px)?$/i.test( ret ) && /^\d/.test( ret ) ) {
+				// Remember the original values
+				var left = style.left, rsLeft = elem.runtimeStyle.left;
+
+				// Put in the new values to get a computed value out
+				elem.runtimeStyle.left = elem.currentStyle.left;
+				style.left = ret || 0;
+				ret = style.pixelLeft + "px";
+
+				// Revert the changed values
+				style.left = left;
+				elem.runtimeStyle.left = rsLeft;
+			} */
+		}
+
+		return ret;
+	},
+
+	// A method for quickly swapping in/out CSS properties to get correct calculations
+	swap: function( elem, options, callback ) {
+		var old = {}, name;
+
+		// Remember the old values, and insert the new ones
+		for ( name in options ) {
+            var camelName = Support.camelCase(name);
+			old[ camelName ] = elem.getStyle( camelName );
+			//elem.style[ name ] = options[ name ];
+            elem.setStyle( camelName, options[ name ] );
+		}
+
+		callback.call( elem );
+
+		// Revert the old values
+        elem.setStyle( old );
+		//for ( name in options ) {
+		//	elem.style[ name ] = old[ name ];
+		//}
+	},
 
 	// A global GUID counter for objects
 	guid: 1,
@@ -1533,6 +1673,46 @@ FBjqRY.extend({
 		// So proxy can be declared as an argument
 		return proxy;
 	}
+
+});
+
+// innerHeight/innerWidth, outerHeight/outerWidth, height/width methods :
+FBjqRY.each([ "Height", "Width" ], function(i, name) {
+
+	var tl = i ? "Left"  : "Top",  // top or left
+		br = i ? "Right" : "Bottom", // bottom or right
+		lower = name.toLowerCase();
+
+	// innerHeight and innerWidth
+	FBjqRY.fn["inner" + name] = function(){
+        var node = this.nodes[0];
+		return node ? jQuery.css( node, lower, false, "padding" ) : null;
+	};
+
+	// outerHeight and outerWidth
+	FBjqRY.fn["outer" + name] = function(margin) {
+        var node = this.nodes[0];
+		return node ? jQuery.css( node, lower, false, margin ? "margin" : "border" ) : null;
+	};
+
+	var type = lower;
+    
+	FBjqRY.fn[ type ] = function( size ) {
+
+		if ( jQuery.isFunction( size ) ) {
+			return this.each( function(i) {
+				var self = jQuery( this );
+				self[ type ]( size.call( this, i, self[ type ]() ) );
+			});
+		}
+        
+		// Get or set width or height on the element
+        return size === undefined ?
+            // Get width or height on the element
+            (this.length ? FBjqRY.css( this.nodes[0], type ) : null) :
+            // Set the width or height on the element (default to pixels if value is unitless)
+            this.css( type, typeof size === "string" ? size : size + "px" );
+	};
 
 });
 
