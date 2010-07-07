@@ -102,7 +102,7 @@ var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
 
 FBjqRY.fn = FBjqRY.prototype = {
 
-    version: "0.3.0-SNAPSHOT",
+    version: "0.3.0",
     
     //CORE
     //====================================
