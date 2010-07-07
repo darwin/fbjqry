@@ -100,10 +100,9 @@ function expect(count) { // @todo not used !
     jsUnity.currentSuite().count = count;
 }
 function reset() {
-    var tearDown = jsUnity.currentSuite().tearDown;
-    if (tearDown) setUp();
-    var setUp = jsUnity.currentSuite().setUp;
-    if (setUp) setUp();
+    var currentSuite = jsUnity.currentSuite();
+    if (currentSuite.tearDown) currentSuite.tearDown();
+    if (currentSuite.setUp) currentSuite.setUp();
 }
 
 function equals(actual, expected, message) {
