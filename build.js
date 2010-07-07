@@ -17,6 +17,8 @@ var outFile = 'fbjqry.js';
 var outMinFile = 'fbjqry.min.js';
 
 var compilerUrl = 'http://closure-compiler.appspot.com/compile';
+var compilerJarUrl = 'http://closure-compiler.googlecode.com/files/compiler-latest.zip';
+var compilerJarPath = 'lib/compiler.jar';
 var compilerOptions = {};
 compilerOptions['output_info'] = 'compiled_code';
 compilerOptions['output_format'] = 'text';
@@ -125,6 +127,75 @@ var minify = function() {
     sys.print('writen minified content into:', outMinFile,
              '(size reduced from '+ content.length +' bytes to '+ minified.length +' bytes)');
 };
+
+/**
+ * Can't use the online version of the closure compiler due to the appengine
+ * request 2MB POST limit !
+ *
+ * Redefining the minify function with an "almost" offline version, downloads
+ * the compiler.zip on-demand and compiles javascript locally.
+ */
+minify = function() {
+    var fs = require("fs"), fsBase = require("fs-base");
+    if ( ! fsBase.exists(compilerJarPath) ) {
+        var jarPath = fs.split(compilerJarPath);
+        var jarFile = jarPath[ jarPath.length - 1 ];
+        var zipFile = fs.base( jarFile, fs.extension(jarFile) ) + '.zip';
+        jarPath = fs.Path( fs.absolute( fs.join( jarPath.slice(0, -1) ) ) );
+        fs.makeTree(jarPath);
+
+        importPackage(java.lang, java.lang.reflect, java.net, java.io);
+        var zipInStream = new URL(compilerJarUrl).openStream();
+        zipFile = new File(jarPath, zipFile);
+        var zipOutStream = new FileOutputStream(zipFile);
+        var buffer = Array.newInstance(Byte.TYPE, 8192), len;
+        try {
+            while ( ( len = zipInStream.read(buffer) ) != -1 ) {
+                zipOutStream.write(buffer, 0, len);
+            }
+        }
+        finally {
+            zipInStream.close();
+            zipOutStream.close();
+        }
+
+        importPackage(java.util.zip);
+        zipFile = new ZipFile(zipFile);
+        var jarInStream = zipFile.getInputStream( zipFile.getEntry('compiler.jar') );
+        var jarOutStream = new FileOutputStream(compilerJarPath);
+        try {
+            while ( ( len = jarInStream.read(buffer) ) != -1 ) {
+                jarOutStream.write(buffer, 0, len);
+            }
+        }
+        finally {
+            jarInStream.close();
+            jarOutStream.close();
+        }
+    }
+
+    addToClasspath( fs.Path( fs.absolute(compilerJarPath) ).toString() );
+
+    var compilerArgs = [];
+    for ( var opt in compilerOptions ) {
+        if ( compilerOptions.hasOwnProperty(opt)
+            && opt.substring(0, 6) != 'output' ) {
+            compilerArgs.push( '--' + opt );
+            compilerArgs.push( compilerOptions[ opt ] );
+        }
+    }
+    var path = fs.Path( fs.absolute(outDir) );
+    compilerArgs.push('--js');
+    compilerArgs.push( path.join( outFile ) );
+    compilerArgs.push('--js_output_file');
+    compilerArgs.push( outMinFile );
+
+    com.google.javascript.jscomp.CommandLineRunner.main(compilerArgs);
+    // main() does a System.exit thus we do not get here ... ;-(
+    sys.print('writen minified content into:', outMinFile,
+             '(size reduced from ' + fsBase.size( path.join( outFile ) ) +
+             ' bytes to ' + fsBase.size( path.join( outMinFile ) ) + ' bytes)');
+}
 
 var tasks = { concat: null, minify: 'concat', _default: 'concat' };
 
