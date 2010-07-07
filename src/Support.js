@@ -194,13 +194,13 @@ var isFBNode = Support.isFBNode = function(node) {
 // NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
 // having the same elements matched with a different __instance identifier !
 var nextId = 1;
-var getFBNodeId = Support.getFBNodeId = function(node) {
+var getFBNodeId = Support.getFBNodeId = function(node, dontGenerate) {
     // __instance is a unique identifier for FBDOM nodes
     //return node && node.__instance;
     if ( node ) {
         if ( ! node.getId ) return undefined;
         var nodeId = node.getId();
-        if ( ! nodeId ) {
+        if ( ! nodeId && ! dontGenerate ) {
             nodeId = '_generated-' + nextId++;
             node.setId( nodeId );
         }

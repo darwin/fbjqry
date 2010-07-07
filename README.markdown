@@ -31,7 +31,10 @@ LIMITATIONS
     var cont = $('#header').contents(); // returns only nodes with a "tagName"
 
  * FBJS does not provide a reliable way to compare FB nodes, thus FBjqRY will
-   generate ids for the accessed HTML (canvas) elements unless explicitly set
+   generate ids for the accessed HTML (canvas) elements unless explicitly set !
+ * the previous limitation also implies that changing a FB element's id using
+   Javascript might have unexpected behavior if the id You set was previously
+   used for a different FB element !
  * FBJS only provides access to a limited set of attributes - thus custom 
    element attributes or even some valid ones might not be accessible
  * FBML "normalizes" Your anchor's href values e.g. :
@@ -58,7 +61,7 @@ LIMITATIONS
     var $el = $('<div id="main"><div/>'); // BAD - double quotes !
     var $el = $("<div id='main'><div/>"); // OK - single quotes
 
-
+ * the `FBjqRY.data()` method does not trigger any handlers as jQuery does
 
 Issues
 ------

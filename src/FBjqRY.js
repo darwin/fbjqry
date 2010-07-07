@@ -1939,60 +1939,51 @@ FBjqRY.extend( FBjqRY.fx, {
 FBjqRY.extend({
     cache: {},
     data: function( elem, name, data ) {
-        //elem = elem == window ? windowData : elem;
-        /*
-        var id = elem[ expando ];
+//        var id = getFBNodeId(elem, true), cache = FBjqRY.cache, thisCache;
+//        if ( ! id ) {
+//            if ( typeof(name) === "string" && typeof(data) === 'undefined' ) return null;
+//        }
+//        else {
+//            id = getFBNodeId(elem, false);
+//        }
+        var id = getFBNodeId(elem), cache = FBjqRY.cache, thisCache;
 
-        // Compute a unique ID for the element
-        if ( !id ) id = elem[ expando ] = ++uuid;
-        */
-        var id = getFBNodeId(elem);
+		// Avoid generating a new cache unless none exists and we
+		// want to manipulate it.
+		if ( typeof name === "object" ) {
+			cache[ id ] = FBjqRY.extend(true, {}, name);
+		}
+        else if ( ! cache[ id ] ) {
+			cache[ id ] = {};
+		}
+		thisCache = cache[ id ];
 
-        // Only generate the data cache if we're
-        // trying to access or manipulate it
-        if ( name && ! FBjqRY.cache[ id ] ) FBjqRY.cache[ id ] = {};
+		// Prevent overriding the named cache with undefined values
+		if ( typeof(data) !== 'undefined' ) thisCache[ name ] = data;
 
-        // Prevent overriding the named cache with undefined values
-        if ( typeof(data) !== 'undefined' ) {
-            FBjqRY.cache[ id ][ name ] = data;
-        }
-
-        // Return the named cache data, or the ID for the element
-        return name ? FBjqRY.cache[ id ][ name ] : id;
+		return typeof(name) === "string" ? thisCache[ name ] : thisCache;
     },
     removeData: function( elem, name ) {
-        //elem = elem == window ? windowData : elem;
-
-        //var id = elem[ expando ];
-
-        var id = getFBNodeId(elem);
-
-        // If we want to remove a specific section of the element's data
-        if ( name ) {
-            if ( FBjqRY.cache[ id ] ) {
-                // Remove the section of cache data
-                delete FBjqRY.cache[ id ][ name ];
-                // If we've removed all the data, remove the element's cache
-                name = "";
-                for ( name in FBjqRY.cache[ id ] ) break;
-                if ( ! name ) FBjqRY.removeData( elem );
-            }
-        // Otherwise, we want to remove all of the element's data
-        } else {
-            // Clean up the element expando
-            /*
-            try {
-                delete elem[ expando ];
-            }
-            catch(e){
-                // IE has trouble directly removing the expando
-                // but it's ok with using removeAttribute
-                if ( elem.removeAttribute ) elem.removeAttribute( expando );
-            } */
-            // Completely remove the data cache
-            delete FBjqRY.cache[ id ];
-        }
+        var id = getFBNodeId(elem, true), cache = FBjqRY.cache; 
+        var thisCache = id ? cache[ id ] : undefined;
+        
+		// If we want to remove a specific section of the element's data
+		if ( name ) {
+			if ( thisCache ) {
+				// Remove the section of cache data
+				delete thisCache[ name ];
+				// If we've removed all the data, remove the element's cache
+				if ( FBjqRY.isEmptyObject(thisCache) ) {
+					FBjqRY.removeData( elem );
+				}
+			}
+		} // Otherwise, we want to remove all of the element's data
+        else {
+			// Completely remove the data cache
+			if ( id ) delete cache[ id ];
+		}
     },
+
     queue: function( elem, type, data ) {
         if ( elem ) {
             type = (type || "fx") + "queue";
@@ -2034,14 +2025,15 @@ FBjqRY.fn.extend({
         }
         else {
             //return this.trigger("setData" + parts[1] + "!", [parts[0], value])
-                return this.each(function() {
-                    FBjqRY.data( this, key, value );
-                });
+            return this.each(function() {
+                FBjqRY.data( this, key, value );
+            });
         }
     },
     removeData: function( key ) {
         return this.each(function(){FBjqRY.removeData( this, key );});
     },
+
     queue: function(type, data) {
         if ( typeof type !== "string" ) {
             data = type; type = "fx";
