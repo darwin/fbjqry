@@ -64,6 +64,11 @@ LIMITATIONS
     var $el = $('<div id="main"><div/>'); // BAD - double quotes !
     var $el = $("<div id='main'><div/>"); // OK - single quotes
 
+   the XHTML parser does not allow inline style with opacity (set manually) :
+
+    var $el = $("<div id='main' style='opacity: 0.55;'><div/>"); // BAD - fails
+    var $el = $("<div id='main'><div/>").css('opacity', '0.55'); // OK - works
+
    the `FBjqRY.data()` method does not trigger any handlers as jQuery does
 
 Issues

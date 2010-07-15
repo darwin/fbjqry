@@ -2,7 +2,7 @@
 // assertion functions shortcut :
 var Asserts = jsUnity.assertions;
 Asserts.assertEqualNode = function(expected, actual, message) {
-    if ( ! Support.sameFBNode(expected, actual) ) {
+    if ( ! FBjqRY.fbjs.sameNode(expected, actual) ) {
         throw jsUnity.format("?: (?) is not equal to node (?)",
             message || "assertEqualNode", actual, expected);
     }
@@ -24,11 +24,26 @@ var removeAllElements = function() {
 
 (function() {
 
-    Support.log.enabled = true;
-    Support.log.throwErrors = true;
+    var logEnabled = true, throwErrors = true;
+    var consoleLog = (typeof console !== 'undefined') && console.log;
+
+    FBjqRY.log = function(msg, e) {
+        if ( logEnabled && consoleLog ) {
+            e ? consoleLog(msg, e) : consoleLog(msg);
+        }
+        if ( e && throwErrors ) throw e;
+    };
+
+    FBjqRY.error = function(msg) {
+        try { throw msg; }
+        catch (e) {
+            FBjqRY.log('[ERROR]', e);
+        }
+        return undefined;
+    };
 
     jsUnity.log = function() {
-        console.log( arguments[0] );
+        if (consoleLog) consoleLog( arguments[0] );
     };
 
     var suiteResults = {}, currentSuite = null;

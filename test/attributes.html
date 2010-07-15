@@ -81,24 +81,24 @@
         equals( jQuery('#option1').attr('selected'), true, 'Check for selected attribute' );
 
         // Related to [5574] and [5683]
-//        var body = document.body, $body = jQuery(body);
-//
-//        ok( $body.attr('foo') === undefined, 'Make sure that a non existent attribute returns undefined' );
-//        ok( $body.attr('nextSibling') === null, 'Make sure a null expando returns null' );
-//
-//        body.setAttribute('foo', 'baz');
-//        equals( $body.attr('foo'), 'baz', 'Make sure the dom attribute is retrieved when no expando is found' );
-//
-//        body.foo = 'bar';
-//        equals( $body.attr('foo'), 'bar', 'Make sure the expando is preferred over the dom attribute' );
-//
-//        $body.attr('foo','cool');
-//        equals( $body.attr('foo'), 'cool', 'Make sure that setting works well when both expando and dom attribute are available' );
-//
-//        body.foo = undefined;
-//        ok( $body.attr('foo') === undefined, 'Make sure the expando is preferred over the dom attribute, even if undefined' );
-//
-//        body.removeAttribute('foo'); // Cleanup
+        //var body = document.body, $body = jQuery(body);
+
+        //ok( $body.attr('foo') === undefined, 'Make sure that a non existent attribute returns undefined' );
+        //ok( $body.attr('nextSibling') === null, 'Make sure a null expando returns null' );
+
+        //body.setAttribute('foo', 'baz');
+        //equals( $body.attr('foo'), 'baz', 'Make sure the dom attribute is retrieved when no expando is found' );
+
+        //body.foo = 'bar';
+        //equals( $body.attr('foo'), 'bar', 'Make sure the expando is preferred over the dom attribute' );
+
+        //$body.attr('foo','cool');
+        //equals( $body.attr('foo'), 'cool', 'Make sure that setting works well when both expando and dom attribute are available' );
+
+        //body.foo = undefined;
+        //ok( $body.attr('foo') === undefined, 'Make sure the expando is preferred over the dom attribute, even if undefined' );
+
+        //body.removeAttribute('foo'); // Cleanup
     };
 
     attributesSuite.testAttr2 = function () {
@@ -366,6 +366,9 @@
         }
         ok( pass, "Add Class" );
 
+        ok( div.is('.test'), "Add Class is()" );
+        ok( div.eq(0).is('.test'), "Add Class eq(0).is()" );
+
         // using contents will get regular, text, and comment nodes
         //var j = jQuery("#nonnodes").contents();
         //j.addClass( valueObj("asdf") );
@@ -436,6 +439,10 @@
         $divs = jQuery('div');
         // Make sure that a null value doesn't cause problems
         $divs.eq(0).addClass("test").removeClass( valueObj(null) );
+
+        //console.log('$divs.eq(0)', $divs.eq(0) );
+        //console.log('$divs.eq(0).is',  $divs.eq(0).is('.test') );
+
         ok( $divs.eq(0).is('.test'), "Null value passed to removeClass" );
 
         $divs.eq(0).addClass("test").removeClass( valueObj("") );
@@ -612,9 +619,10 @@
 
         jq.addClass("hi foo bar");
         jq.removeClass("foo");
-        // @todo returning "hi  bar" should not be fatal :
-        //equals( x.getClassName(), "hi bar", "Check removal of one class" );
-        equals( x.getClassName(), "hi  bar", "Check removal of one class" );
+        
+        equals( x.getClassName(), "hi bar", "Check removal of one class" );
+        // returning "hi  bar" should not be fatal :
+        //equals( x.getClassName(), "hi  bar", "Check removal of one class" );
 
         ok( jq.hasClass("hi"), "Check has1" );
         ok( jq.hasClass("bar"), "Check has2" );

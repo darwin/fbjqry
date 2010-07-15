@@ -73,11 +73,11 @@
         //Asserts.assertEqual(4, div.length);
 
         var div = jQuery("<div><hr/><code/><b/></div>");
-        Asserts.assertEqual(1, div.length);
-        Asserts.assertTrue(1, div.get(0).getTagName);
+        Asserts.assertEqual(1, div.length, 'one div (parent) node exist');
+        Asserts.assertTrue(div.get(0).getTagName);
         Asserts.assertEqual('DIV', div.get(0).getTagName());
         var divChilds = div.get(0).getChildNodes();
-        Asserts.assertEqual(3, divChilds.length);
+        Asserts.assertEqual(3, divChilds.length, 'div has 3 child nodes');
         Asserts.assertEqual('HR', divChilds[0].getTagName());
         Asserts.assertEqual('CODE', divChilds[1].getTagName());
         Asserts.assertEqual('B', divChilds[2].getTagName());
@@ -211,10 +211,6 @@
     };
 
     coreSuite.testFBjqRY_HTML = function () {
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
-
         var input = jQuery("<input/>");
         Asserts.assertEqual(1, input.length);
         Asserts.assertTrue( input.get(0).getTagName );
@@ -393,9 +389,6 @@
     };
 
     coreSuite.testMerge = function () {
-        var same = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         var parse = jQuery.merge;
 
@@ -416,12 +409,6 @@
     };
 
     coreSuite.testExtend = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
 
         var settings = { xnumber1: 5, xnumber2: 7, xstring1: "peter", xstring2: "pan" },
             options = { xnumber2: 1, xstring2: "x", xxx: "newstring" },
@@ -433,7 +420,7 @@
             deep2copy = { foo: { baz: true }, foo2: document },
             deepmerged = { foo: { bar: true, baz: true }, foo2: document };
 
-        jQuery.extend(settings, options);
+        FBjqRY.extend(settings, options);
         equals( settings, merged, "Check if extended: settings must be extended" );
         equals( options, optionsCopy, "Check if not modified: options must not be modified" );
 
@@ -441,7 +428,7 @@
         equals( settings, merged, "Check if extended: settings must be extended" );
         equals( options, optionsCopy, "Check if not modified: options must not be modified" );
 
-        jQuery.extend(true, deep1, deep2);
+        jQuery.extend(true, deep1, deep2); ////
         equals( deep1.foo, deepmerged.foo, "Check if foo: settings must be extended" );
         equals( deep2.foo, deep2copy.foo, "Check if not deep2: options must not be modified" );
         equals( deep1.foo2, document, "Make sure that a deep clone was not attempted on the document" );
@@ -494,12 +481,6 @@
     };
 
     coreSuite.testMakeArray = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
 
         equals( jQuery.makeArray( jQuery('div') )[0].getTagName(), "DIV", "Pass makeArray a jQuery object" );
         var root = document.getRootElement();

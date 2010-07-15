@@ -1,24 +1,42 @@
-
-if (typeof Support === 'undefined') throw 'Support module not defined !';
-
 /**
- * findNodes function - the selector "engine" behing FBjqRY.
- * 
- * @param nodes the nodes to filter (assumes no context given if not null), set
- * to null if You're providing a context or want to start at the root element
+ * find function - the selector "engine" behing FBjqRY.
+ *
  * @param sel the selector (string)
  * @param context the context of the search e.g. a FB node or a FBjqRY object
+ * @param nodes the nodes to filter (assumes no context given if not null), set
+ * to null if You're providing a context or want to start at the root element
  * @return an array of matched nodes
- *
- * NOTE: Depends on Support functions !
  */
-Support.findNodes = (function() {
+FBjqRY.find = (function() {
     var idCheck = /^#(\w+)/,
         classCheck = /^\.([\w\-]+)/,
         tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*|~|\|)?=?["|']?([^\]]+?)?["|']?\]/,
         pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
         pseudoCheck = /^:(\w+)/;
+
+    // Elements can be considered hidden for several reasons :
+    // * They have a CSS display value of none.
+    // * They are form elements with type="hidden".
+    // * Their width and height are explicitly set to 0.
+    // * An ancestor element is hidden, so the element is not shown on the page.
+    var _isHidden = function(node) {
+        if ( node.getTagName().toLowerCase() === 'input' ) {
+            var type = node.getType();
+            if ( type && type.toLowerCase() === 'hidden' ) return true;
+        }
+        while ( node ) {
+            if ( node.getStyle('display') === 'none' ) return true;
+            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
+            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
+        }
+        return false;
+    };
+    var _isInputType = function(node, type) {
+        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
+        var nodeType = node.getType();
+        return nodeType && nodeType.toLowerCase() === type;
+    };
 
     function filterNodes(nodes, fn, recurse) {
         var retNodes = [];
@@ -104,20 +122,20 @@ Support.findNodes = (function() {
                     return a.length === v.length ? a === v : ( a.indexOf(v) === 0 && a.charAt(v.length) === '-' );
                 };
                 break;
-            case "~": matchFunc = function(a, v) { return Support.indexOf(v, a.split(' ')) !== -1; }; break;
+            case "~": matchFunc = function(a, v) { return FBjqRY.inArray(v, a.split(' ')) !== -1; }; break; // indexOf
             default:
                 if ( value === true ) matchFunc = function(a, v) { return !!a; };
                 else matchFunc = function(a, v) { return a === v; };
         }
         return filterNodes( nodes,
             function() {
-                return matchFunc( Support.attr(this, name), value );
+                return matchFunc( FBjqRY.attr(this, name), value );
             },
             recurse
         );
     }
 
-    return function(nodes, sel, context) { // the findNodes function
+    return function(sel, context, nodes) { // the find function
         if ( typeof(sel) !== "string" ) {
             if ( sel.length || sel.length === 0 ) return sel;
             return [ sel ];
@@ -126,22 +144,22 @@ Support.findNodes = (function() {
         var i, len;
 
         //Is context a valid FBDOM element
-        if ( context ) {
+        if ( context ) { // context != document
             if ( nodes && nodes.length > 0 ) {
-                return Support.error("Support.findNodes() could not handle context with nodes");
+                return FBjqRY.error("find() could not handle context with nodes");
             }
-            if ( Support.isFBNode(context) ) {
+            if ( FBjqRY.fbjs.isNode(context) ) {
                 nodes = context.getChildNodes(); // context is never part of the result
             }
             else if ( typeof(context.length) === 'number' ) { // FBjqRY or array
-                if ( typeof(context.selector) !== 'undefined' ) context = context.nodes;
+                if ( context.jquery ) context = context.nodes;
                 nodes = [];
                 for ( i = 0, len = context.length; i < len; i++ ) {
                     nodes = nodes.concat( context[i].getChildNodes() );
                 }
             }
             else {
-                return Support.error("Support.findNodes() invalid context: " + context);
+                return FBjqRY.error("find() invalid context: " + context);
             }
         }
 
@@ -149,26 +167,27 @@ Support.findNodes = (function() {
             prevSel, selectors = sel.split(","),
             allNodes = [], origNodes = nodes;
 
+        var trim = FBjqRY.trim;
         for ( i = 0, len = selectors.length; i < len; i++ ) {
-            sel = Support.trim(selectors[i]);
+            sel = trim(selectors[i]);
             prevSel = "";
             recurse = true;
             while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
                     recurse = (sel.charAt(0) === ' ');
                     if ( recurse ) {
-                        sel = Support.trim(sel);
+                        sel = trim(sel);
                         var nextNodes = [], j, sibling;
                         switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
                             case '>':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
                                 }
                                 recurse = false; // only 1st level childs
                                 break;
                             case '~':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     while ( sibling ) {
@@ -179,7 +198,7 @@ Support.findNodes = (function() {
                                 recurse = false;
                                 break;
                             case '+':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     if ( sibling ) {
@@ -239,27 +258,6 @@ Support.findNodes = (function() {
                     var intValue = value ? parseInt(value, 10) : null;
 
                     var _nodes = nodes;
-                    // Elements can be considered hidden for several reasons :
-                    // * They have a CSS display value of none.
-                    // * They are form elements with type="hidden".
-                    // * Their width and height are explicitly set to 0.
-                    // * An ancestor element is hidden, so the element is not shown on the page.
-                    var _isHidden = function(node) {
-                        if ( node.getTagName().toLowerCase() === 'input' ) {
-                            var type = node.getType();
-                            if ( type && type.toLowerCase() === 'hidden' ) return true;
-                        }
-                        while ( node ) {
-                            if ( node.getStyle('display') === 'none' ) return true;
-                            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
-                            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
-                        }
-                        return false;
-                    };
-                    var _isInputType = function(node, type) {
-                        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
-                        return node.getType() && node.getType().toLowerCase() === type;
-                    };
 
                     switch ( pseudo ) {
                         case "first":
@@ -273,122 +271,122 @@ Support.findNodes = (function() {
                         case "gt":
                             nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
                         case "even":
-                            nodes = Support.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
+                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
                         case "odd":
-                            nodes = Support.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
+                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
                         case "contains":
                             nodes = null;
-                            notSupported(":contains pseudo selector not supported (cannot read text from FB nodes)");
-                            break;
+                            return FBjqRY.error("find() :contains pseudo selector not supported");
+                            //break;
                         case "hidden":
-                            nodes = Support.grep(nodes, _isHidden); break;
+                            nodes = FBjqRY.grep(nodes, _isHidden); break;
                         case "visible":
-                            nodes = Support.grep(nodes, function(node) { return ! _isHidden(node); }); break;
+                            nodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
                         case "has":
-                            nodes = Support.grep(nodes, function(node) {
-                                var matches = find([ node ], value);
+                            nodes = FBjqRY.grep(nodes, function(node) {
+                                var matches = FBjqRY.find(value, null, [ node ]);
                                 return matches.length > 0;
                             });
                             break;
                         case "not":
-                            nodes = Support.grep(nodes, function(node) {
-                                var notMatches = find([ node ], value);
+                            nodes = FBjqRY.grep(nodes, function(node) {
+                                var notMatches = FBjqRY.find(value, null, [ node ]);
                                 // if smt is matched return false :
                                 return notMatches.length == 0;
                             });
                             break;
                         case "nth-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
                             });
                             break;
                         case "first-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 if ( childs && childs[0] ) nodes.push( childs[0] );
                             });
                             break;
                         case "last-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 var length = childs && childs.length;
                                 if ( length ) nodes.push( childs[length - 1] );
                             });
                             break;
                         case "only-child":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var parentChilds = node.getParentNode().getChildNodes();
                                 return parentChilds.length === 1;
                             });
                             break;
                         case "parent": // all elements that are the parent of another element :
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var childNodes = node.getChildNodes();
                                 return childNodes && childNodes.length > 0;
                             });
                             break;
                         case "empty": // all elements that have no children :
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var childNodes = node.getChildNodes();
                                 return ! childNodes || childNodes.length === 0;
                             });
                             break;
                         case "disabled":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var disabled = node.getDisabled();
                                 return !! disabled; // @todo disabled === 'disabled'
                             });
                             break;
                         case "enabled":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var disabled = node.getDisabled();
                                 return ! disabled;
                             });
                             break;
                         case "selected":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var selected = node.getSelected();
                                 return !! selected; // @todo selected === 'selected'
                             });
                             break;
                         case "input": // all input, textarea, select and button elements
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var tagName = node.getTagName().toLowerCase();
                                 return tagName === 'input' || tagName === 'textarea'
                                     || tagName === 'select' || tagName === 'button';
                             });
                             break;
                         case "text":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'text') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
                             break;
                         case "password":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'password') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
                             break;
                         case "radio":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'radio') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
                             break;
                         case "file":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'file') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
                             break;
                         case "image": // all image inputs
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'image') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
                             break;
                         case "reset":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'reset') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
                             break;
                         case "submit":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var type = node.getType(), tagName = node.getTagName().toLowerCase();
                                 return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
                                        (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
                             });
                             break;
                         case "header":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var tagName = node.getTagName().toLowerCase();
                                 return tagName.length === 2 && tagName.charAt(0) === 'h';
                             });
@@ -401,7 +399,7 @@ Support.findNodes = (function() {
             }
             if ( sel ) {
                 nodes = [];
-                return Support.error("Support.findNodes() could not parse the remaining selector: '" + sel + "'");
+                return FBjqRY.error("find() could not parse the remaining selector: '" + sel + "'");
             }
             else {
                 allNodes = allNodes.concat(nodes);
@@ -409,6 +407,6 @@ Support.findNodes = (function() {
             }
         }
 
-        return Support.unique(allNodes);
+        return FBjqRY.unique(allNodes);
     };
 })();
