@@ -11,7 +11,23 @@
  * 
  */
 var srcDir = 'src'
-var srcFiles = [ 'Support.js', 'Support_findNodes.js', 'FBjqRY.js' ];
+
+var srcFiles = [
+    'intro.js',
+    'core.js',
+    'support.js',
+    'data_queue.js',
+    'attributes.js',
+    'css_dimensions.js',
+    'selector.js',
+    'traversing.js',
+    'manipulation.js',
+    'event.js',
+    'ajax.js',
+    'effects.js',
+    'offset.js',
+    'outro.js'
+];
 var outDir = '.';
 var outFile = 'fbjqry.js';
 var outMinFile = 'fbjqry.min.js';

@@ -1,485 +1,915 @@
-/*
- Current HTML Parser by: Nate McQuay for use with Facebook (FBJS)
- Based on HTML Parser by: John Resig (ejohn.org)
- Original code came from: http://ejohn.org/blog/pure-javascript-html-parser/
- Original code by: Erik Arvidsson, Mozilla Public License
- http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
-
- // Usage:
- // inject into an existing FBDOM node
- Support.html(htmlString, FBNode);
-
- // return array of parsed nodes
- var nodes = Support.html(htmlString);
-
- Support.html is the exposed function for HTMLtoDOM
-*/
-
-/*
-  Current JSON parser modified by: Nate McQuay for use with Facebook (FBJS)
-  Original parser by: Mike Samuel
-  Original code from: http://code.google.com/p/json-sans-eval/
-
-  // Usage:
-  // return a js object
-  Support.json(jsonString);
-*/
-
-var Support = {};  // expose variable globally
-
-(function() {
-
-// ============================================================================
-/** Helpers */
-// ============================================================================
-//IE console work-arounds
-//if (typeof console === 'undefined') { console = {}; }
-//if (typeof console.error !== 'function') {  console.error = function() {}; }
-var consoleLog = (typeof console !== 'undefined') && console.log;
-Support.log = function(msg, e) {
-    if ( Support.log.enabled && consoleLog ) {
-        e ? consoleLog(msg, e) : consoleLog(msg);
-    }
-    if ( e && Support.log.throwErrors ) throw e;
-}
-Support.error = function(msg) {
-    try { throw msg; }
-    catch (e) {
-        Support.log('[ERROR]', e);
-    }
-    return undefined;
-}
-
-Support.memo = function(fn, cache) { // function return value memoization
-    cache = cache || {};
-    return function(p) {
-        if( p && cache[p] ) { return cache[p]; }
-        cache[p] = fn(p);
-        return cache[p];
-    };
-};
-
-// copied from facebooker
-Support.encodeURIComponent = function(str) {
-    if ( typeof(str) === "string" ) {
-        return str.replace(/=/g,'%3D').replace(/&/g,'%26');
-    }
-    // checkboxes and radio buttons return objects instead of a string
-    else if( typeof(str) === "object" ){
-        for (var i in str) {
-            return str[i].replace(/=/g,'%3D').replace(/&/g,'%26');
-        }
-    }
-};
-
-// ============================================================================
-/** String functions */
-// ============================================================================
-var rtrim = /^(\s|\u00A0)+|(\s|\u00A0)+$/g; // Used for trimming whitespace
-var emptyString = '';
-//var trim = Support.trim = function(s) { return s.replace(/^\s+|\s+$/g, ""); };
-var trim = Support.trim = function(str) {
-    if ( str != null && typeof(str) !== 'string' ) str = str.toString();
-    return ( str || emptyString ).replace( rtrim, emptyString );
-};
-var camelCase = Support.camelCase = Support.memo(function(str) {
-    return str.replace(/\-(\w)/g, function(all, letter){ return letter.toUpperCase(); });
-});
-
-// ============================================================================
-/** Object functions */
-// ============================================================================
-var object = Support.object = {}; // we can't access Array.prototype
-
-//current version is slightly modified from jQuery version
-/*
-isFunction: function( fn ) {
-    return !!fn && typeof fn != "string" && !fn.nodeName && (/^[\s[]?function/.test( fn + "" ));
-         //the following condition should be in there too, but FBJS prevents access to Array
-         //fn.constructor != [].constructor
-},
-*/
-// See test/unit/core.js for details concerning isFunction.
-// Since version 1.3, DOM methods and functions like alert
-// aren't supported. They return false on IE (#2968).
-
-var toString = object.toString;
-var isFunction = Support.isFunction = function(obj) { // @todo
-    return toString.call(obj) === "[object Function]";
-};
-
-Support.isArray = function(obj) {
-    return toString.call(obj) === "[object Array]";
-};
-/**
- * NOTE: this method is important as FBML might "prerender" JS strings
- * that contain HTML (to be used with setInnerXHTML etc.) !
+/*!
+ * A wrapper for FBJS to make it feel more like jQuery.
+ *  FB   = Facebook
+ *  jqRY = jQuery
+ *  RY   = RockYou!
+ * @author: Nate McQuay [borrowing heavily from jQuery 1.2.6]
+ * @author: Karol Bucek [building on top of Nate's version to make it more "complete"]
  *
- * typeof(variable) for such strings might return 'object' !
+ * Copyright 2010, Karol Bucek
+ * Released under the MIT license.
  */
-Support.isString = function(obj) {
-    //return object.toString() === object;
-    return toString.call(obj) === "[object String]";
+
+//can't wrap this because it needs to be "global" and we don't have access to the window object
+var FBjqRY = function(selector, context) {
+    return new FBjqRY.prototype.init(selector, context);
 };
+//We can wrap everything else
+(function() {// Use the correct document accordingly with window argument (sandbox)
+//document = window.document,
 
-Support.isEmptyObject = function(obj) {
-    for ( var n in obj ) return false;
-    return true;
-};
+// A simple way to check for HTML strings or ID strings
+// (both of which we optimize for)
+//var quickExpr = /^[^<]*(<[\w\W]+>)[^>]*$|^#([\w\-]+)$/;
+var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
+// Is it a simple selector
+//var isSimple = /^.[^:#\[\.,]*$/;
+// Check if a string has a non-whitespace character in it
+//var rnotwhite = /\S/;
+// Used for trimming whitespace
+var trimLeft = /^\s+/;
+var trimRight = /\s+$/;
+// Match a standalone tag
+//var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
+// Keep a UserAgent string for use with jQuery.browser
+//userAgent = navigator.userAgent,
+// For matching the engine and version of the browser
+//browserMatch,
+// Has the ready events already been bound?
+//readyBound = false,
+// The functions to execute on DOM ready
+//readyList = [],
+// The ready event handler
+//DOMContentLoaded,
 
-/*
-Support.each = function(obj, cb, args) {
-    if ( !obj || !obj.length ) return obj; // return [];
+// Save a reference to some core methods
+//toString = Object.prototype.toString;
+var toString = {}.toString;
+var slice = [].slice;
 
-    var i, len = obj.length;
-    if ( args ) {
-        if ( len ) {
-            for ( i = 0; i < len; i++ ) cb.apply(obj[i], args);
-        }
-        else {
-            for ( i in obj ) {
-                if ( obj.hasOwnProperty(i) ) cb.apply(obj[i], args);
-            }
-        }
-    } else {
-        if ( len ) {
-            for ( i = 0; i < len; i++ ) cb.call(obj[i]);
-        }
-        else {
-            for ( i in obj ) {
-                if ( obj.hasOwnProperty(i) ) cb.call(obj[i]);
-            }
-        }
-    }
-    return obj;
-}; */
-Support.each = function( object, callback, args ) { // args is for internal usage only
-    var name, i, length = object.length;
-    var isObj = length === undefined || isFunction(object);
+//hasOwn = Object.prototype.hasOwnProperty;
+//push = Array.prototype.push;
 
-    if ( args ) {
-        if ( isObj ) { // length === undefined
-            for ( name in object )
-                if ( callback.apply( object[ name ], args ) === false )
-                    break;
-        } else {
-            for ( i = 0; i < length; )
-                if ( callback.apply( object[ i++ ], args ) === false )
-                    break;
-        }
-    // A special, fast, case for the most common use of each
-    } else {
-        if ( isObj ) { // length === undefined
-            for ( name in object )
-                if ( callback.call( object[ name ], name, object[ name ] ) === false )
-                    break;
-        } else {
-            i = 0;
-            for ( var value = object[0];
-                  i < length && callback.call( value, i, value ) !== false;
-                  value = object[++i] ) { }
-        }
-    }
+trim = ''.trim;
+
+FBjqRY.fn = FBjqRY.prototype = {
     
-    return object;
-};
-
-// ============================================================================
-/** FBNode helpers */
-// ============================================================================
-var isFBNode = Support.isFBNode = function(node) {
-    return node && (node.__instance || node.__instance === 0);
-};
-
-// NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
-// having the same elements matched with a different __instance identifier !
-var nextId = 1;
-var getFBNodeId = Support.getFBNodeId = function(node, dontGenerate) {
-    // __instance is a unique identifier for FBDOM nodes
-    //return node && node.__instance;
-    if ( node ) {
-        if ( ! node.getId ) return undefined;
-        var nodeId = node.getId();
-        if ( ! nodeId && ! dontGenerate ) {
-            nodeId = '_generated-' + nextId++;
-            node.setId( nodeId );
+    init: function(selector, context) {
+        //selector = selector || document; // makes no sense document is a stub only !
+        if ( typeof(selector) === 'undefined' ) { // @todo probably non sense to have it ...
+            this.context = document;
+            this.length = 0;
+            return this;
         }
-        return nodeId;
-    }
-    return node;
-};
-var sameFBNode = Support.sameFBNode = function(node1, node2) {
-    // __instance is a unique identifier for FBDOM nodes
-    //return node1.__instance == node2.__instance;
-    return getFBNodeId(node1) === getFBNodeId(node2);
-};
-
-Support.style = function(node, name, value) { // supports multiple nodes
-    var i, len = node.length, val;
-    
-    if ( Support.isString(name) && typeof(value) !== 'undefined' ) {
-        name = Support.camelCase(name);
-        if (name === 'float' || name === 'styleFloat') name = 'cssFloat';
-
-        if (typeof(value) === 'number') value = value + "px";
-        if ( len ) {
-            for ( i = 0; i < len; i++ ) {
-                val = value;
-                if ( Support.isFunction(value) ) {
-                    val = value(i, node[i].getStyle(name));
+        //ready state shortcut handler -- no need for ready event because FBJS delays execution
+        if ( FBjqRY.isFunction(selector) ) return this.ready(selector);
+        //Are we dealing with an FBjqRY object?
+        else if ( selector.jquery ) {
+            var nodes = selector.get();
+            this.nodes = nodes.length ? nodes : [ nodes ];
+            this.length = nodes.length;
+            this.selector = selector.selector;
+            this.context = selector.context;
+            return this;
+        }
+        //Are we dealing with FB DOM Nodes?
+        else if ( FBjqRY.fbjs.isNode(selector) || FBjqRY.fbjs.isNode(selector[0]) ) {
+            this.nodes = selector.length ? selector : [ selector ];
+            this.length = this.nodes.length;
+            this.context = selector;
+            return this;
+        }
+        else if ( typeof(selector) !== 'undefined' ) {
+            var match = quickExpr.exec(selector);
+            if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
+                if ( match[1] ) { // HANDLE: $(html) -> $(array)
+                    this.nodes = nodesFromXHTML( match[1] ); // helper from manipulation.js
                 }
-                node[i].setStyle(name, val);
+                else { // HANDLE: $("#id")
+                    this.nodes = [];
+                    var node = document.getElementById( match[3] );
+                    if ( node ) this.nodes[0] = node;
+                }
+            }
+            else {
+                //context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
+                // HANDLE: $(expr, [context]) -- which is just equivalent to: $(context).find(expr)
+                this.nodes = FBjqRY.find( selector, context, null ); // find setup in selector.js
             }
         }
-        else { // only used from Support.attr
-            node.setStyle(name, value);
+
+        this.selector = selector;
+        this.context = context || document; // @todo does the document make any sense with FBJS ?!
+        this.length = this.nodes.length;
+        return this;
+    },
+
+	// Start with an empty selector
+	selector: "",
+
+	// The current version of jQuery being used
+	jquery: "0.4.0", //"@VERSION",
+
+	// The default length of a jQuery object is 0
+	length: 0,
+
+	// The number of elements contained in the matched element set
+	size: function() { return this.length; },
+
+	toArray: function() {
+        return slice.call( this.nodes, 0 ); // won't work with FBJS
+        /*
+        var array = [];
+        for ( var i = 0, len = this.length; i < len; i++ ) {
+            array[i] = this.nodes[i];
         }
-        //return false;
+        return array; */
+    },
+
+	// Get the Nth element in the matched element set OR
+	// Get the whole matched element set as a clean array
+	get: function(i) {
+        // Return a 'clean' array or just the element :
+		return typeof(i) === 'undefined' ? slice.call( this.nodes ) : this.nodes[i];
+	},
+
+    // Take an array of elements and push it onto the stack
+    // (returning the new matched element set)
+    pushStack: function( elems, name, selector ) {
+        // Build a new jQuery matched element set
+        var ret = FBjqRY( elems );
+        // Add the old object onto the stack (as a reference)
+        ret.prevObject = this;
+        ret.context = this.context;
+
+        if ( name === "find" ) {
+            ret.selector = this.selector + (this.selector ? " " : "") + selector;
+        }
+        else if ( name ) {
+            ret.selector = this.selector + "." + name + "(" + selector + ")";
+        }
+        // Return the newly-formed element set
+        return ret;
+    },
+
+	// Execute a callback for every element in the matched set.
+	// (You can seed the arguments with an array of args, but this is
+	// only used internally.)
+    each: function(callback, args) {
+        FBjqRY.each(this.nodes, callback, args);
+        return this;
+    },
+
+    ready: function(fn) {
+        setTimeout( function() { fn(); } );
+        return this;
+    },
+
+	eq: function( i ) {
+		return i === -1 ? this.slice( i ) : this.slice( i, +i + 1 );
+    },
+
+	first: function() { return this.eq(0); },
+	last: function() { return this.eq(-1); },
+
+    slice: function(arg1, arg2) {
+        return this.pushStack(
+            slice.apply( this.nodes, arguments ),
+            //this.nodes.slice( arg1, arg2 ),
+            "slice", slice.call(arguments).join(",")
+        );
+    },
+
+	map: function( callback ) {
+		return this.pushStack( FBjqRY.map(this.nodes, function(elem, i){
+			return callback.call( elem, i, elem );
+		}));
+	},
+
+    end: function() { // @todo || jQuery(null); ?
+        return this.prevObject || FBjqRY( [] );
     }
-    else if ( typeof(name) === 'object' ) {
-        //if ( name['float'] && ! name.cssFloat ) name.cssFloat = name['float'];
 
-        var values = {};
-        for ( var n in name ) {
-            if ( name.hasOwnProperty(n) ) {
-                value = name[n];
-                
-                n = Support.camelCase(n);
-                if (n === 'float' || n === 'styleFloat') n = 'cssFloat';
+	// For internal use only.
+	// Behaves like an Array's method, not like a jQuery method.
+	//push: push,
+	//sort: [].sort,
+	//splice: [].splice
+};
 
-                if (typeof(value) === 'number') value = value + "px";
+// Give the init function the jQuery prototype for later instantiation
+FBjqRY.fn.init.prototype = FBjqRY.fn;
 
-                ///values[ n ] = value;
-                if ( len ) {
-                    for ( i = 0; i < len; i++ ) {
-                        val = value;
-                        if ( Support.isFunction(value) ) {
-                            val= value(i, node[i].getStyle(n));
-                        }
-                        node[i].setStyle(n, val);
+// ============================================================================
+/** FBJS helpers */
+// ============================================================================
+FBjqRY.fbjs = { // NOTE: needs to be defined before extend is first used !
+    nextId: 1,
+    // NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
+    // having the same elements matched with a different __instance identifier !
+    getNodeId: function(node, dontGenerate) {
+        // __instance is a unique identifier for FBDOM nodes
+        //return node && node.__instance;
+        if ( node ) {
+            if ( ! node.getId ) return undefined;
+            var nodeId = node.getId();
+            if ( ! nodeId && ! dontGenerate ) {
+                nodeId = '_generated-' + FBjqRY.fbjs.nextId++;
+                node.setId( nodeId );
+            }
+            return nodeId;
+        }
+        return node;
+    },
+    isNode: function(node) {
+        return node && (node.__instance || node.__instance === 0);
+    },
+    sameNode: function(node1, node2) {
+        var getNodeId = FBjqRY.fbjs.getNodeId;
+        // __instance is a unique identifier for FBDOM nodes
+        //return node1.__instance == node2.__instance;
+        return getNodeId(node1) === getNodeId(node2);
+    }
+};
+
+/* // 1.4.2 version - requires isPlainObject
+FBjqRY.extend = FBjqRY.fn.extend = function() {
+	// copy reference to target object
+	var target = arguments[0] || {}, i = 1, length = arguments.length,
+        deep = false, options, name, src, copy;
+
+	// Handle a deep copy situation
+	if ( typeof target === "boolean" ) {
+		deep = target;
+		target = arguments[1] || {};
+		// skip the boolean and the target
+		i = 2;
+	}
+
+	// Handle case when target is a string or something (possible in deep copy)
+	if ( typeof target !== "object" && ! FBjqRY.isFunction(target) ) {
+		target = {};
+	}
+
+	// extend jQuery itself if only one argument is passed
+	if ( length === i ) { target = this; --i; }
+
+	for ( ; i < length; i++ ) {
+		// Only deal with non-null/undefined values
+		if ( (options = arguments[ i ]) != null ) {
+			// Extend the base object
+			for ( name in options ) {
+				src = target[ name ];
+				copy = options[ name ];
+
+				// Prevent never-ending loop
+				if ( target === copy ) {
+					continue;
+				}
+
+				// Recurse if we're merging object literal values or arrays
+				if ( deep && copy && ( isPlainObject(copy) || isArray(copy) ) ) {
+					var clone = src && ( isPlainObject(src) || isArray(src) ) ? src
+						: isArray(copy) ? [] : {};
+
+					// Never move original objects, clone them
+					target[ name ] = FBjqRY.extend( deep, clone, copy );
+
+				// Don't bring in undefined values
+				} else if ( copy !== undefined ) {
+					target[ name ] = copy;
+				}
+			}
+		}
+	}
+
+	// Return the modified object
+	return target;
+}; */
+FBjqRY.extend = FBjqRY.fn.extend = function() {
+	// copy reference to target object
+	var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options;
+
+	// Handle a deep copy situation
+	if ( typeof target === "boolean" ) {
+		deep = target;
+		target = arguments[1] || {};
+		// skip the boolean and the target
+		i = 2;
+	}
+
+	// Handle case when target is a string or something (possible in deep copy)
+	if ( typeof target !== "object" && ! FBjqRY.isFunction(target) ) target = {};
+
+	// extend jQuery itself if only one argument is passed
+	if ( length == i ) {
+		target = this;
+		i--;
+	}
+
+    var isFBNode = FBjqRY.fbjs.isNode;
+    
+	for ( ; i < length; i++ ) {
+		// Only deal with non-null/undefined values
+		if ( (options = arguments[ i ]) != null )
+			// Extend the base object
+			for ( var name in options ) {
+				var src = target[ name ], copy = options[ name ];
+
+				// Prevent never-ending loop
+				if ( target === copy ) continue;
+
+				// Recurse if we're merging object values
+				if ( deep && copy && typeof copy === "object" && ! isFBNode(copy) ) {
+                    //console.log('deep', name, target, copy);
+					target[ name ] = FBjqRY.extend( deep,
+						// Never move original objects, clone them
+						src || ( copy.length != null ? [] : {} )
+					, copy );
+                }
+				// Don't bring in undefined values
+				else if ( typeof copy !== 'undefined' ) target[ name ] = copy;
+
+			}
+    }
+
+	// Return the modified object
+	return target;
+};
+
+FBjqRY.extend({
+	noConflict: function( deep ) {
+		//window.$ = _$;
+		//if ( deep ) {
+		//	window.jQuery = _jQuery;
+		//}
+		return FBjqRY;
+	},
+	// Is the DOM ready to be used? Set to true once it occurs.
+	isReady: true, // false,
+    
+	// Handle when the DOM is ready
+	//ready: function() { },
+	//bindReady: function() { if ( true ) return; },
+
+	// See test/unit/core.js for details concerning isFunction.
+	// Since version 1.3, DOM methods and functions like alert
+	// aren't supported. They return false on IE (#2968).
+	isFunction: function( obj ) {
+		return toString.call(obj) === "[object Function]";
+	},
+	isArray: function( obj ) {
+		return toString.call(obj) === "[object Array]";
+	},
+
+    /**
+     * NOTE: this method is important as FBML might "prerender" JS strings
+     * that contain HTML (to be used with setInnerXHTML etc.) !
+     *
+     * typeof(variable) for such strings might return 'object' !
+     * 
+     * @FBjqRY.extension
+     */
+    isString: function(obj) { // @todo var var isString !
+        //return object.toString() === object;
+        return toString.call(obj) === "[object String]";
+    },
+
+    /*
+	isPlainObject: function( obj ) {
+		// Must be an Object.
+		// Because of IE, we also have to check the presence of the constructor property.
+		// Make sure that DOM nodes and window objects don't pass through, as well
+		if ( !obj || toString.call(obj) !== "[object Object]" || obj.nodeType || obj.setInterval ) {
+			return false;
+		}
+
+		// Not own constructor property must be Object
+		if ( obj.constructor &&
+			!hasOwn.call(obj, "constructor") &&
+			!hasOwn.call(obj.constructor.prototype, "isPrototypeOf") ) {
+			return false;
+		}
+
+		// Own properties are enumerated firstly, so to speed up,
+		// if last one is own, then all properties are own.
+
+		var key;
+		for ( key in obj ) {}
+
+		return key === undefined || hasOwn.call( obj, key );
+	}, */
+
+	isEmptyObject: function( obj ) {
+		for ( var name in obj ) {
+			return false;
+		}
+		return true;
+	},
+
+	error: function( msg ) {
+		throw msg;
+	},
+
+	parseJSON: function(data) {
+		if ( ! FBjqRY.isString(data) || ! data ) return null;
+
+		// Make sure leading/trailing whitespace is removed (IE can't handle it)
+		//data = jQuery.trim( data );
+
+		// Make sure the incoming data is actual JSON
+		// Logic borrowed from http://json.org/json2.js
+		if ( /^[\],:{}\s]*$/.test(data.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, "@")
+			.replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, "]")
+			.replace(/(?:^|:|,)(?:\s*\[)+/g, "")) ) {
+
+			return parseJSON(data); // from support.js
+
+		}
+        else {
+			return FBjqRY.error("parseJSON() invalid JSON: " + data);
+		}
+	},
+
+	noop: function() {},
+
+	// Evalulates a script in a global context
+    /*
+	globalEval: function( data ) {
+		if ( data && rnotwhite.test(data) ) {
+			// Inspired by code by Andrea Giammarchi
+			// http://webreflection.blogspot.com/2007/08/global-scope-evaluation-and-dom.html
+			var head = document.getElementsByTagName("head")[0] || document.documentElement,
+				script = document.createElement("script");
+
+			script.type = "text/javascript";
+
+			if ( jQuery.support.scriptEval ) {
+				script.appendChild( document.createTextNode( data ) );
+			} else {
+				script.text = data;
+			}
+
+			// Use insertBefore instead of appendChild to circumvent an IE6 bug.
+			// This arises when a base node is used (#2709).
+			head.insertBefore( script, head.firstChild );
+			head.removeChild( script );
+		}
+	}, */
+
+	nodeName: function(elem, name) {
+		return elem.getTagName && elem.getTagName().toUpperCase() === name.toUpperCase();
+	},
+
+	// args is for internal usage only
+    each: function( object, callback, args ) {
+        var name, i, length = object.length;
+        var isObj = length === undefined || FBjqRY.isFunction(object);
+
+        if ( args ) {
+            if ( isObj ) { // length === undefined
+                for ( name in object )
+                    if ( callback.apply( object[ name ], args ) === false )
+                        break;
+            } else {
+                for ( i = 0; i < length; )
+                    if ( callback.apply( object[ i++ ], args ) === false )
+                        break;
+            }
+        // A special, fast, case for the most common use of each
+        } else {
+            if ( isObj ) { // length === undefined
+                for ( name in object )
+                    if ( callback.call( object[ name ], name, object[ name ] ) === false )
+                        break;
+            } else {
+                i = 0;
+                for ( var value = object[0];
+                      i < length && callback.call( value, i, value ) !== false;
+                      value = object[++i] ) { }
+            }
+        }
+
+        return object;
+    },
+
+	// Use native String.trim function wherever possible
+	trim: trim ?
+		function( text ) {
+			return text == null ? "" : trim.call( text.toString() );
+		} :
+		// Otherwise use our own trimming functionality
+		function( text ) {
+            var empty = '';
+			return text == null ? empty :
+				text.toString().replace( trimLeft, empty ).replace( trimRight, empty );
+		},
+
+	// results is for internal usage only
+	makeArray: function( array, results ) {
+		var ret = results || [];
+
+		if( array != null ) {
+			var i = array.length;
+			// The window, strings (and functions) also have 'length'
+			if( i == null || FBjqRY.isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
+				ret[0] = array;
+            } else {
+                if ( array.jquery ) array = array.nodes;
+                FBjqRY.merge( ret, array ); // while ( i ) ret[--i] = array[i];
+            }
+		}
+
+		return ret;
+	},
+
+	inArray: function(elem, array) {
+        var cmpFn, isNode = FBjqRY.fbjs.isNode;
+        if ( isNode(elem) ) {
+            var sameNode = FBjqRY.fbjs.sameNode;
+            cmpFn = function(v) { return isNode(v) && sameNode(elem, v); };
+        }
+        else {
+            if ( elem.equals ) cmpFn = function(v) { return elem.equals(v); };
+            else cmpFn = function(v) { return (elem === v); };
+        }
+
+        for (var i = 0, len = array.length; i < len; i++) {
+            if ( cmpFn(array[i]) ) return i;
+        }
+        return -1;
+    },
+
+	merge: function(first, second) {
+        var i = first.length, j = 0;
+
+        if ( typeof(second.length) === "number" ) {
+            for ( var len = second.length; j < len; j++ ) {
+                first[i++] = second[j];
+            }
+        }
+        else {
+            while ( typeof(second[j]) !== 'undefined' ) {
+                first[i++] = second[j++];
+            }
+        }
+
+        first.length = i;
+        return first;
+    },
+
+	grep: function( array, callback, inv ) {
+        var ret = [];
+
+        // Go through the array, only saving the items
+        // that pass the validator function
+        for ( var i = 0, len = array.length; i < len; i++ ) {
+            if ( !inv != !callback( array[i], i ) ) {
+                ret.push( array[i] );
+            }
+        }
+        return ret;
+    },
+
+	// arg is for internal usage only
+	map: function( elems, callback, arg ) {
+		var ret = [], value;
+
+		// Go through the array, translating each of the items to their
+		// new value (or values).
+		for ( var i = 0, length = elems.length; i < length; i++ ) {
+			value = callback( elems[ i ], i, arg );
+
+			if ( value != null ) {
+				ret[ ret.length ] = value;
+			}
+		}
+
+		return ret.concat.apply( [], ret );
+	},
+
+	// A global GUID counter for objects
+	guid: 1,
+	proxy: function( fn, proxy, thisObject ) {
+		if ( arguments.length === 2 ) {
+			if ( typeof proxy === "string" ) {
+				thisObject = fn;
+				fn = thisObject[ proxy ];
+				proxy = undefined;
+			}
+            else if ( proxy && !jQuery.isFunction( proxy ) ) {
+				thisObject = proxy;
+				proxy = undefined;
+			}
+		}
+
+		if ( ! proxy && fn ) {
+			proxy = function() {
+				return fn.apply( thisObject || this, arguments );
+			};
+		}
+
+		// Set the guid of unique handler to the same of original handler, so it can be removed
+		if ( fn ) {
+			proxy.guid = fn.guid = fn.guid || proxy.guid || jQuery.guid++;
+		}
+
+		// So proxy can be declared as an argument
+		return proxy;
+	},
+
+	// Mutifunctional method to get and set values to a collection
+	// The value/s can be optionally by executed if its a function
+	access: function( elems, key, value, exec, fn, pass ) {
+        var origElems = elems;
+        if ( elems.jquery ) elems = elems.nodes;
+		var length = elems.length;
+
+		// Setting many attributes
+		if ( typeof key === "object" ) {
+            var access = FBjqRY.access;
+			for ( var k in key ) {
+				access( elems, k, key[k], exec, fn, value );
+			}
+			return origElems;
+		}
+
+		// Setting one attribute
+		if ( typeof(value) !== 'undefined' ) {
+			// Optionally, function values get executed if exec is true
+			exec = ! pass && exec && FBjqRY.isFunction(value);
+
+			for ( var i = 0; i < length; i++ ) {
+				fn( elems[i], key, exec ? value.call( elems[i], i, fn( elems[i], key ) ) : value, pass );
+			}
+
+			return origElems;
+		}
+
+		// Getting an attribute
+		return length ? fn( elems[0], key ) : undefined;
+	},
+
+	now: function() { return (new Date()).getTime(); },
+
+	// Use of jQuery.browser is frowned upon.
+	// More details: http://docs.jquery.com/Utilities/jQuery.browser
+    /*
+	uaMatch: function( ua ) {
+		ua = ua.toLowerCase();
+
+		var match = /(webkit)[ \/]([\w.]+)/.exec( ua ) ||
+			/(opera)(?:.*version)?[ \/]([\w.]+)/.exec( ua ) ||
+			/(msie) ([\w.]+)/.exec( ua ) ||
+			!/compatible/.test( ua ) && /(mozilla)(?:.*? rv:([\w.]+))?/.exec( ua ) ||
+			[];
+
+		return { browser: match[1] || "", version: match[2] || "0" };
+	}, */
+
+	browser: {},
+
+    unique: function(array) {
+        //if ( !array || !array.length ) return [];
+        /*
+        var indexFn = function(elem) { return elem; };
+
+        if ( ary[0].__instance || ary[0].__instance === 0) {
+            indexFn = function(elem) { return elem.__instance; };
+        }
+
+        for(var i = 0, length = ary.length; i < length; i++) {
+            index = indexFn(ary[i]);
+            if(!done[index]) {
+                done[index] = true;
+                ret.push(ary[i]);
+            }
+        }
+        */
+        var ret = [], done = {}, i, len, e, id;
+        try {
+            if ( FBjqRY.fbjs.isNode(array[0]) ) {
+                var getNodeId = FBjqRY.fbjs.getNodeId;
+                for (i = 0, len = array.length; i < len; i++) {
+                    e = array[i]; id = getNodeId(e);
+                    if ( ! done[id] ) {
+                        done[id] = true;
+                        ret.push(e);
                     }
                 }
-                else { // only used from Support.attr
-                    node.setStyle(n, value);
-                }
             }
-        }
-
-        ///if ( len ) {
-        ///    for ( i = 0; i < len; i++ ) node[i].setStyle(values);
-        //}
-        ///else {
-        ///    node.setStyle(values);
-        ///}
-        //return false;
-    }
-};
-
-Support.attr = (function() {
-    var validAttrs = (function() {
-        var validAttrs = {},
-            // node attributes :
-            attrs = ("accessKey,action,checked,className,cols,colSpan,dir,disabled,href,id," +
-                       "maxLength,method,name,readOnly,rows,rowSpan,selected,selectedIndex," +
-                       "selection,src,style,tabIndex,target,title,type,value");
-            // node accessors (getters) :
-            attrs += ",tagName,parentNode,nextSibling,previousSibling,firstChild,lastChild";
-            attrs = attrs.split(",");
-        for (var i = 0, len = attrs.length; i < len; i++) {
-            var attr = attrs[i];
-            validAttrs[ attr.toLowerCase() ] = 'set' +
-                attr.charAt(0).toUpperCase() + attr.substr(1);
-        }
-        // name aliases :
-        validAttrs[ "class" ] = "setClassName";
-        validAttrs[ "nodeName".toLowerCase() ] = "setTagName";
-        // html/text setters :
-        validAttrs[ "html" ] = "setInnerXHTML";
-        validAttrs[ "fbml" ] = "setInnerFBML";
-        validAttrs[ "text" ] = "setTextValue";
-        // css/style setters :
-        validAttrs[ "css" ] = "setStyle";
-        validAttrs[ "style" ] = "setStyle";
-        // height/width helpers :
-        validAttrs[ "height" ] = "setHeight";
-        validAttrs[ "width" ] = "setWidth";
-        return validAttrs;
-    })();
-
-    var setStyle = function(node, val) { // a special case for the set style attr method
-        if ( typeof(val) === 'string' ) {
-            var styles = val.split(";");
-            for ( var i = 0, len = styles.length; i < len; i++ ) {
-                var s = styles[i].split(":");
-                if ( s.length == 2 ) {
-                    var name = trim( s[0].toLowerCase() );
-                    var value = trim( s[1] );
-                    Support.style(node, name, value);
-                }
-            }
-        }
-        else {
-            Support.style(node, val);
-        }
-    };
-
-    return function(node, attr, val) {
-        var setAttr = validAttrs[ attr.toLowerCase() ];
-        if ( ! setAttr ) {
-           Support.log("Support.attr() attribute name '" + attr + "' is not supported");
-           return undefined;
-        }
-
-        if ( typeof val !== 'undefined' ) { // setter :
-            try {
-               if (setAttr === "setStyle") setStyle(node, val);
-               else if (setAttr === "setWidth") Support.style(node, 'width', val);
-               else if (setAttr === "setHeight") Support.style(node, 'height', val);
-               //else if (setAttr === "setInnerXHTML") Support.xhtml(val, node);
-               else node[setAttr](val); // e.g. setTitle(val)
-            }
-            catch (e) { // e.g. when setting an invalid url parameter using setSrc()
-                return Support.error("Support.attr() setter node[" + setAttr + "](" + val + ") failed: " + e);
-            }
-            return node;
-        }
-        // else getter :
-        var getAttr = 'g' + setAttr.substr(1); // setStyle -> getStyle
-        if ( ! node[getAttr] ) {
-            return Support.error("Support.attr() getter " + getAttr + " not supported !");
-        }
-        val = undefined;
-        try {
-            if (getAttr === "getStyle") throw "unsupported use css('styleProperty') to get style values";
-            else if (getAttr === "getWidth") val = Support.style(node, 'width');
-            else if (getAttr === "getHeight") val = Support.style(node, 'height');
             else {
-                val = node[getAttr]();  // e.g. getTitle()
-                //if ( typeof(val) === 'undefined' ) val = '';
+                for (i = 0, len = array.length; i < len; i++) {
+                    e = array[i]; id = e;
+                    if ( ! done[id] ) {
+                        done[id] = true;
+                        ret.push(e);
+                    }
+                }
             }
         }
         catch (e) {
-            // some nodes for some attrs e.g. getHref throw an error :
-            // "TypeError: b is undefined" instead of returning correctly
-            Support.log("Support.attr() getter node[" + getAttr + "]() failed: " + e);
+            FBjqRY.log("unique() returning original array", e);
+            ret = array;
         }
-        return val;
-    };
+        return ret;
+    }
+});
+/*
+browserMatch = jQuery.uaMatch( userAgent );
+if ( browserMatch.browser ) {
+	jQuery.browser[ browserMatch.browser ] = true;
+	jQuery.browser.version = browserMatch.version;
+}
+
+// Deprecated, use jQuery.browser.webkit instead
+if ( jQuery.browser.webkit ) {
+	jQuery.browser.safari = true;
+} */
+
+// Verify that \s matches non-breaking spaces
+// (IE fails on this test)
+if ( !/\s/.test( "\xA0" ) ) {
+	trimLeft = /^[\s\xA0]+/;
+	trimRight = /[\s\xA0]+$/;
+}
+
+FBjqRY.log = FBjqRY.noop; // a tracing helper
+
+// All jQuery objects should point back to these
+//rootjQuery = jQuery(document);
+
+// Expose jQuery to the global object
+//window.jQuery = window.$ = jQuery;
+(function() {
+
+	//var root = document.getRootElement();
+    //var script = document.createElement("script");
+    //var id = "script" + FBjqRY.now();
+    
+    var div = document.createElement("div");
+	div.setStyle('display', "none");
+	div.setInnerXHTML(
+    "<div>" +
+        //"<link/>" +
+        "<table></table>" +
+        // FBJS (XHTML issue): opacity: 0.55 is not a valid CSS style
+        //"<a href='/a' style='color:red; float:left; opacity: 0.55;'>a</a>" +
+        "<a href='/a' style='color:red; float:left;'>a</a>" +
+        "<input type='checkbox'/>" +
+    "</div>");
+
+	var all = div.getFirstChild().getElementsByTagName("*"),
+		a = div.getElementsByTagName("a")[0];
+
+    a.setStyle('opacity', '0.55'); // works despite the inline style doesn't !
+
+	// Can't get basic test support
+	if ( !all || !all.length || !a ) {
+        FBjqRY.support = {};
+        return;
+    }
+
+	FBjqRY.support = {
+		// IE strips leading whitespace when .innerHTML is used
+		leadingWhitespace: false, //div.getFirstChild().nodeType === 3,
+
+		// Make sure that tbody elements aren't automatically inserted
+		// IE will insert them into empty tables
+		tbody: !div.getElementsByTagName("tbody").length,
+
+		// Make sure that link elements get serialized correctly by innerHTML
+		// This requires a wrapper element in IE
+        // FBJS: link is not an allowed DOM element
+		//htmlSerialize: !!div.getElementsByTagName("link").length,
+
+		// Get the style information from getAttribute
+		// (IE uses .cssText insted)
+		//style: /red/.test( a.getAttribute("style") ),
+
+		// Make sure that URLs aren't manipulated
+		// (IE normalizes it by default)
+		hrefNormalized: true, //a.getAttribute("href") === "/a",
+
+		// Make sure that element opacity exists
+		// (IE uses filter instead)
+		// Use a regex to work around a WebKit issue. See #5145
+		opacity: /^0.55$/.test( a.getStyle('opacity') ),
+
+		// Verify style float existence
+		// (IE uses styleFloat instead of cssFloat)
+		cssFloat: !!a.getStyle('cssFloat'),
+
+		// Make sure that if no value is specified for a checkbox
+		// that it defaults to "on".
+		// (WebKit defaults to "" instead)
+		checkOn: div.getElementsByTagName("input")[0].value === "on",
+
+		// Make sure that a selected-by-default option has a working selected property.
+		// (WebKit defaults to false instead of true, IE too, if it's in an optgroup)
+		optSelected: document.createElement("select").appendChild( document.createElement("option") ).selected,
+
+		// Will be defined later
+		checkClone: false,
+		scriptEval: false,
+		noCloneEvent: true,
+		boxModel: null
+	};
+    /*
+	script.type = "text/javascript";
+	try {
+		script.appendChild( document.createTextNode( "window." + id + "=1;" ) );
+	}
+    catch(e) {}
+
+	root.insertBefore( script, root.firstChild );
+
+	// Make sure that the execution of code works by injecting a script
+	// tag with appendChild/createTextNode
+	// (IE doesn't support this, fails, and uses .text instead)
+	if ( window[ id ] ) {
+		FBjqRY.support.scriptEval = true;
+		delete window[ id ];
+	}
+
+	root.removeChild( script );
+
+	if ( div.attachEvent && div.fireEvent ) {
+		div.attachEvent("onclick", function click() {
+			// Cloning a node shouldn't copy over any
+			// bound event handlers (IE does this)
+			FBjqRY.support.noCloneEvent = false;
+			div.detachEvent("onclick", click);
+		});
+		div.cloneNode(true).fireEvent("onclick");
+	}
+
+	div = document.createElement("div");
+	div.innerHTML = "<input type='radio' name='radiotest' checked='checked'/>";
+
+	var fragment = document.createDocumentFragment();
+	fragment.appendChild( div.firstChild );
+
+	// WebKit doesn't clone checked state correctly in fragments
+	FBjqRY.support.checkClone = fragment.cloneNode(true).cloneNode(true).lastChild.checked;
+
+	// Figure out if the W3C box model works as expected
+	// document.body must exist before we can do this
+	FBjqRY(function() {
+		var div = document.createElement("div");
+		div.style.width = div.style.paddingLeft = "1px";
+
+		document.body.appendChild( div );
+		FBjqRY.boxModel = FBjqRY.support.boxModel = div.offsetWidth === 2;
+		document.body.removeChild( div ).style.display = 'none';
+		div = null;
+	});
+    */
+
+	// Technique from Juriy Zaytsev
+	// http://thinkweb2.com/projects/prototype/detecting-event-support-without-browser-sniffing/
+	var eventSupported = function( eventName ) {
+		var el = document.createElement("div");
+		eventName = "on" + eventName;
+
+		var isSupported = (eventName in el);
+		if ( ! isSupported ) {
+			el.setAttribute(eventName, "return;");
+			isSupported = typeof el[eventName] === "function";
+		}
+		el = null;
+
+		return isSupported;
+	};
+
+    // @todo :
+	//FBjqRY.support.submitBubbles = eventSupported("submit");
+	//FBjqRY.support.changeBubbles = eventSupported("change");
+
+	// release memory in IE
+	root = script = div = all = a = null;
+    
 })();
 
-// ============================================================================
-/** Array functions */
-// ============================================================================
-Support.array = []; // we can't access Array.prototype
-
-Support.map = function( array, callback ) {
-    var ret = [];
-
-    // Go through the array, translating each of the items to their
-    // new value (or values).
-    for ( var i = 0, len = array.length; i < len; i++ ) {
-        var value = callback( array[i], i );
-        if ( value != null ) ret[ ret.length ] = value;
-    }
-    return ret.concat.apply( [], ret );
+/*
+FBjqRY.props = {
+	"for": "htmlFor",
+	"class": "className",
+	readonly: "readOnly",
+	maxlength: "maxLength",
+	cellspacing: "cellSpacing",
+	rowspan: "rowSpan",
+	colspan: "colSpan",
+	tabindex: "tabIndex",
+	usemap: "useMap",
+	frameborder: "frameBorder"
 };
-
-Support.grep = function( array, callback, inv ) {
-    var ret = [];
-
-    // Go through the array, only saving the items
-    // that pass the validator function
-    for ( var i = 0, len = array.length; i < len; i++ ) {
-        if ( !inv != !callback( array[i], i ) ) {
-            ret.push( array[i] );
-        }
-    }
-    return ret;
-};
-
-Support.unique = function(array) {
-    //if ( !array || !array.length ) return [];
-    /*
-    var indexFn = function(elem) { return elem; };
-    
-    if ( ary[0].__instance || ary[0].__instance === 0) {
-        indexFn = function(elem) { return elem.__instance; };
-    }
-
-    for(var i = 0, length = ary.length; i < length; i++) {
-        index = indexFn(ary[i]);
-        if(!done[index]) {
-            done[index] = true;
-            ret.push(ary[i]);
-        }
-    }
-    */
-    var ret = [], done = {}, i, len, e, id;
-    try {
-        if ( isFBNode(array[0]) ) {
-            for (i = 0, len = array.length; i < len; i++) {
-                e = array[i]; id = getFBNodeId(e);
-                if ( ! done[id] ) {
-                    done[id] = true;
-                    ret.push(e);
-                }
-            }
-        }
-        else {
-            for (i = 0, len = array.length; i < len; i++) {
-                e = array[i]; id = e;
-                if ( ! done[id] ) {
-                    done[id] = true;
-                    ret.push(e);
-                }
-            }
-        }
-    }
-    catch (e) {
-        Support.log("Support.unique() returning original array", e);
-        ret = array;
-    }
-    return ret;
-};
-
-Support.indexOf = function(elem, array) {
-    var cmpFn;
-    if ( isFBNode(elem) ) {
-        cmpFn = function(v) { return isFBNode(v) && sameFBNode(elem, v); };
-    }
-    else {
-        if ( elem.equals ) cmpFn = function(v) { return elem.equals(v); };
-        else cmpFn = function(v) { return (elem === v); };
-    }
-    
-    for (var i = 0, len = array.length; i < len; i++) {
-        if ( cmpFn(array[i]) ) return i;
-    }
-    return -1;
-};
-
-Support.merge = function(first, second) {
-    var i = first.length, j = 0;
-
-    if ( typeof(second.length) === "number" ) {
-        for ( var len = second.length; j < len; j++ ) {
-            first[i++] = second[j];
-        }
-    }
-    else {
-        while ( typeof(second[j]) !== 'undefined' ) {
-            first[i++] = second[j++];
-        }
-    }
-
-    first.length = i;
-    return first;
-};
+*/
 
 // ============================================================================
 /** JSON parser */
 // ============================================================================
-Support.json = (function() { //Modified json parser begins here :
+var parseJSON = (function() { //Modified json parser begins here :
     var number  = '(?:-?\\b(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\\b)';
     var oneChar = '(?:[^\\0-\\x08\\x0a-\\x1f\"\\\\]|\\\\(?:[\"/\\\\bfnrt]|u[0-9A-Fa-f]{4}))';
     var string  = '(?:\"' + oneChar + '*\")';
@@ -511,7 +941,7 @@ Support.json = (function() { //Modified json parser begins here :
         } else if ('[' === tok) {
             result = [];
         } else {
-            return Support.error("Support.json() unsupported initial json token: '" + tok + "'");
+            return FBjqRY.error("parseJSON() unsupported initial json token: '" + tok + "'");
         }
 
         var key;
@@ -577,7 +1007,7 @@ Support.json = (function() { //Modified json parser begins here :
           }
         }
         if ( stack.length ) {
-            return Support.error("Support.json() could not fully process json object");
+            return FBjqRY.error("parseJSON() could not fully process json object");
         }
 
         if (opt_reviver) {
@@ -609,364 +1039,875 @@ Support.json = (function() { //Modified json parser begins here :
 
         return result;
       };
+})();//var windowData = {};
+FBjqRY.extend({
+	cache: {},
+
+	// Please use with caution
+	//uuid: 0,
+
+	// Unique for each copy of jQuery on the page
+	expando: "FBjqRY" + FBjqRY.now(),
+
+	// The following elements throw uncatchable exceptions if you
+	// attempt to add expando properties to them.
+    /*
+	noData: {
+		"embed": true,
+		"object": true,
+		"applet": true
+	}, */
+
+    data: function( elem, name, data ) {
+//        var id = getFBNodeId(elem, true), cache = FBjqRY.cache, thisCache;
+//        if ( ! id ) {
+//            if ( typeof(name) === "string" && typeof(data) === 'undefined' ) return null;
+//        }
+//        else {
+//            id = getFBNodeId(elem, false);
+//        }
+        var id = FBjqRY.fbjs.getNodeId(elem), cache = FBjqRY.cache, thisCache;
+
+		// Avoid generating a new cache unless none exists and we
+		// want to manipulate it.
+		if ( typeof name === "object" ) {
+			cache[ id ] = FBjqRY.extend(true, {}, name);
+		}
+        else if ( ! cache[ id ] ) {
+			cache[ id ] = {};
+		}
+		thisCache = cache[ id ];
+
+		// Prevent overriding the named cache with undefined values
+		if ( typeof(data) !== 'undefined' ) thisCache[ name ] = data;
+
+		return typeof(name) === "string" ? thisCache[ name ] : thisCache;
+    },
+
+    removeData: function( elem, name ) {
+        var id = FBjqRY.fbjs.getNodeId(elem, true), cache = FBjqRY.cache;
+        var thisCache = id ? cache[ id ] : undefined;
+
+		// If we want to remove a specific section of the element's data
+		if ( name ) {
+			if ( thisCache ) {
+				// Remove the section of cache data
+				delete thisCache[ name ];
+				// If we've removed all the data, remove the element's cache
+				if ( FBjqRY.isEmptyObject(thisCache) ) {
+					FBjqRY.removeData( elem );
+				}
+			}
+		} // Otherwise, we want to remove all of the element's data
+        else {
+			// Completely remove the data cache
+			if ( id ) delete cache[ id ];
+		}
+    },
+
+    // embedded queue.js :
+
+	queue: function( elem, type, data ) {
+		if ( !elem ) return;
+
+		type = (type || "fx") + "queue";
+		var q = FBjqRY.data( elem, type );
+
+		// Speed up dequeue by getting out quickly if this is just a lookup
+		if ( !data ) return q || [];
+
+		if ( !q || FBjqRY.isArray(data) ) {
+			q = FBjqRY.data( elem, type, FBjqRY.makeArray(data) );
+		}
+        else {
+			q.push( data );
+		}
+
+		return q;
+	},
+
+	dequeue: function( elem, type ) {
+		type = type || "fx";
+
+		var queue = FBjqRY.queue( elem, type ), fn = queue.shift();
+
+		// If the fx queue is dequeued, always remove the progress sentinel
+		if ( fn === "inprogress" ) fn = queue.shift();
+
+		if ( fn ) {
+			// Add a progress sentinel to prevent the fx queue from being
+			// automatically dequeued
+			if ( type === "fx" ) {
+				queue.unshift("inprogress");
+			}
+
+			fn.call(elem, function() {
+				FBjqRY.dequeue(elem, type);
+			});
+		}
+	}
+
+});
+
+FBjqRY.fn.extend({
+    data: function( key, value ) {
+        if ( typeof(key) === 'undefined' && this.length ) {
+            return FBjqRY.data( this.nodes[0] );
+        }
+        else if ( typeof key === "object" ) {
+            return this.each(function() { 
+                FBjqRY.data( this, key );
+            });
+        }
+
+        var parts = key.split(".");
+        parts[1] = parts[1] ? "." + parts[1] : "";
+
+        if ( typeof(value) === 'undefined' ) {
+            //var data = this.triggerHandler("getData" + parts[1] + "!", [parts[0]]);
+            if ( typeof(data) === 'undefined' && this.length ) {
+                var data = FBjqRY.data( this.nodes[0], key );
+            }
+            return (typeof(data) === 'undefined' && parts[1]) ? this.data( parts[0] ) : data;
+        }
+        else {
+            //return this.trigger("setData" + parts[1] + "!", [parts[0], value])
+            return this.each(function() {
+                FBjqRY.data( this, key, value );
+            });
+        }
+    },
+    
+    removeData: function( key ) {
+        return this.each(function(){ 
+            FBjqRY.removeData( this, key );
+        });
+    },
+
+    // embedded queue.js :
+
+	queue: function( type, data ) {
+		if ( typeof type !== "string" ) {
+			data = type;
+			type = "fx";
+		}
+
+		if ( data === undefined ) {
+			return FBjqRY.queue( this[0], type );
+		}
+		return this.each(function( i, elem ) {
+			var queue = FBjqRY.queue( this, type, data );
+
+			if ( type === "fx" && queue[0] !== "inprogress" ) {
+				FBjqRY.dequeue( this, type );
+			}
+		});
+	},
+	dequeue: function( type ) {
+		return this.each(function() {
+			FBjqRY.dequeue( this, type );
+		});
+	},
+
+	// Based off of the plugin by Clint Helfers, with permission.
+	// http://blindsignals.com/index.php/2009/07/jquery-delay/
+	delay: function( time, type ) {
+		time = FBjqRY.fx ? jQuery.fx.speeds[time] || time : time;
+		type = type || "fx";
+
+		return this.queue( type, function() {
+			var elem = this;
+			setTimeout(function() {
+				FBjqRY.dequeue( elem, type );
+			}, time );
+		});
+	},
+
+	clearQueue: function( type ) {
+		return this.queue( type || "fx", [] );
+	}
+
+});var rclass = /[\n\t]/g,
+	//rspace = /\s+/,
+	//rreturn = /\r/g,
+	//rspecialurl = /href|src|style/,
+	//rtype = /(button|input)/i,
+	//rfocusable = /(button|input|object|select|textarea)/i,
+	//rclickable = /^(a|area)$/i,
+	rradiocheck = /radio|checkbox/;
+
+FBjqRY.fn.extend({
+	attr: function( name, value ) {
+		return FBjqRY.access( this, name, value, true, FBjqRY.attr );
+	},
+    
+	removeAttr: function(name) {
+		return this.each(function() {
+			FBjqRY.attr( this, name, "" );
+		});
+	},
+
+    addClass: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.addClass( value.call(this, i, self.attr("class")) );
+			});
+		}
+
+        if ( value && typeof value === "string" ) {
+            var trim = FBjqRY.trim;
+            value = trim( value );
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                var node = this.nodes[i];
+                node.addClassName(value);
+
+                var className = node.getClassName();
+                var trimmedClass = trim( className );
+                if ( className.length !== trimmedClass.length ) {
+                    node.setClassName( trimmedClass );
+                }
+            }
+        }
+        return this;
+    },
+
+    removeClass: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.removeClass( value.call(this, i, self.attr("class")) );
+			});
+		}
+
+        if ( (value && typeof(value) === "string") || value === undefined ) {
+            var trim = FBjqRY.trim;
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = this.nodes[i];
+                if ( value ) { // remove
+                    node.removeClassName(value);
+
+                    var className = node.getClassName();
+                    var trimmedClass = trim( className );
+                    if ( className.length !== trimmedClass.length ) {
+                        node.setClassName( trimmedClass );
+                    }
+                }
+                else { // remove all classes :
+                    node.setClassName('');
+                }
+            }
+        }
+        return this;
+    },
+
+    toggleClass: function(value, state) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each(function(i) {
+				var self = FBjqRY(this);
+				self.toggleClass( value.call(this, i, self.attr("class"), state), state );
+			});
+		}
+
+        var type = typeof(value), className;
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            if ( type === 'string' ) {
+                //node.toggleClassName(value);
+				// toggle individual class names :
+				var c = 0, classNames = value.split(/\s+/),
+                    stateBool = typeof(state) === 'boolean';
+
+				while ( (className = classNames[ c++ ]) ) {
+					// check each className given, space seperated list
+                    if ( stateBool ) {
+                        node[state ? 'addClassName' : 'removeClassName'](className)
+                    }
+                    else {
+                        node.toggleClassName(className);
+                    }
+				}
+            }
+			else if ( type === "undefined" || type === "boolean" ) {
+                className = node.getClassName();
+				if ( className ) {
+					// store className if set
+					FBjqRY.data( node, "__className__", className );
+				}
+				// toggle whole className
+                if (className || value === false) className = "";
+                else {
+                    className = FBjqRY.data( node, "__className__" ) || "";
+                }
+				node.setClassName( className );
+			}
+        }
+        return this;
+    },
+
+    hasClass: function(className) {
+        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( this.nodes[i].hasClassName(className) ) return true;
+        }
+        return false;
+    },
+
+    val: function(value) {
+        var i, len, node, values;
+        if( typeof(value) !== 'undefined' ) {
+            var isFunction = FBjqRY.isFunction(value);
+
+            for ( i = 0, len = this.nodes.length; i < len; i++ ) {
+                node = this.nodes[i]; var val = value, nodeVal;
+
+                if ( isFunction ) {
+                    nodeVal = FBjqRY(node).val();
+                    val = value.call(node, i, nodeVal);
+                }
+                // Typecast each time if the value is a Function and the appended
+                // value is therefore different each time.
+                if ( typeof val === "number" ) val += "";
+
+                if ( FBjqRY.isArray(val) && rradiocheck.test( node.getType() ) ) {
+                    nodeVal = FBjqRY(node).val();
+                    node.setChecked( FBjqRY.inArray( nodeVal, val ) >= 0 );
+                }
+                else if ( node.getTagName().toUpperCase() === "SELECT" ) {
+                    values = FBjqRY.makeArray(val);
+
+                    FBjqRY("option", node).each(function() {
+                        var optVal = FBjqRY(this).val();
+                        this.setSelected( FBjqRY.inArray( optVal, values ) >= 0 );
+                    });
+
+                    if ( ! values.length ) node.setSelectedIndex(-1);
+                }
+                else {
+                    node.setValue(val);
+                }
+            }
+            return this;
+        }
+
+        node = this.nodes[0];
+        if ( node ) {
+            var nodeName = node.getTagName().toUpperCase();
+            // NOTE: can't read text from FB nodes !
+            //if ( nodeName === 'OPTION' ) {
+            //    value = node.getValue() || node.getTextValue();
+            //}
+            // We need to handle select boxes special
+            if ( nodeName === "SELECT" ) {
+                var index = node.getSelectedIndex(),
+                    options = FBjqRY('option', node).nodes,
+                    one = node.getType() === "select-one";
+
+                // Nothing was selected
+                if ( index < 0 ) return null;
+
+                values = [];
+                // Loop through all the selected options
+                for ( i = one ? index : 0, max = one ? index + 1 : options.length; i < max; i++ ) {
+                    var option = options[ i ];
+                    if ( option.getSelected() ) {
+                        // We don't need an array for one selects
+                        if ( one ) {
+                            value = option.getValue();
+                            break;
+                        }
+                        // Multi-Selects return an array
+                        values.push( option.getValue() );
+                    }
+                }
+                if ( ! one ) return values;
+            }
+            else {
+                value = node.getValue();
+            }
+
+            return value ? value : '';
+        }
+        return undefined; // no node
+    }
+});
+
+var validAttrs = (function() {
+    var validAttrs = {},
+        // node attributes :
+        attrs = ("accessKey,action,checked,className,cols,colSpan,dir,disabled,href,id," +
+                   "maxLength,method,name,readOnly,rows,rowSpan,selected,selectedIndex," +
+                   "selection,src,style,tabIndex,target,title,type,value");
+        // node accessors (getters) :
+        attrs += ",tagName,parentNode,nextSibling,previousSibling,firstChild,lastChild";
+        attrs = attrs.split(",");
+    for (var i = 0, len = attrs.length; i < len; i++) {
+        var attr = attrs[i];
+        validAttrs[ attr.toLowerCase() ] = 'set' +
+            attr.charAt(0).toUpperCase() + attr.substr(1);
+    }
+    // name aliases :
+    validAttrs[ "class" ] = "setClassName";
+    validAttrs[ "nodeName".toLowerCase() ] = "setTagName";
+    // html/text setters :
+    //validAttrs[ "html" ] = "setInnerXHTML";
+    validAttrs[ "fbml" ] = "setInnerFBML";
+    //validAttrs[ "text" ] = "setTextValue";
+    // css/style setters :
+    //validAttrs[ "css" ] = "setStyle";
+    validAttrs[ "style" ] = "setStyle";
+    // height/width helpers :
+    //validAttrs[ "height" ] = "setHeight";
+    //validAttrs[ "width" ] = "setWidth";
+    return validAttrs;
 })();
 
-// ============================================================================
-/** A helper around setInnerXHTML (FBJS beta feature) */
-// ============================================================================
-Support.xhtml = function( elems, context ) { // based on jQuery.clean 1.3.2
-    context = context || document;
-    if ( typeof context.createElement === "undefined" ) context = document;
-
-    if ( typeof elems === 'string' ) { // support single string
-        elems = [ elems ];
-    }
-
-    // If a single string is passed in and it's a single tag
-    // just do a createElement and skip the rest
-    if ( elems.length === 1 && Support.isString( elems[0] ) ) {
-        var match = /^<(\w+)\s*\/?>$/.exec( elems[0] );
-        if ( match ) return [ context.createElement( match[1] ) ];
-    }
-
-    var ret = [], div = context.createElement("div");
-
-    Support.each(elems, function() {
-        var elem = this;
-
-        if ( typeof elem === "number" ) elem += '';
-        if ( ! elem ) return;
-
-        // Convert html string into DOM nodes
-        if ( Support.isString(elem) ) {
-            // Fix "XHTML"-style tags in all browsers
-            elem = elem.replace(/(<(\w+)[^>]*?)\/>/g, function(all, front, tag){
-                return tag.match(/^(abbr|br|col|img|input|link|meta|param|hr|area|embed)$/i) ?
-                    all : front + "></" + tag + ">";
-            });
-
-            // Trim whitespace, otherwise indexOf won't work as expected
-            var tags = elem.replace(/^\s+/, "").substring(0, 10).toLowerCase();
-            var wrap = // @todo not sure if this is needed FBJS might handle it it's own way ...
-                // option or optgroup
-                ! tags.indexOf("<opt") &&
-                [ 1, "<select multiple='multiple'>", "</select>" ] ||
-
-                ! tags.indexOf("<leg") &&
-                [ 1, "<fieldset>", "</fieldset>" ] ||
-
-                tags.match(/^<(thead|tbody|tfoot|colg|cap)/) &&
-                [ 1, "<table>", "</table>" ] ||
-
-                ! tags.indexOf("<tr") &&
-                [ 2, "<table><tbody>", "</tbody></table>" ] ||
-
-                // <thead> matched above
-                (! tags.indexOf("<td") || !tags.indexOf("<th")) &&
-                [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ] ||
-
-                ! tags.indexOf("<col") &&
-                [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ] ||
-
-                [ 0, "", "" ];
-
-            // Go to html and back, then peel off extra wrappers
-            div.setInnerXHTML( wrap[1] + elem + wrap[2] );
-
-            // Move to the right depth
-            while ( wrap[0]-- ) div = div.getLastChild();
-
-            elem = div.getChildNodes();
+var setStyle = function(node, val) { // a special case for the set style attr method
+    if ( typeof(val) === 'string' ) {
+        var styles = val.split(";");
+        for ( var i = 0, len = styles.length; i < len; i++ ) {
+            var s = styles[i].split(":");
+            if ( s.length == 2 ) {
+                var name = trim( s[0].toLowerCase() );
+                var value = trim( s[1] );
+                FBjqRY.style(node, name, value);
+            }
         }
-
-        if ( Support.isFBNode(elem) ) ret.push( elem );
-        else ret = Support.merge( ret, elem );
-
-    });
-
-    return ret;
+    }
+    else {
+        FBjqRY.style(node, val);
+    }
 };
 
-// ============================================================================
-/** HTML parser */
-// ============================================================================
+FBjqRY.extend({
+	attrFn: {
+		val: true,
+		css: true,
+		html: true,
+		text: true,
+		data: true,
+		width: true,
+		height: true,
+		offset: true
+	},
+
+	attr: function( elem, name, value, pass ) {
+		// don't set attributes on text and comment nodes
+		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
+		//	return undefined;
+		//}
+
+		if ( pass && FBjqRY.attrFn[name] ) {
+			return FBjqRY(elem)[name](value);
+		}
+
+		//var notxml = elem.nodeType !== 1 || !jQuery.isXMLDoc( elem ),
+        // Whether we are setting (or getting)
+        var set = typeof value !== 'undefined';
+
+		// Try to normalize/fix the name
+		//name = notxml && jQuery.props[ name ] || name;
+
+        // Safari mis-reports the default selected property of an option
+        // Accessing the parent's selectedIndex property fixes it
+        if ( name === "selected" && ! FBjqRY.support.optSelected ) {
+            var parent = elem.getParentNode();
+            if ( parent ) {
+                parent.getSelectedIndex();
+                // Make sure that it also works with optgroups, see #5701
+                parent = parent.getParentNode();
+                if ( parent ) parent.getSelectedIndex();
+            }
+        }
+
+        // These attributes require special treatment
+        /*
+        var special = rspecialurl.test( name );
+
+        // If applicable, access the attribute via the DOM 0 way
+        if ( name in elem && notxml && !special ) {
+            if ( set ) {
+                // We can't allow the type property to be changed (since it causes problems in IE)
+                if ( name === "type" && rtype.test( elem.nodeName ) && elem.parentNode ) {
+                    jQuery.error( "type property can't be changed" );
+                }
+
+                elem[ name ] = value;
+            }
+
+            // browsers index elements by id/name on forms, give priority to attributes.
+            if ( jQuery.nodeName( elem, "form" ) && elem.getAttributeNode(name) ) {
+                return elem.getAttributeNode( name ).nodeValue;
+            }
+
+            // elem.tabIndex doesn't always return the correct value when it hasn't been explicitly set
+            // http://fluidproject.org/blog/2008/01/09/getting-setting-and-removing-tabindex-values-with-javascript/
+            if ( name === "tabIndex" ) {
+                var attributeNode = elem.getAttributeNode( "tabIndex" );
+
+                return attributeNode && attributeNode.specified ?
+                    attributeNode.value :
+                    rfocusable.test( elem.nodeName ) || rclickable.test( elem.nodeName ) && elem.href ?
+                        0 :
+                        undefined;
+            }
+
+            return elem[ name ];
+        }
+        */
+
+        var setAttr = validAttrs[ name.toLowerCase() ];
+        if ( ! setAttr ) {
+           FBjqRY.log("attr() attribute name '" + name + "' is not supported");
+           return undefined;
+        }
+
+        if ( set ) {
+            try {
+               if ( /* ! FBjqRY.support.style && */ setAttr === "setStyle") setStyle(elem, value);
+               else if (setAttr === "setWidth") FBjqRY.style(elem, 'width', value);
+               else if (setAttr === "setHeight") FBjqRY.style(elem, 'height', value);
+               //else if (setAttr === "setInnerXHTML") Support.xhtml(value, node);
+               else elem[setAttr](value); // e.g. setTitle(value)
+            }
+            catch (e) { // e.g. when setting an invalid url parameter using setSrc()
+                return FBjqRY.error("attr() setter node[" + setAttr + "](" + value + ") failed: " + e);
+            }
+            //return node;
+        }
+
+        // getter :
+        var getAttr = 'g' + setAttr.substr(1); // setStyle -> getStyle
+        if ( ! elem[getAttr] ) {
+            if ( set ) return undefined;
+            return FBjqRY.error("attr() getter " + getAttr + " not supported !");
+        }
+        value = undefined;
+        try {
+            if (getAttr === "getStyle") return FBjqRY.error("attr() could not get bare 'style' attribute value");
+            else if (getAttr === "getWidth") value = FBjqRY.style(elem, 'width');
+            else if (getAttr === "getHeight") value = FBjqRY.style(elem, 'height');
+            else {
+                value = elem[getAttr]();  // e.g. getTitle()
+                //if ( typeof(value) === 'undefined' ) value = '';
+            }
+        }
+        catch (e) {
+            // some nodes for some attrs e.g. getHref throw an error :
+            // "TypeError: b is undefined" instead of returning correctly
+            FBjqRY.log("attr() getter node[" + getAttr + "]() failed: " + e); // @todo log
+        }
+        // Non-existent attributes return null, we normalize to undefined
+        return value === null ? undefined : value;
+	}
+});
+// exclude the following css properties to add px
+var rexclude = /z-?index|font-?weight|opacity|zoom|line-?height/i,
+	ralpha = /alpha\([^)]*\)/,
+	ropacity = /opacity=([^)]*)/,
+	rfloat = /float/i,
+	rdashAlpha = /-([a-z])/ig,
+	//rupper = /([A-Z])/g,
+	//rnumpx = /^-?\d+(?:px)?$/i,
+	//rnum = /^-?\d/,
+
+	cssShow = { position: "absolute", visibility: "hidden", display:"block" },
+	cssWidth = [ "Left", "Right" ],
+	cssHeight = [ "Top", "Bottom" ],
+
+	// cache check for defaultView.getComputedStyle
+	getComputedStyle = document.defaultView && document.defaultView.getComputedStyle,
+	// normalize float css property
+	styleFloat = FBjqRY.support.cssFloat ? "cssFloat" : "styleFloat",
+	fcamelCase = function( all, letter ) { return letter.toUpperCase(); };
+
+function getWH( elem, name, extra ) {
+	var which = name === "width" ? cssWidth : cssHeight,
+		val = name === "width" ? elem.getOffsetWidth() : elem.getOffsetHeight();
+
+	if ( extra === "border" ) {
+		return val;
+	}
+
+    FBjqRY.each( which, function() {
+        if ( !extra ) {
+            val -= parseFloat(FBjqRY.curCSS( elem, "padding" + this, true)) || 0;
+        }
+        if ( extra === "margin" ) {
+            val += parseFloat(FBjqRY.curCSS( elem, "margin" + this, true)) || 0;
+        }
+        else {
+            val -= parseFloat(FBjqRY.curCSS( elem, "border" + this + "Width", true)) || 0;
+        }
+    });
+
+	return val;
+}
+
+function getOpacityFilter(elem) {
+    var filter = elem.getStyle('filter');
+    return filter && filter.indexOf("opacity=") >= 0 ?
+            (parseFloat( ropacity.exec(filter)[1] ) / 100) + "":
+                "";
+}
+function setOpacityFilter(elem, value) {
+    // IE has trouble with opacity if it does not have layout
+    // Force it by setting the zoom level
+    elem.setStyle('zoom', '1');
+    // Set the alpha filter to set the opacity
+    var opacity = parseInt( value, 10 ) + "" === "NaN" ? "" : "alpha(opacity=" + value * 100 + ")";
+    var filter = elem.getStyle('filter') || FBjqRY.curCSS( elem, "filter" ) || "";
+    filter = ralpha.test(filter) ? filter.replace(ralpha, opacity) : opacity;
+    elem.setStyle('filter', filter);
+}
+
+FBjqRY.fn.css = function( name, value ) {
+	return FBjqRY.access( this, name, value, true, function( elem, name, value ) {
+
+		if ( value === undefined ) return FBjqRY.curCSS( elem, name );
+
+        // NOTE: moved to style()
+		//if ( typeof value === "number" && ! rexclude.test(name) ) {
+		//	value += "px";
+		//}
+
+		FBjqRY.style( elem, name, value );
+	});
+};
+
+FBjqRY.extend({
+	style: function( elem, name, value ) {
+
+        if ( typeof(name) === 'object' ) {
+            var values = {};
+            for ( var n in name ) {
+                if ( name.hasOwnProperty(n) ) {
+                    var val = FBjqRY.style(elem, n, name[n]);
+                    values[n] = val;
+                }
+            }
+            return values;
+        }
+
+		if ( (name === "width" || name === "height") && parseFloat(value) < 0 ) {
+			value = undefined;
+		}
+		if ( typeof value === "number" && ! rexclude.test(name) ) {
+			value += "px";
+		}
+
+		// don't set styles on text and comment nodes
+		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
+		//	return undefined;
+		//}
+
+		var set = value !== undefined; //, style = elem.style || elem;
+
+		// IE uses filters for opacity
+		if ( ! FBjqRY.support.opacity && name === "opacity" ) {
+			if ( set ) setOpacityFilter(elem, value);
+			return getOpacityFilter(elem);
+		}
+
+		// Make sure we're using the right name for getting the float value
+		if ( rfloat.test( name ) ) name = styleFloat;
+		else name = name.replace(rdashAlpha, fcamelCase);
+
+		if ( set ) {
+			elem.setStyle(name, value);
+		}
+		return elem.getStyle(name);
+	},
+
+	css: function( elem, name, force, extra ) {
+		if ( name === "width" || name === "height" ) {
+			if ( elem.getOffsetWidth() !== 0 ) {
+				val = getWH( elem, name, extra );
+			}
+            else {
+				FBjqRY.swap( elem, cssShow, function() {
+					val = getWH( elem, name, extra );
+				});
+			}
+
+			return Math.max(0, Math.round(val));
+		}
+
+		return FBjqRY.curCSS( elem, name, force );
+	},
+
+	curCSS: function( elem, name, force ) {
+		var ret;
+		// We need to handle opacity special in IE
+		if ( name == 'opacity' /* && ! FBjqRY.support.opacity*/ ) {
+			ret = elem.getStyle('opacity');
+			return ret == "" ? "1" : ret;
+		}
+		// IE uses filters for opacity
+		if ( ! FBjqRY.support.opacity && name === "opacity" && elem.getStyle ) {
+            var filter = elem.getStyle('filter');
+            var opacity = ropacity.exec(filter || '');
+            if ( opacity ) opacity = opacity[1];
+			ret = opacity ? (parseFloat(opacity) / 100) + "" : "";
+			return ret === "" ? "1" : ret;
+		}
+
+		// Make sure we're using the right name for getting the float value
+		if ( rfloat.test( name ) ) {
+			name = styleFloat;
+		}
+
+		//if ( ! force && elem.getStyle && elem.getStyle(name) ) {
+        //    ret = elem.getStyle(name);
+        //}
+		//else
+        if ( elem.getStyle ) {
+            name = name.replace(rdashAlpha, fcamelCase);
+			ret = elem.getStyle( name );
+
+			// From the awesome hack by Dean Edwards
+			// http://erik.eae.net/archives/2007/07/27/18.54.15/#comment-102291
+
+			// If we're not dealing with a regular pixel number
+			// but a number that has a weird ending, we need to convert it to pixels
+            /*
+			if ( !/^\d+(px)?$/i.test( ret ) && /^\d/.test( ret ) ) {
+				// Remember the original values
+				var left = style.left, rsLeft = elem.runtimeStyle.left;
+
+				// Put in the new values to get a computed value out
+				elem.runtimeStyle.left = elem.currentStyle.left;
+				style.left = ret || 0;
+				ret = style.pixelLeft + "px";
+
+				// Revert the changed values
+				style.left = left;
+				elem.runtimeStyle.left = rsLeft;
+			} */
+		}
+
+		return ret;
+	},
+
+	// A method for quickly swapping in/out CSS properties to get correct calculations
+	swap: function( elem, options, callback ) {
+		var old = {}, name;
+
+		// Remember the old values, and insert the new ones
+		for ( name in options ) {
+            var camelName = name.replace(rdashAlpha, fcamelCase);
+			old[ camelName ] = elem.getStyle( camelName );
+			//elem.style[ name ] = options[ name ];
+            elem.setStyle( camelName, options[ name ] );
+		}
+
+		callback.call( elem );
+
+		// Revert the old values
+        elem.setStyle( old );
+		//for ( name in options ) {
+		//	elem.style[ name ] = old[ name ];
+		//}
+	}
+});
+
 /*
-Support.html = ( function() { //Modified htmlparser begins here:
+if ( jQuery.expr && jQuery.expr.filters ) {
+	jQuery.expr.filters.hidden = function( elem ) {
+		var width = elem.offsetWidth, height = elem.offsetHeight,
+			skip = elem.nodeName.toLowerCase() === "tr";
 
-    var each = Support.each;
-    var makeMap = function(str) {
-        var obj = {}, items = str.split(",");
-        for (var i=0, len=items.length; i < len; i++) {
-            obj[ items[i] ] = true;
-        }
-        return obj;
-    };
+		return width === 0 && height === 0 && !skip ?
+			true :
+			width > 0 && height > 0 && !skip ?
+				false :
+				jQuery.curCSS(elem, "display") === "none";
+	};
 
-    // Regular Expressions for parsing tags and attributes
-    var startTag = /^<(\w+)((?:\s+\w+(?:\s*=\s*(?:(?:"[^"]*")|(?:'[^']*')|[^>\s]+))?)*)\s*(\/?)>/,
-        endTag = /^<\/(\w+)[^>]*>/,
-        attr = /(\w+)(?:\s*=\s*(?:(?:"((?:\\.|[^"])*)")|(?:'((?:\\.|[^'])*)')|([^>\s]+)))?/g,
-        endTable = /<\/(table)>/;
-
-    // Empty Elements - HTML 4.01
-    var empty = makeMap("area,base,basefont,br,col,frame,hr,img,input,isindex,link,meta,param,embed");
-    // Block Elements - HTML 4.01
-    var block = makeMap("address,applet,blockquote,button,center,dd,del,dir,div,dl,dt,fieldset,form,frameset,hr,iframe,ins,isindex,li,map,menu,noframes,noscript,object,ol,p,pre,script,table,tbody,td,tfoot,th,thead,tr,ul");
-    // Inline Elements - HTML 4.01
-    var inline = makeMap("a,abbr,acronym,applet,b,basefont,bdo,big,br,button,cite,code,del,dfn,em,font,i,iframe,img,input,ins,kbd,label,map,object,q,s,samp,script,select,small,span,strike,strong,sub,sup,textarea,tt,u,var");
-    // Elements that you can, intentionally, leave open
-    // (and which close themselves)
-    var closeSelf = makeMap("colgroup,dd,dt,li,options,p,td,tfoot,th,thead,tr");
-    // Attributes that have their values filled in disabled="disabled"
-    var fillAttrs = makeMap("checked,compact,declare,defer,disabled,ismap,multiple,nohref,noresize,noshade,nowrap,readonly,selected");
-    // Special Elements (can contain anything)
-    var special = makeMap("script,style");
-
-    //HTMLParser
-    var handler, match, stack = [];
-    stack.last  = function() { return this[this.length - 1]; };
-    stack.reset = function() { this.length = 0; };
-
-    var parseEndTag = function(tag, tagName) {
-        // If no tag name is provided, clean shop
-        var pos = stack.length - 1, i = pos;
-        if(!tagName) {
-            pos = 0;
-        } else { // Find the closest opened tag of the same type
-            for(; pos >= 0; pos--) { if(stack[pos] == tagName) { break; } }
-        }
-
-        if(pos >= 0) {
-            // Close all the open elements, up the stack
-            for(; i >= pos; i--) { if(handler.end) { handler.end(stack[i]); } }
-            stack.length = pos; // Remove the open elements from the stack
-        }
-    };
-
-    var parseStartTag = function(tag, tagName, rest, unary) {
-        if(block[tagName]) {
-            while(stack.last() && inline[stack.last()]) { parseEndTag("", stack.last()); }
-        }
-
-        if(closeSelf[tagName] && stack.last() == tagName) { parseEndTag("", tagName); }
-
-        unary = empty[tagName] || !!unary;
-        if(!unary) { stack.push(tagName); }
-
-        if(handler.start) {
-            var attrs = [];
-
-            rest.replace(attr, function(match, name) {
-                var value = arguments[2] ? arguments[2] :
-                    arguments[3] ? arguments[3] :
-                    arguments[4] ? arguments[4] :
-                    fillAttrs[name] ? name : "";
-
-                attrs.push({
-                    name: name,
-                    value: value,
-                    escaped: value.replace(/(^|[^\\])"/g, '$1\\\"') //"
-                });
-            });
-
-            if(handler.start) { handler.start(tagName, attrs, unary); }
-        }
-    };
-
-    var replaceFn = function(all, text) {
-        text = text.replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").replace(/<!--(.*?)-->/g, "$1");
-        if ( handler.chars ) handler.chars(text);
-        return "";
-    };
-
-    var entityReplace = (function() {
-        //A map of entities and their associated character codes
-        //http://www.w3schools.com/tags/ref_entities.asp
-        //http://www.w3schools.com/tags/ref_symbols.asp
-
-        var entMap = {},
-            ent = ['nbsp','iexcl','cent','pound','curren','yen','brvbar','sect','uml','copy','ordf','laquo','not','shy','reg','macr','deg','plusmn','sup2','sup3','acute','micro','para','middot','cedil','sup1','ordm','raquo','frac14','frac12','frac34','iquest','Agrave','Aacute','Acirc','Atilde','Auml','Aring','AElig','Ccedil','Egrave','Eacute','Ecirc','Euml','Igrave','Iacute','Icirc','Iuml','ETH','Ntilde','Ograve','Oacute','Ocirc','Otilde','Ouml','times','Oslash','Ugrave','Uacute','Ucirc','Uuml','Yacute','THORN','szlig','agrave','aacute','acirc','atilde','auml','aring','aelig','ccedil','egrave','eacute','ecirc','euml','igrave','iacute','icirc','iuml','eth','ntilde','ograve','oacute','ocirc','otilde','ouml','divide','oslash','ugrave','uacute','ucirc','uuml','yacute','thorn','yuml'],
-            i, length, cc;
-        //map of entities 160 - 255
-        for(i = 0, length = ent.length; i < length; i++) { entMap[ent[i]] = String.fromCharCode(160+i); }
-
-        //entities outisde 160-255 range
-        ent = ['quot','apos','amp','lt','gt','forall','part','exists','empty','nabla','isin','notin','ni','prod','sum','minus','lowast','radic','prop','infin','ang','and','or','cap','cup','int','there4','sim','cong','asymp','ne','equiv','le','ge','sub','sup','nsub','sube','supe','oplus','otimes','perp','sdot','Alpha','Beta','Gamma','Delta','Epsilon','Zeta','Eta','Theta','Iota','Kappa','Lambda','Mu','Nu','Xi','Omicron','Pi','Rho','Sigma','Tau','Upsilon','Phi','Chi','Psi','Omega','alpha','beta','gamma','delta','epsilon','zeta','eta','theta','iota','kappa','lambda','mu','nu','xi','omicron','pi','rho','sigmaf','sigma','tau','upsilon','phi','chi','psi','omega','thetasym','upsih','piv','OElig','oelig','Scaron','scaron','Yuml','fnof','circ','tilde','ensp','emsp','thinsp','zwnj','zwj','lrm','rlm','ndash','mdash','lsquo','rsquo','sbquo','ldquo','rdquo','bdquo','dagger','Dagger','bull','hellip','permil','prime','Prime','lsaquo','rsaquo','oline','euro','trade','larr','uarr','rarr','darr','harr','crarr','lceil','rceil','lfloor','rfloor','loz','spades','clubs','hearts','diams'];
-        cc  = [34,39,38,60,62,8704,8706,8707,8709,8711,8712,8713,8715,8719,8721,8722,8727,8730,8733,8734,8736,8743,8744,8745,8746,8747,8756,8764,8773,8776,8800,8801,8804,8805,8834,8835,8836,8838,8839,8853,8855,8869,8901,913,914,915,916,917,918,919,920,921,922,923,924,925,926,927,928,929,931,932,933,934,935,936,937,945,946,947,948,949,950,951,952,953,954,955,956,957,958,959,960,961,962,963,964,965,966,967,968,969,977,978,982,338,339,352,353,376,402,710,732,8194,8195,8201,8204,8205,8206,8207,8211,8212,8216,8217,8218,8220,8221,8222,8224,8225,8226,8230,8240,8242,8243,8249,8250,8254,8364,8482,8592,8593,8594,8595,8596,8629,8968,8969,8970,8971,9674,9824,9827,9829,9830];
-        for(i = 0, length = ent.length; i < length; i++) { entMap[ent[i]] = String.fromCharCode(cc[i]); }
-
-        var entRegx = /&(#?)(\w+);/,
-              m, str, cutPoint;
-
-        return function(text) {
-          str = "";
-          while((m = entRegx.exec(text)) !== null) {
-            if(m[2]) {
-              if(m[1]) {
-                  text = text.replace('&#' + m[2] + ';', String.fromCharCode(m[2]));
-              } else if(entMap[m[2]]) {
-                  text = text.replace('&' + m[2] + ';', entMap[m[2]]);
-              } else { //handle things that look like entities, but are not entities
-                cutPoint = text.indexOf('&' + m[2] + ';') + m[2].length + 2;
-                str += text.substr(0, cutPoint);
-                text = text.substr(cutPoint);
-              }
-            }
-          }
-          return str + text;
-        };
-    })();
-
-    function HTMLParser(html) {
-        var index, chars, last = html;
-        var tbodyCheck = false;
-        stack.reset();
-
-        while (html) {
-            chars = true;
-            // Make sure we're not in a script or style element
-            if(!stack.last() || !special[stack.last()]) {
-                // Comment
-                if(html.indexOf("<!--") === 0) {
-                    index = html.indexOf("-->");
-                    if(index >= 0) {
-                        if(handler.comment) { handler.comment(html.substr(4, index)); }
-                        html = html.substr(index + 3);
-                        chars = tbodyCheck = false;
-                    }
-                } else if(html.indexOf("</") === 0) { // end tag
-                    match = html.match(endTag);
-                    if(match) {
-                        html = html.substr( match[0].length );
-                        match[0].replace(endTag, parseEndTag);
-                        chars = tbodyCheck = false;
-                    }
-                } else if(html.indexOf("<") === 0) { // start tag
-                    match = html.match(startTag);
-                    if(match) {
-                        if(tbodyCheck && match[1] !== 'tbody') {
-                            //This will cause problems with nested tables and some other cases
-                            //TODO: Stack based fix
-                            html = html.replace(endTable, '</tbody></table>');
-                            html = '<tbody>' + html;
-                            match = html.match(startTag);
-                        }
-                        html = html.substr( match[0].length );
-                        match[0].replace(startTag, parseStartTag);
-                        chars = false;
-                        tbodyCheck = match[1].toLowerCase() == 'table';
-                    }
-                }
-
-                if(chars) {
-                    index = html.indexOf("<");
-                    var testStr,
-                        commentReg = /^<!--/;
-
-                    //handle non tag-related '<' entities
-                    while(index >= 0) {
-                        testStr = html.substr(index);
-                        match = testStr.match(startTag);
-                        if(match) { break; }
-                        match = testStr.match(endTag);
-                        if(match) { break; }
-                        match = testStr.match(commentReg);
-                        if(match) { break; }
-                        index = html.indexOf("<", index + 1);
-                    }
-
-                    var text = index < 0 ? html : html.substr(0, index);
-                    if (trim(text)) {
-                        text = entityReplace(text);
-                        handler.chars(text);
-                    }
-                    html = index < 0 ? "" : html.substr(index);
-                }
-            } else {
-                html = html.replace(new RegExp("(.*)<\/" + stack.last() + "[^>]*>"), replaceFn);
-                parseEndTag("", stack.last());
-            }
-
-            if ( html == last ) {
-                return Support.error("Support.html() parse error: " + html);
-            }
-            last = html;
-        }
-
-        parseEndTag(); // Clean up any remaining tags
-    }
-
-    var elems, startNode, curParentNode, children;
-    handler = {
-        start: function(tagName, attrs, unary) {
-            var el = document.createElement(tagName);
-            each(attrs, function() { Support.attr(el, this.name, this.value); }, [el]);
-
-            if (curParentNode && curParentNode.appendChild) {
-                curParentNode.appendChild(el);
-            }
-
-            if (!unary) {
-                elems.push(el);
-                curParentNode = el;
-            }
-        },
-        end: function(tag) {
-            elems.length -= 1;
-            curParentNode = elems[elems.length - 1];
-        },
-        chars: function(text) {
-            //Bug Report: http://bugs.developers.facebook.com/show_bug.cgi?id=1114
-            //TODO: find a way to create text nodes without the span wrapper if bug is not fixed
-            //TODO: with FBJS2 we should be able to use createTextNode instead of this hack
-            //      --but will the parser be needed?
-            var el = document.createElement('span');
-            el.setClassName('textNode');
-            el.setTextValue(text);
-            curParentNode.appendChild(el);
-        },
-        comment: function(text) {}
-    };
-
-    //html - the html string to parse
-    //doc  - the insertion point in the document
-    return function(html, doc) {
-        elems = [];
-        html = "<div>" + html + "</div>";
-        startNode = document.createElement('div');
-        curParentNode = startNode;
-
-        HTMLParser(html);
-        children = startNode.getChildNodes()[0].getChildNodes();
-
-        if (! doc) return children;
-        doc.setTextValue('');
-        each(children, function() { doc.appendChild(this); }, [ doc ]);
-        return doc;
-    };
-})(); // -- END Support.html
+	jQuery.expr.filters.visible = function( elem ) {
+		return !jQuery.expr.filters.hidden( elem );
+	};
+}
 */
-})(); // -- END Utility function wrapper
-if (typeof Support === 'undefined') throw 'Support module not defined !';
 
+// dimensions.js :
+
+// innerHeight/innerWidth, outerHeight/outerWidth, height/width methods :
+FBjqRY.each([ "Height", "Width" ], function( i, name ) {
+
+	var type = name.toLowerCase();
+
+	// innerHeight and innerWidth
+	FBjqRY.fn["inner" + name] = function() {
+        var node = this.nodes[0];
+		return node ? FBjqRY.css( node, type, false, "padding" ) : null;
+	};
+
+	// outerHeight and outerWidth
+	FBjqRY.fn["outer" + name] = function( margin ) {
+        var node = this.nodes[0];
+		return node ? FBjqRY.css( node, type, false, margin ? "margin" : "border" ) : null;
+	};
+
+	FBjqRY.fn[ type ] = function( size ) {
+		// Get window width or height
+		var elem = this.nodes[0];
+		if ( ! elem ) return size == null ? null : this;
+
+		if ( FBjqRY.isFunction( size ) ) {
+			return this.each(function( i ) {
+				var self = FBjqRY( this );
+				self[ type ]( size.call( this, i, self[ type ]() ) );
+			});
+		}
+
+        // Get or set width or height on the element
+		return size === undefined ?
+                // Get width or height on the element
+                FBjqRY.css( elem, type ) :
+                // Set the width or height on the element (default to pixels if value is unitless)
+                this.css( type, typeof size === "string" ? size : size + "px" );
+	};
+
+});
 /**
- * findNodes function - the selector "engine" behing FBjqRY.
- * 
- * @param nodes the nodes to filter (assumes no context given if not null), set
- * to null if You're providing a context or want to start at the root element
+ * find function - the selector "engine" behing FBjqRY.
+ *
  * @param sel the selector (string)
  * @param context the context of the search e.g. a FB node or a FBjqRY object
+ * @param nodes the nodes to filter (assumes no context given if not null), set
+ * to null if You're providing a context or want to start at the root element
  * @return an array of matched nodes
- *
- * NOTE: Depends on Support functions !
  */
-Support.findNodes = (function() {
+FBjqRY.find = (function() {
     var idCheck = /^#(\w+)/,
         classCheck = /^\.([\w\-]+)/,
         tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*|~|\|)?=?["|']?([^\]]+?)?["|']?\]/,
         pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
         pseudoCheck = /^:(\w+)/;
+
+    // Elements can be considered hidden for several reasons :
+    // * They have a CSS display value of none.
+    // * They are form elements with type="hidden".
+    // * Their width and height are explicitly set to 0.
+    // * An ancestor element is hidden, so the element is not shown on the page.
+    var _isHidden = function(node) {
+        if ( node.getTagName().toLowerCase() === 'input' ) {
+            var type = node.getType();
+            if ( type && type.toLowerCase() === 'hidden' ) return true;
+        }
+        while ( node ) {
+            if ( node.getStyle('display') === 'none' ) return true;
+            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
+            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
+        }
+        return false;
+    };
+    var _isInputType = function(node, type) {
+        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
+        var nodeType = node.getType();
+        return nodeType && nodeType.toLowerCase() === type;
+    };
 
     function filterNodes(nodes, fn, recurse) {
         var retNodes = [];
@@ -1052,20 +1993,20 @@ Support.findNodes = (function() {
                     return a.length === v.length ? a === v : ( a.indexOf(v) === 0 && a.charAt(v.length) === '-' );
                 };
                 break;
-            case "~": matchFunc = function(a, v) { return Support.indexOf(v, a.split(' ')) !== -1; }; break;
+            case "~": matchFunc = function(a, v) { return FBjqRY.inArray(v, a.split(' ')) !== -1; }; break; // indexOf
             default:
                 if ( value === true ) matchFunc = function(a, v) { return !!a; };
                 else matchFunc = function(a, v) { return a === v; };
         }
         return filterNodes( nodes,
             function() {
-                return matchFunc( Support.attr(this, name), value );
+                return matchFunc( FBjqRY.attr(this, name), value );
             },
             recurse
         );
     }
 
-    return function(nodes, sel, context) { // the findNodes function
+    return function(sel, context, nodes) { // the find function
         if ( typeof(sel) !== "string" ) {
             if ( sel.length || sel.length === 0 ) return sel;
             return [ sel ];
@@ -1074,22 +2015,22 @@ Support.findNodes = (function() {
         var i, len;
 
         //Is context a valid FBDOM element
-        if ( context ) {
+        if ( context ) { // context != document
             if ( nodes && nodes.length > 0 ) {
-                return Support.error("Support.findNodes() could not handle context with nodes");
+                return FBjqRY.error("find() could not handle context with nodes");
             }
-            if ( Support.isFBNode(context) ) {
+            if ( FBjqRY.fbjs.isNode(context) ) {
                 nodes = context.getChildNodes(); // context is never part of the result
             }
             else if ( typeof(context.length) === 'number' ) { // FBjqRY or array
-                if ( typeof(context.selector) !== 'undefined' ) context = context.nodes;
+                if ( context.jquery ) context = context.nodes;
                 nodes = [];
                 for ( i = 0, len = context.length; i < len; i++ ) {
                     nodes = nodes.concat( context[i].getChildNodes() );
                 }
             }
             else {
-                return Support.error("Support.findNodes() invalid context: " + context);
+                return FBjqRY.error("find() invalid context: " + context);
             }
         }
 
@@ -1097,26 +2038,27 @@ Support.findNodes = (function() {
             prevSel, selectors = sel.split(","),
             allNodes = [], origNodes = nodes;
 
+        var trim = FBjqRY.trim;
         for ( i = 0, len = selectors.length; i < len; i++ ) {
-            sel = Support.trim(selectors[i]);
+            sel = trim(selectors[i]);
             prevSel = "";
             recurse = true;
             while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
                     recurse = (sel.charAt(0) === ' ');
                     if ( recurse ) {
-                        sel = Support.trim(sel);
+                        sel = trim(sel);
                         var nextNodes = [], j, sibling;
                         switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
                             case '>':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
                                 }
                                 recurse = false; // only 1st level childs
                                 break;
                             case '~':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     while ( sibling ) {
@@ -1127,7 +2069,7 @@ Support.findNodes = (function() {
                                 recurse = false;
                                 break;
                             case '+':
-                                sel = Support.trim(sel.substr(1)); // ltrim
+                                sel = trim(sel.substr(1)); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     if ( sibling ) {
@@ -1187,27 +2129,6 @@ Support.findNodes = (function() {
                     var intValue = value ? parseInt(value, 10) : null;
 
                     var _nodes = nodes;
-                    // Elements can be considered hidden for several reasons :
-                    // * They have a CSS display value of none.
-                    // * They are form elements with type="hidden".
-                    // * Their width and height are explicitly set to 0.
-                    // * An ancestor element is hidden, so the element is not shown on the page.
-                    var _isHidden = function(node) {
-                        if ( node.getTagName().toLowerCase() === 'input' ) {
-                            var type = node.getType();
-                            if ( type && type.toLowerCase() === 'hidden' ) return true;
-                        }
-                        while ( node ) {
-                            if ( node.getStyle('display') === 'none' ) return true;
-                            if ( node.getOffsetWidth() == 0 && node.getOffsetHeight() == 0 ) return true;
-                            node = node.getParentNode(); // for rootNode this is null - thus we'll stop
-                        }
-                        return false;
-                    };
-                    var _isInputType = function(node, type) {
-                        if ( node.getTagName().toLowerCase() !== 'input' ) return false;
-                        return node.getType() && node.getType().toLowerCase() === type;
-                    };
 
                     switch ( pseudo ) {
                         case "first":
@@ -1221,122 +2142,122 @@ Support.findNodes = (function() {
                         case "gt":
                             nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
                         case "even":
-                            nodes = Support.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
+                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
                         case "odd":
-                            nodes = Support.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
+                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
                         case "contains":
                             nodes = null;
-                            notSupported(":contains pseudo selector not supported (cannot read text from FB nodes)");
-                            break;
+                            return FBjqRY.error("find() :contains pseudo selector not supported");
+                            //break;
                         case "hidden":
-                            nodes = Support.grep(nodes, _isHidden); break;
+                            nodes = FBjqRY.grep(nodes, _isHidden); break;
                         case "visible":
-                            nodes = Support.grep(nodes, function(node) { return ! _isHidden(node); }); break;
+                            nodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
                         case "has":
-                            nodes = Support.grep(nodes, function(node) {
-                                var matches = find([ node ], value);
+                            nodes = FBjqRY.grep(nodes, function(node) {
+                                var matches = FBjqRY.find(value, null, [ node ]);
                                 return matches.length > 0;
                             });
                             break;
                         case "not":
-                            nodes = Support.grep(nodes, function(node) {
-                                var notMatches = find([ node ], value);
+                            nodes = FBjqRY.grep(nodes, function(node) {
+                                var notMatches = FBjqRY.find(value, null, [ node ]);
                                 // if smt is matched return false :
                                 return notMatches.length == 0;
                             });
                             break;
                         case "nth-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
                             });
                             break;
                         case "first-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 if ( childs && childs[0] ) nodes.push( childs[0] );
                             });
                             break;
                         case "last-child":
                             nodes = [];
-                            Support.each(_nodes, function(node) {
+                            FBjqRY.each(_nodes, function(node) {
                                 var childs = node.getChildNodes();
                                 var length = childs && childs.length;
                                 if ( length ) nodes.push( childs[length - 1] );
                             });
                             break;
                         case "only-child":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var parentChilds = node.getParentNode().getChildNodes();
                                 return parentChilds.length === 1;
                             });
                             break;
                         case "parent": // all elements that are the parent of another element :
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var childNodes = node.getChildNodes();
                                 return childNodes && childNodes.length > 0;
                             });
                             break;
                         case "empty": // all elements that have no children :
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var childNodes = node.getChildNodes();
                                 return ! childNodes || childNodes.length === 0;
                             });
                             break;
                         case "disabled":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var disabled = node.getDisabled();
                                 return !! disabled; // @todo disabled === 'disabled'
                             });
                             break;
                         case "enabled":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var disabled = node.getDisabled();
                                 return ! disabled;
                             });
                             break;
                         case "selected":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var selected = node.getSelected();
                                 return !! selected; // @todo selected === 'selected'
                             });
                             break;
                         case "input": // all input, textarea, select and button elements
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var tagName = node.getTagName().toLowerCase();
                                 return tagName === 'input' || tagName === 'textarea'
                                     || tagName === 'select' || tagName === 'button';
                             });
                             break;
                         case "text":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'text') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
                             break;
                         case "password":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'password') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
                             break;
                         case "radio":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'radio') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
                             break;
                         case "file":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'file') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
                             break;
                         case "image": // all image inputs
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'image') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
                             break;
                         case "reset":
-                            nodes = Support.grep(nodes, function(node) { return _isInputType(node, 'reset') });
+                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
                             break;
                         case "submit":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var type = node.getType(), tagName = node.getTagName().toLowerCase();
                                 return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
                                        (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
                             });
                             break;
                         case "header":
-                            nodes = Support.grep(nodes, function(node) {
+                            nodes = FBjqRY.grep(nodes, function(node) {
                                 var tagName = node.getTagName().toLowerCase();
                                 return tagName.length === 2 && tagName.charAt(0) === 'h';
                             });
@@ -1349,7 +2270,7 @@ Support.findNodes = (function() {
             }
             if ( sel ) {
                 nodes = [];
-                return Support.error("Support.findNodes() could not parse the remaining selector: '" + sel + "'");
+                return FBjqRY.error("find() could not parse the remaining selector: '" + sel + "'");
             }
             else {
                 allNodes = allNodes.concat(nodes);
@@ -1357,64 +2278,321 @@ Support.findNodes = (function() {
             }
         }
 
-        return Support.unique(allNodes);
+        return FBjqRY.unique(allNodes);
     };
 })();
-//A wrapper for FBJS to make it feel more like jQuery
-//About name:
-// FB   = Facebook
-// jqRY = jQuery
-// RY   = RockYou!
-//Author: Nate McQuay [borrowing heavily from jQuery 1.2.6]
-//Author: Karol Bucek [building on top of Nate's version to make it more "complete"]
-//=====================================================
+//var runtil = /Until$/,
+	//rparentsprev = /^(?:parents|prevUntil|prevAll)/,
+	// Note: This RegExp should be improved, or likely pulled from Sizzle
+	//rmultiselector = /,/,
+	//isSimple = /^.[^:#\[\.,]*$/;
 
-//can't wrap this because it needs to be "global" and we don't have access to the window object
-var FBjqRY = function(selector, context) {
-    return new FBjqRY.prototype.init(selector, context);
-};
+FBjqRY.fn.extend({
 
-// @todo isPlainObject not implemented !
-// @todo isXMLDoc not implemented !
+    find: function(selector) {
+        return this.pushStack( FBjqRY.find(selector, this.nodes), "find", selector );
+    },
 
-//We can wrap everything else
-(function() {
+    /*
+	has: function( target ) {
+		var targets = jQuery( target );
+		return this.filter(function() {
+			for ( var i = 0, l = targets.length; i < l; i++ ) {
+				if ( jQuery.contains( this, targets[i] ) ) {
+					return true;
+				}
+			}
+		});
+	}, */
 
-var encodeURIComponent = Support.encodeURIComponent;
+    not: function( selector ) { // @todo TEST
+        //filter out specified nodes
+        var notNodes;
+        if ( selector.jquery ) notNodes = selector.nodes;
+        else if ( FBjqRY.isArray(selector) ) notNodes = selector;
 
-var each = Support.each;
-var map = Support.map;
-var grep = Support.grep;
-var merge = Support.merge;
-var indexOf = Support.indexOf;
-var unique = Support.unique;
-var trim = Support.trim;
+        if ( notNodes ) {
+            var nodes = this.get(); // is a copy already
+            for ( var i = 0, len = notNodes.length; i < len; i++ ) {
+                var idx = FBjqRY.inArray( notNodes[i], nodes ); // indexOf
+                if ( idx != -1 ) nodes.splice(idx, 1); // remove element
+            }
+        }
+        else { // expr assumed to be a selector :
+            notNodes = FBjqRY.find(selector, this.nodes);
+        }
 
-var slice = Support.array.slice;
+        return this.pushStack( nodes, "not", selector );
+    },
 
-//var isFunction = Support.isFunction;
-//var isArray = Support.isArray;
-var isString = Support.isString;
-//var isEmptyObject = Support.isEmptyObject;
+	is: function( selector ) {
+		return !! selector && FBjqRY.filter( selector, this.nodes ).length > 0;
+	},
 
-var isFBNode = Support.isFBNode;
-var sameFBNode = Support.sameFBNode;
-var getFBNodeId = Support.getFBNodeId;
+    filter: function(selector) {
+        var fn = selector;
+        if ( typeof(fn) === "string" ) {
+            fn = function() { 
+                return FBjqRY.find( selector, this ).length > 0;
+            };
+        }
+        // else it should already be a function
+        var nodes = [];
+        for ( var i = 0, len = this.length; i < len; i++ ) {
+            var node = this.nodes[i];
+            if ( fn.call( node, i ) ) nodes.push( node );
+        }
 
-var find = Support.findNodes;
+        return this.pushStack( nodes, "filter", selector );
+    },
 
-var is = function(expr, nodes) {
-    return !!expr && find(nodes, expr).length > 0; //(this.find(expr).length > 0);
-};
+    /*
+	closest: function( selectors, context ) {
+		if ( jQuery.isArray( selectors ) ) {
+			var ret = [], cur = this[0], match, matches = {}, selector, level = 1;
+
+			if ( cur && selectors.length ) {
+				for ( var i = 0, l = selectors.length; i < l; i++ ) {
+					selector = selectors[i];
+
+					if ( !matches[selector] ) {
+						matches[selector] = jQuery.expr.match.POS.test( selector ) ? 
+							jQuery( selector, context || this.context ) :
+							selector;
+					}
+				}
+
+				while ( cur && cur.ownerDocument && cur !== context ) {
+					for ( selector in matches ) {
+						match = matches[selector];
+
+						if ( match.jquery ? match.index(cur) > -1 : jQuery(cur).is(match) ) {
+							ret.push({ selector: selector, elem: cur, level: level });
+						}
+					}
+					cur = cur.parentNode;
+					level++;
+				}
+			}
+
+			return ret;
+		}
+
+		var pos = jQuery.expr.match.POS.test( selectors ) ? 
+			jQuery( selectors, context || this.context ) : null;
+
+		return this.map(function( i, cur ) {
+			while ( cur && cur.ownerDocument && cur !== context ) {
+				if ( pos ? pos.index(cur) > -1 : jQuery(cur).is(selectors) ) {
+					return cur;
+				}
+				cur = cur.parentNode;
+			}
+			return null;
+		});
+	}, */
+	
+	// Determine the position of an element within
+	// the matched set of elements
+    index: function(elem) {
+        // If it receives a jQuery object, the first element is used
+        if ( typeof(elem.selector) !== 'undefined' ) elem = elem.get(0);
+        var sameNode = FBjqRY.fbjs.sameNode;
+        for ( var i = this.length - 1; i >= 0; i-- ) {
+            if ( sameNode(elem, this.nodes[i]) ) break;
+        }
+        return i; // not found == -1
+    },
+
+	add: function( selector ) {
+        var selNodes = FBjqRY.isString(selector) ?
+            //find( null, selector ) :
+            FBjqRY( selector ).nodes : // selector might be a html string !
+                FBjqRY.makeArray( selector );
+
+		return this.pushStack( FBjqRY.unique( FBjqRY.merge(
+			this.get(), // it's a clone
+			selNodes
+		)));
+	},
+
+	andSelf: function() {
+		return this.add( this.prevObject );
+	}
+});
+
+FBjqRY.fn.extend({
+    parent: function(selector) {
+        var parents = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var node = this.nodes[i].getParentNode(); nodeArray[0] = node;
+            if ( ! selector || isNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
+                parents.push(node);
+            }
+        }
+        //return FBjqRY(FBjqRY.unique(parents));
+        return this.pushStack( FBjqRY.unique(parents), "parent", selector );
+    },
+    parents: function(selector) {
+        var parents = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var node = this.nodes[i].getParentNode();
+            while ( node ) {
+                 nodeArray[0] = node;
+                if( ! selector || isNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
+                    parents.push(node);
+                }
+                node = node.getParentNode();
+            }
+        }
+        //return FBjqRY(FBjqRY.unique(parents));
+        return this.pushStack( FBjqRY.unique(parents), "parents", selector );
+    },
+
+    next: function(selector) {
+        var siblings = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var sibling = this.nodes[i].getNextSibling();
+            nodeArray[0] = sibling;
+            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
+        }
+        //return FBjqRY(FBjqRY.unique(siblings));
+        return this.pushStack( FBjqRY.unique(siblings), "next", selector );
+    },
+    nextAll: function(selector) {
+        var siblings = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var sibling = this.nodes[i].getNextSibling();
+            while ( sibling ) {
+                nodeArray[0] = sibling;
+                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
+                sibling = sibling.getNextSibling();
+            }
+        }
+        //return FBjqRY(FBjqRY.unique(siblings));
+        return this.pushStack( FBjqRY.unique(siblings), "nextAll", selector );
+    },
     
-var filter = function(expr, nodes) {
-    var fNodes = [], nodeArray = [];
-    for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-        var node = nodes[i]; nodeArray[0] = node;
-        if ( is(expr, nodeArray) ) fNodes.push( node );
+    prev: function(selector) {
+        var siblings = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var sibling = this.nodes[i].getPreviousSibling();
+            nodeArray[0] = sibling;
+            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
+        }
+        //return FBjqRY(FBjqRY.unique(siblings));
+        return this.pushStack( FBjqRY.unique(siblings), "prev", selector );
+    },
+    prevAll: function(selector) {
+        var siblings = [], len = this.length, nodeArray = [];
+        for (var i = 0; i < len; i++) {
+            var sibling = this.nodes[i].getPreviousSibling();
+            while ( sibling ) {
+                nodeArray[0] = sibling;
+                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
+                sibling = sibling.getPreviousSibling();
+            }
+        }
+        //return FBjqRY(FBjqRY.unique(siblings));
+        return this.pushStack( FBjqRY.unique(siblings), "prevAll", selector );
+    },
+
+    siblings: function(expr) {
+        return this.prevAll(expr).concat(this.nextAll(expr)); // @todo pushStack !
+    },
+
+    children: function(selector) {
+        var children = [];
+        for ( var i = 0, len = this.length; i < len; i++ ) {
+            children = children.concat( this.nodes[i].getChildNodes() );
+        }
+        //var ret = FBjqRY(unique(children));
+        //return selector ? ret.filter(selector) : ret;
+
+        var nodes = FBjqRY.unique(children);
+        if ( selector ) nodes = filter(selector, nodes);
+        return this.pushStack( nodes, "children", selector );
+
+        /*
+        if (expr) {
+            children = FBjqRY(this.nodes).find(expr).get();
+        }
+        else {
+            children = [];
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                children = children.concat( this.nodes[i].getChildNodes() );
+            }
+        }
+        return FBjqRY(unique(children));
+        */
+    },
+    
+    contents: function() { // @todo: This doesn't feel right... TEST
+        function grabNodes(node) {
+            var nodes = node.getChildNodes();
+            for (var i = 0, len = nodes.length; i < len; i++) {
+                nodes = nodes.concat(grabNodes(nodes[i]));
+            }
+            return nodes;
+        }
+
+        var nodes = this.nodes;
+        for (var i = 0; i < nodes.length; i++) {
+            nodes = nodes.concat(grabNodes(nodes[i]));
+        }
+        return FBjqRY(FBjqRY.unique(nodes)); // @todo pushStack
+    }
+
+});
+
+var isNodes = function(selector, nodes) {
+    return !! selector && FBjqRY.filter( selector, nodes ).length > 0;
+};
+
+FBjqRY.filter = function( selector, nodes, not ) {
+    if ( not ) selector = ":not(" + selector + ")"; // not-used
+    var fNodes = []; //nodeArray = [];
+    //console.log('filter', selector, nodes);
+    for ( var i = 0, len = nodes.length; i < len; i++ ) {
+        var node = nodes[i]; //nodeArray[0] = node;
+        if ( FBjqRY.find(selector, null, [ node ]).length > 0 ) {
+            fNodes.push( node );
+        }
     }
     return fNodes;
 };
+var //rinlinejQuery = / jQuery\d+="(?:\d+|null)"/g,
+	rleadingWhitespace = /^\s+/,
+	rxhtmlTag = /(<([\w:]+)[^>]*?)\/>/g,
+	rtagName = /<([\w:]+)/,
+	//rtbody = /<tbody/i,
+	//rhtml = /<|&#?\w+;/,
+	rnocache = /<script|<object|<embed|<option|<style/i,
+	//rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,  // checked="checked" or checked (html5)
+    rselfClosing = /^(?:area|br|col|embed|hr|img|input|link|meta|param)$/i,
+	fcloseTag = function( all, front, tag ) {
+		return rselfClosing.test( tag ) ? all : front + "></" + tag + ">";
+	},
+	wrapMap = {
+		option: [ 1, "<select multiple='multiple'>", "</select>" ],
+		legend: [ 1, "<fieldset>", "</fieldset>" ],
+		thead: [ 1, "<table>", "</table>" ],
+		tr: [ 2, "<table><tbody>", "</tbody></table>" ],
+		td: [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ],
+		col: [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ],
+		area: [ 1, "<map>", "</map>" ],
+		_default: [ 0, "", "" ]
+	};
+
+wrapMap.optgroup = wrapMap.option;
+wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
+wrapMap.th = wrapMap.td;
+
+// IE can't serialize <link> and <script> tags normally
+/*
+if ( ! FBjqRY.support.htmlSerialize ) {
+	wrapMap._default = [ 1, "div<div>", "</div>" ];
+} */
 
 /**
  * Helper for the following manipulation functions :
@@ -1439,307 +2617,171 @@ var delegateManipulation = function(name, fn, selector) {
     return this.pushStack( ret, name, selector );
 };
 
-var elemdisplay = {}; // helper for show()/hide()
+var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
 
-var fxAttrs = [
-    // height animations
-    [ "height", "marginTop", "marginBottom", "paddingTop", "paddingBottom" ],
-    // width animations
-    [ "width", "marginLeft", "marginRight", "paddingLeft", "paddingRight" ],
-    // opacity animations
-    [ "opacity" ]
-];
-function genFx( type, num ){
-	var obj = {};
-	FBjqRY.each( fxAttrs.concat.apply( [], fxAttrs.slice(0,num) ), function() {
-		obj[ this ] = type;
-	});
-	return obj;
-}
+// ============================================================================
+/** A helper around setInnerXHTML (FBJS beta feature) */
+// ============================================================================
+var nodesFromXHTML = function( elems, context ) { // based on jQuery.clean 1.3.2
+    context = context || document;
+    if ( typeof context.createElement === "undefined" ) context = document;
 
-var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
-    //quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#([\w-]+)$/;
-    //isSimple  = /^.[^:#\[\.]*$/, undefined;
+    if ( FBjqRY.isString(elems) ) { // support single string
+        elems = [ elems ];
+    }
 
-FBjqRY.fn = FBjqRY.prototype = {
+    // If a single string is passed in and it's a single tag
+    // just do a createElement and skip the rest
+    if ( elems.length === 1 && FBjqRY.isString( elems[0] ) ) {
+        var match = rsingleTag.exec( elems[0] );
+        if ( match ) return [ context.createElement( match[1] ) ];
+    }
 
-    version: "0.3.0",
-    
-    //CORE
-    //====================================
+    var ret = [], div = context.createElement("div");
+    var isFBNode = FBjqRY.fbjs.isNode;
 
-    init: function(selector, context) {
-        //selector = selector || document; // makes no sense document is a stub only !
-        if ( typeof(selector) === 'undefined' ) { // @todo probably non sense to have it ...
-            this.context = document;
-            this.length = 0;
-            return this;
+    FBjqRY.each(elems, function() {
+        var elem = this;
+
+        if ( typeof elem === "number" ) elem += '';
+        if ( ! elem ) return;
+
+        // Convert html string into DOM nodes
+        if ( FBjqRY.isString(elem) ) {
+            // Fix "XHTML"-style tags in all browsers
+            //var html = elem.replace(rxhtmlTag, rselfClosing);
+            var html = elem;
+
+            // Trim whitespace, otherwise indexOf won't work as expected
+            //html = html.replace(rleadingWhitespace, '');
+
+            var tag = rtagName.exec( html );
+            tag = tag ? tag[1] : '_default';
+            var wrap = wrapMap[ tag ] || wrapMap._default;
+
+            /*
+            var tags = html.replace(rleadingWhitespace, "").substring(0, 10).toLowerCase();
+            var wrap = // @todo not sure if this is needed FBJS might handle it it's own way ...
+                // option or optgroup
+                ! tags.indexOf("<opt") &&
+                [ 1, "<select multiple='multiple'>", "</select>" ] ||
+
+                ! tags.indexOf("<leg") &&
+                [ 1, "<fieldset>", "</fieldset>" ] ||
+
+                tags.match(/^<(thead|tbody|tfoot|colg|cap)/) &&
+                [ 1, "<table>", "</table>" ] ||
+
+                ! tags.indexOf("<tr") &&
+                [ 2, "<table><tbody>", "</tbody></table>" ] ||
+
+                // <thead> matched above
+                (! tags.indexOf("<td") || !tags.indexOf("<th")) &&
+                [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ] ||
+
+                ! tags.indexOf("<col") &&
+                [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ] ||
+
+                [ 0, "", "" ]; */
+
+            // Go to html and back, then peel off extra wrappers
+            //try {
+                div.setInnerXHTML( wrap[1] + html + wrap[2] );
+            //}
+            //catch(e) { // @todo errors ?
+                //console.log('wrap', wrap, rtagName.exec( html ), e);
+                //throw e;
+            //}
+
+            // Move to the right depth
+            var unwrapCount = wrap[0];
+            while ( unwrapCount-- ) div = div.getLastChild();
+
+            elem = div.getChildNodes();
         }
-        //ready state shortcut handler -- no need for ready event because FBJS delays execution
-        if ( FBjqRY.isFunction(selector) ) return this.ready(selector);
-        //Are we dealing with an FBjqRY object?
-        else if ( typeof(selector.selector) !== 'undefined' ) {
-            var nodes = selector.get();
-            this.nodes = nodes.length ? nodes : [ nodes ];
-            this.length = nodes.length;
-            this.selector = selector.selector;
-            this.context = selector.context;
-            return this;
-        }
-        //Are we dealing with FB DOM Nodes?
-        else if ( isFBNode(selector) || isFBNode(selector[0]) ) {
-            this.nodes = selector.length ? selector : [ selector ];
-            this.length = this.nodes.length;
-            this.context = selector;
-            return this;
-        }
-        else if ( typeof(selector) !== 'undefined' ) {
-            var match = quickExpr.exec(selector);
-            if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
-                if ( match[1] ) { // HANDLE: $(html) -> $(array)
-                    this.nodes = Support.xhtml( match[1] ); // Support.html( match[1] );
-                }
-                else { // HANDLE: $("#id")
-                    this.nodes = [];
-                    var node = document.getElementById( match[3] );
-                    if ( node ) this.nodes[0] = node;
-                }
+
+        if ( isFBNode(elem) ) ret.push( elem );
+        else ret = FBjqRY.merge( ret, elem );
+
+    });
+
+    return ret;
+};
+
+FBjqRY.fn.extend({
+    text: function(text) {
+        if ( typeof(text) !== 'undefined' ) {
+            //if ( FBjqRY.isFunction(text) ) {
+            //    return this.each(function(i) {
+            //        var self = FBjqRY(this);
+            //        self.text( text.call(this, i, null /* self.text() */) );
+            //    });
+            //}
+            //each(this.nodes, function() {  this.setTextValue(text); });
+            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+                this.nodes[i].setTextValue(text);
             }
-            else {
-                //context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
-                // HANDLE: $(expr, [context]) -- which is just equivalent to: $(context).find(expr)
-                this.nodes = find( null, selector, context );
-            }
+            return this;
         }
-
-        this.selector = selector;
-        this.context = context || document; // @todo does the document make any sense with FBJS ?!
-        this.length = this.nodes.length;
-        return this;
+        return FBjqRY.error("text() getter not supported");
     },
-
-    selector: "", // start with an empty selector
-
-    size: function() { return this.length; },
-    
-	toArray: function() { 
-        //return slice.call( this, 0 ); // won't work with FBJS
-        var array = [];
-        for ( var i = 0, len = this.length; i < len; i++ ) {
-            array[i] = this.nodes[i];
-        }
-        return array;
-    },
-
-    each: function(fn) {
-        each(this.nodes, fn);
-        return this;
-    },
-	// Get the Nth element in the matched element set OR
-	// Get the whole matched element set as a clean array
-	get: function(i) {
-        // Return a 'clean' array or just the element :
-		return typeof(i) === 'undefined' ? slice.call( this.nodes ) : this.nodes[i];
-	},
-    index: function(elem) {
-        // If it receives a jQuery object, the first element is used
-        if ( typeof(elem.selector) !== 'undefined' ) elem = elem.get(0);
-        for ( var i = this.nodes.length - 1; i >= 0; i-- ) {
-            if ( sameFBNode(elem, this.nodes[i]) ) break;
-        }
-        return i; // not found == -1
-    },
-
-    slice: function() {
-        return this.pushStack( 
-            slice.apply( this.nodes, arguments ),
-            "slice", slice.call(arguments).join(",")
-        );
-    },
-    
-	eq: function( i ) {
-		return i === -1 ? this.slice( i ) : this.slice( i, +i + 1 );
-    },
-	first: function() { return this.eq( 0 ); },
-	last: function() { return this.eq( -1 ); },
-    
-	map: function( callback ) {
-		return this.pushStack( map(this.nodes, function(elem, i){
-			return callback.call( elem, i, elem );
-		}));
-	},
-
-    // Take an array of elements and push it onto the stack
-    // (returning the new matched element set)
-    pushStack: function( elems, name, selector ) {
-        // Build a new jQuery matched element set
-        var ret = FBjqRY( elems );
-        // Add the old object onto the stack (as a reference)
-        ret.prevObject = this;
-        ret.context = this.context;
-
-        if ( name === "find" ) {
-            ret.selector = this.selector + (this.selector ? " " : "") + selector;
-        }
-        else if ( name ) {
-            ret.selector = this.selector + "." + name + "(" + selector + ")";
-        }
-        // Return the newly-formed element set
-        return ret;
-    },
-    // Force the current matched set of elements to become
-    // the specified array of elements (destroying the stack in the process)
-    // You should use pushStack() in order to do this, but maintain the stack
     /*
-    setArray: function( elems ) {
-        // Resetting the length to 0, then using the native Array push
-        // is a super-fast way to populate an object with array-like properties
-        this.length = 0;
-        push.apply( this, elems );
-
-        return this;
-    }, */
-
-    //ATTRIBUTES
-    //====================================
-    attr: function(name, value) {
-        var options = name;
-        // Look for the case where we're accessing a value
-        if ( typeof(name) === 'string' ) {
-            if ( typeof(value) === 'undefined' ) {
-                var node = this.nodes[0];
-                return node && Support.attr(node, name);
-            }
-            else {
-                options = {};
-                options[ name ] = value;
-            }
-        }
-        // Check to see if we're setting values
-        return this.each( function(i) {
-            for ( name in options ) {
-                var value = options[name];
-                if ( FBjqRY.isFunction(value) ) value = value.call(this, i);
-                Support.attr(this, name, value);
-            }
-        });
-    },
-	removeAttr: function(name) {
-		return this.each(function() {
-			//jQuery.attr( this, name, "" );
-            Support.attr(this, name, '');
-		});
-	},
-
-    addClass: function(value) {
-		if ( FBjqRY.isFunction(value) ) {
-			return this.each(function(i) {
-				var self = FBjqRY(this);
-				self.addClass( value.call(this, i, self.attr("class")) );
-			});
-		}
-
-        if ( value && typeof value === "string" ) {
-            var node, className, trim = FBjqRY.trim;
-            value = trim( value );
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                node = this.nodes[i];
-                node.addClassName(value);
-                
-                className = node.getClassName();
-                var trimmedClass = trim( className );
-                if ( className.length !== trimmedClass.length ) {
-                    node.setClassName( trimmedClass );
-                }
-            }
-        }
-        return this;
-    },
-
-    removeClass: function(value) {
-		if ( FBjqRY.isFunction(value) ) {
-			return this.each(function(i) {
-				var self = FBjqRY(this);
-				self.removeClass( value.call(this, i, self.attr("class")) );
-			});
-		}
-
-        if ( (value && typeof value === "string") || value === undefined ) {
-            var node, className, trim = FBjqRY.trim;
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                node = this.nodes[i];
-                if ( value ) { // remove
-                    node.removeClassName(value);
-
-                    className = node.getClassName();
-                    var trimmedClass = trim( className );
-                    if ( className.length !== trimmedClass.length ) {
-                        node.setClassName( trimmedClass );
-                    }
-                }
-                else { // remove all classes :
-                    node.setClassName('');
-                }
-            }
-        }
-        return this;
-    },
-
-    toggleClass: function(value, state) {
-		if ( FBjqRY.isFunction(value) ) {
-			return this.each(function(i) {
-				var self = FBjqRY(this);
-				self.toggleClass( value.call(this, i, self.attr("class"), state), state );
-			});
-		}
-
-        var type = typeof(value), className;
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            if ( type === 'string' ) {
-                //node.toggleClassName(value);
-				// toggle individual class names :
-				var c = 0, classNames = value.split(/\s+/),
-                    stateBool = typeof(state) === 'boolean';
-                    
-				while ( (className = classNames[ c++ ]) ) {
-					// check each className given, space seperated list
-                    if ( stateBool ) {
-                        node[state ? 'addClassName' : 'removeClassName'](className)
-                    }
-                    else {
-                        node.toggleClassName(className);
-                    }
-				}
-            }
-			else if ( type === "undefined" || type === "boolean" ) {
-                className = node.getClassName();
-				if ( className ) {
-					// store className if set
-					FBjqRY.data( node, "__className__", className );
-				}
-				// toggle whole className
-                if (className || value === false) className = "";
-                else {
-                    className = FBjqRY.data( node, "__className__" ) || "";
-                }
-				node.setClassName( className );
-			}
-        }
-        return this;
-    },
-
     html: function(html) {
         if ( typeof(html) !== 'undefined' ) {
             //each(this.nodes, function() { Support.html(html, this); });
             for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                Support.html( html, this.nodes[i] );
+                buildNodesXHTML( html, this.nodes[i] );
             }
             return this;
         }
-        return Support.error("html() getter not supported in FBJS");
-    },
+        return FBjqRY.error("html() getter not supported");
+    }, */
+    
+	html: function( html ) {
+		if ( typeof(html) === undefined ) {
+            return FBjqRY.error("html() getter not supported");
+        }
+		// See if we can take a shortcut and just use innerHTML
+		else if ( FBjqRY.isString(html) && ! rnocache.test( html ) &&
+			(FBjqRY.support.leadingWhitespace || ! rleadingWhitespace.test( html )) &&
+			! wrapMap[ (rtagName.exec( html ) || ["", ""])[1].toLowerCase() ] ) {
 
+			html = html.replace(rxhtmlTag, fcloseTag);
+
+			try {
+				for ( var i = 0, l = this.length; i < l; i++ ) {
+					// Remove element nodes and prevent memory leaks
+					//if ( this[i].nodeType === 1 ) {
+                    var node = this.nodes[i];
+                    FBjqRY.cleanData( node.getElementsByTagName("*") ); // @todo cleanData ?
+                    node.setInnerXHTML( html );
+					//}
+				}
+			// If using innerHTML throws an exception, use the fallback method
+			}
+            catch(e) {
+				this.empty().append( html );
+			}
+		}
+        //else if ( FBjqRY.isFunction( html ) ) {
+		//	this.each( function(i) {
+		//		var self = FBjqRY(this), old = self.html();
+		//		self.empty().append(function(){
+		//			return html.call( this, i, old );
+		//		});
+		//	});
+        //
+		//}
+        else {
+			this.empty().append( html );
+		}
+
+		return this;
+	},
+
+    /**
+     * @FBjqRY.extension
+     */
     fbml: function(fbml) {
         if ( typeof(fbml) !== 'undefined' ) {
             //each(this.nodes, function() { this.setInnerFBML(fbml); });
@@ -1748,156 +2790,47 @@ FBjqRY.fn = FBjqRY.prototype = {
             }
             return this;
         }
-        return Support.error("fbml() getter not supported in FBJS");
+        return FBjqRY.error("fbml() getter not supported");
     },
 
-    text: function(text) {
-        if ( typeof(text) !== 'undefined' ) {
-            //each(this.nodes, function() {  this.setTextValue(text); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                this.nodes[i].setTextValue(text);
-            }
-            return this;
-        }
-        return Support.error("text() getter not supported in FBJS");
-    },
-
-    val: function(value) {
-        var i, len, node, values;
-        if( typeof(value) !== 'undefined' ) {
-            var isFunction = FBjqRY.isFunction(value);
-            
-            for ( i = 0, len = this.nodes.length; i < len; i++ ) {
-                node = this.nodes[i]; var val = value, nodeVal;
-                
-                if ( isFunction ) {
-                    nodeVal = FBjqRY(node).val();
-                    val = value.call(node, i, nodeVal);
-                }
-                // Typecast each time if the value is a Function and the appended
-                // value is therefore different each time.
-                if ( typeof val === "number" ) val += "";
-                
-                if ( FBjqRY.isArray(val) && /radio|checkbox/.test( node.getType() ) ) {
-                    nodeVal = FBjqRY(node).val();
-                    node.setChecked( FBjqRY.inArray( nodeVal, val ) >= 0 );
-                }
-                else if ( node.getTagName().toUpperCase() === "SELECT" ) {
-                    values = FBjqRY.makeArray(val);
-
-                    FBjqRY("option", node).each(function() {
-                        var optVal = FBjqRY(this).val();
-                        this.setSelected( FBjqRY.inArray( optVal, values ) >= 0 );
-                    });
-
-                    if ( ! values.length ) node.setSelectedIndex(-1);
-                }
-                else {
-                    node.setValue(val);
-                }
-            }
-            return this;
-        }
-
-        node = this.nodes[0];
-        if ( node ) {
-            var nodeName = node.getTagName().toUpperCase();
-            // NOTE: can't read text from FB nodes !
-            //if ( nodeName === 'OPTION' ) {
-            //    value = node.getValue() || node.getTextValue();
-            //}
-            // We need to handle select boxes special
-            if ( nodeName === "SELECT" ) {
-                var index = node.getSelectedIndex(),
-                    options = FBjqRY('option', node).nodes,
-                    one = node.getType() === "select-one";
-
-                // Nothing was selected
-                if ( index < 0 ) return null;
-
-                values = [];
-                // Loop through all the selected options
-                for ( i = one ? index : 0, max = one ? index + 1 : options.length; i < max; i++ ) {
-                    var option = options[ i ];
-                    if ( option.getSelected() ) {
-                        // We don't need an array for one selects
-                        if ( one ) {
-                            value = option.getValue();
-                            break;
-                        }
-                        // Multi-Selects return an array
-                        values.push( option.getValue() );
-                    }
-                }
-                if ( ! one ) return values;
-            }
-            else {
-                value = node.getValue();
-            }
-
-            return value ? value : '';
-        }
-        return undefined; // no node
-    },
-
-    //added for our own uses
-    dimensions: function() {
+    wrapAll: function(html) {
         var node = this.nodes[0];
-        return {
-            top:    node.getAbsoluteTop(),
-            left:   node.getAbsoluteLeft(),
-            width:  node.getOffsetWidth(),
-            height: node.getOffsetHeight(),
-            right:  node.getAbsoluteLeft() + node.getOffsetWidth(),
-            bottom: node.getAbsoluteTop() + node.getOffsetHeight(),
-            clientWidth: node.getClientWidth(),
-            clientHeight: node.getClientHeight(),
-            scrollTop: node.getScrollTop(),
-            scrollLeft: node.getScrollLeft()
-        };
-    },
+		if ( node ) {
+			// The elements to wrap the target around
+			var wrap = FBjqRY( html ).clone();
 
-    //CSS:
-    //========================================
-	css: function( key, value ) {
-		// ignore negative width and height values
-		if ( (key == 'width' || key == 'height') && parseFloat(value) < 0 ) {
-			value = undefined;
-        }
-        if ( Support.isString(key) && typeof(value) === 'undefined' ) {
-            var node = this.nodes[0];
-            return node && FBjqRY.curCSS(node, key); // getter
-        }
-        else {
-            Support.style(this.nodes, key, value); // setter
-            return this;
-        }
+			if ( node.getParentNode() ) {
+				wrap.insertBefore( node );
+            }
+			wrap.map( function() {
+				var elem = this, child = this.getFirstChild();
+				while ( child ) {
+                    elem = child;
+                    child = elem.getFirstChild();
+                }
+				return elem;
+			}).append(this);
+		}
+		return this;
+    },
+    
+	wrapInner: function( html ) {
+		return this.each(function() {
+			FBjqRY(this).contents().wrapAll(html);
+		});
 	},
 
-    offset: function() {
-        var node = this.nodes[0];
-        return {
-            top:  node.getAbsoluteTop(),
-            left: node.getAbsoluteLeft()
-        };
-    },
+	wrap: function( html ) {
+		return this.each(function() {
+			FBjqRY(this).wrapAll(html);
+		});
+	},
 
-//    height: function(h) {
-//        if (typeof h === 'undefined') {
-//            return this.nodes[0].getOffsetHeight();
-//        }
-//        return this.css("height", h);
-//    },
-//
-//    width: function(w) {
-//        if (typeof w === 'undefined') {
-//            return this.nodes[0].getOffsetWidth();
-//        }
-//        return this.css("width", w);
-//    },
-
-    //MANIPULATION:
-    //========================================
+	unwrap: function() {
+		return this.parent().each(function() {
+			FBjqRY( this ).replaceWith( this.getChildNodes() );
+		}).end();
+	},
 
     append: function(content) {
         content = FBjqRY(content).get();
@@ -1975,49 +2908,6 @@ FBjqRY.fn = FBjqRY.prototype = {
         return delegateManipulation.call(this, 'insertBefore', this.before, content);
     },
 
-    replaceWith: function(content) {
-        return this.after(content).remove();
-    },
-    replaceAll: function(content) {
-        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, content);
-    },
-
-    wrapAll: function(html) {
-        var node = this.nodes[0];
-		if ( node ) {
-			// The elements to wrap the target around
-			var wrap = FBjqRY( html ).clone();
-
-			if ( node.getParentNode() ) {
-				wrap.insertBefore( node );
-            }
-			wrap.map( function() {
-				var elem = this, child = this.getFirstChild();
-				while ( child ) {
-                    elem = child;
-                    child = elem.getFirstChild();
-                }
-				return elem;
-			}).append(this);
-		}
-		return this;
-    },
-	wrapInner: function( html ) {
-		return this.each(function() {
-			FBjqRY(this).contents().wrapAll(html);
-		});
-	},
-	wrap: function( html ) {
-		return this.each(function() {
-			FBjqRY(this).wrapAll(html);
-		});
-	},
-
-    empty: function() {
-        this.children().remove();
-        return this;
-    },
-
     remove: function(expr) {
         //each(this.nodes, function() {
         //    if ( ! expr || is(expr, [ this ]) ) {
@@ -2034,6 +2924,11 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this;
     },
 
+    empty: function() {
+        this.children().remove();
+        return this;
+    },
+
     clone: function(includeEvents) {
         var cloned = [];
         //each(this.nodes, function() {cloned.push( this.cloneNode() );});
@@ -2043,287 +2938,1779 @@ FBjqRY.fn = FBjqRY.prototype = {
         return FBjqRY(cloned);
     },
 
-    //TRAVERSING:
-    //========================================
-    hasClass: function(className) {
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            if ( this.nodes[i].hasClassName(className) ) return true;
-        }
-        return false;
+    replaceWith: function(content) {
+        return this.after(content).remove();
+    },
+    replaceAll: function(content) {
+        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, content);
     },
 
-    filter: function(selector) {
-        var fn = selector;
-        if ( typeof(fn) === "string" ) {
-            fn = function() { return is(selector, [ this ]); };
-        } 
-        // else it should already be a function
-        var nodes = [];
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            if ( fn.call( node, i ) ) nodes.push( node );
-        }
+	detach: function( selector ) {
+		return this.remove( selector, true );
+	}
+});
 
-        return this.pushStack( nodes, "filter", selector );
-    },
+/*
+function root( elem, cur ) {
+	return jQuery.nodeName(elem, "table") ?
+		(elem.getElementsByTagName("tbody")[0] ||
+		elem.appendChild(elem.ownerDocument.createElement("tbody"))) :
+		elem;
+}
 
-    find: function(expr) {
-        //return FBjqRY( find(this.nodes, expr) );
+function cloneCopyEvent(orig, ret) {
+	var i = 0;
+
+	ret.each(function() {
+		if ( this.nodeName !== (orig[i] && orig[i].nodeName) ) {
+			return;
+		}
+
+		var oldData = jQuery.data( orig[i++] ), curData = jQuery.data( this, oldData ), events = oldData && oldData.events;
+
+		if ( events ) {
+			delete curData.handle;
+			curData.events = {};
+
+			for ( var type in events ) {
+				for ( var handler in events[ type ] ) {
+					jQuery.event.add( this, type, events[ type ][ handler ], events[ type ][ handler ].data );
+				}
+			}
+		}
+	});
+}
+
+function buildFragment( args, nodes, scripts ) {
+	var fragment, cacheable, cacheresults,
+		doc = (nodes && nodes[0] ? nodes[0].ownerDocument || nodes[0] : document);
+
+	// Only cache "small" (1/2 KB) strings that are associated with the main document
+	// Cloning options loses the selected state, so don't cache them
+	// IE 6 doesn't like it when you put <object> or <embed> elements in a fragment
+	// Also, WebKit does not clone 'checked' attributes on cloneNode, so don't cache
+	if ( args.length === 1 && typeof args[0] === "string" && args[0].length < 512 && doc === document &&
+		!rnocache.test( args[0] ) && (jQuery.support.checkClone || !rchecked.test( args[0] )) ) {
+
+		cacheable = true;
+		cacheresults = jQuery.fragments[ args[0] ];
+		if ( cacheresults ) {
+			if ( cacheresults !== 1 ) {
+				fragment = cacheresults;
+			}
+		}
+	}
+
+	if ( !fragment ) {
+		fragment = doc.createDocumentFragment();
+		jQuery.clean( args, doc, fragment, scripts );
+	}
+
+	if ( cacheable ) {
+		jQuery.fragments[ args[0] ] = cacheresults ? fragment : 1;
+	}
+
+	return { fragment: fragment, cacheable: cacheable };
+}
+
+jQuery.fragments = {};
+
+jQuery.extend({
+	clean: function( elems, context, fragment, scripts ) {
+		context = context || document;
+
+		// !context.createElement fails in IE with an error but returns typeof 'object'
+		if ( typeof context.createElement === "undefined" ) {
+			context = context.ownerDocument || context[0] && context[0].ownerDocument || document;
+		}
+
+		var ret = [];
+
+		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
+			if ( typeof elem === "number" ) {
+				elem += "";
+			}
+
+			if ( !elem ) {
+				continue;
+			}
+
+			// Convert html string into DOM nodes
+			if ( typeof elem === "string" && !rhtml.test( elem ) ) {
+				elem = context.createTextNode( elem );
+
+			} else if ( typeof elem === "string" ) {
+				// Fix "XHTML"-style tags in all browsers
+				elem = elem.replace(rxhtmlTag, fcloseTag);
+
+				// Trim whitespace, otherwise indexOf won't work as expected
+				var tag = (rtagName.exec( elem ) || ["", ""])[1].toLowerCase(),
+					wrap = wrapMap[ tag ] || wrapMap._default,
+					depth = wrap[0],
+					div = context.createElement("div");
+
+				// Go to html and back, then peel off extra wrappers
+				div.innerHTML = wrap[1] + elem + wrap[2];
+
+				// Move to the right depth
+				while ( depth-- ) {
+					div = div.lastChild;
+				}
+
+				// Remove IE's autoinserted <tbody> from table fragments
+				if ( !jQuery.support.tbody ) {
+
+					// String was a <table>, *may* have spurious <tbody>
+					var hasBody = rtbody.test(elem),
+						tbody = tag === "table" && !hasBody ?
+							div.firstChild && div.firstChild.childNodes :
+
+							// String was a bare <thead> or <tfoot>
+							wrap[1] === "<table>" && !hasBody ?
+								div.childNodes :
+								[];
+
+					for ( var j = tbody.length - 1; j >= 0 ; --j ) {
+						if ( jQuery.nodeName( tbody[ j ], "tbody" ) && !tbody[ j ].childNodes.length ) {
+							tbody[ j ].parentNode.removeChild( tbody[ j ] );
+						}
+					}
+
+				}
+
+				// IE completely kills leading whitespace when innerHTML is used
+				if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
+					div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
+				}
+
+				elem = div.childNodes;
+			}
+
+			if ( elem.nodeType ) {
+				ret.push( elem );
+			} else {
+				ret = jQuery.merge( ret, elem );
+			}
+		}
+
+		if ( fragment ) {
+			for ( i = 0; ret[i]; i++ ) {
+				if ( scripts && jQuery.nodeName( ret[i], "script" ) && (!ret[i].type || ret[i].type.toLowerCase() === "text/javascript") ) {
+					scripts.push( ret[i].parentNode ? ret[i].parentNode.removeChild( ret[i] ) : ret[i] );
+				
+				} else {
+					if ( ret[i].nodeType === 1 ) {
+						ret.splice.apply( ret, [i + 1, 0].concat(jQuery.makeArray(ret[i].getElementsByTagName("script"))) );
+					}
+					fragment.appendChild( ret[i] );
+				}
+			}
+		}
+
+		return ret;
+	},
+	
+	cleanData: function( elems ) {
+		var data, id, cache = jQuery.cache,
+			special = jQuery.event.special,
+			deleteExpando = jQuery.support.deleteExpando;
+		
+		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
+			if ( elem.nodeName && jQuery.noData[elem.nodeName.toLowerCase()] ) {
+				continue;
+			}
+
+			id = elem[ jQuery.expando ];
+			
+			if ( id ) {
+				data = cache[ id ];
+				
+				if ( data && data.events ) {
+					for ( var type in data.events ) {
+						if ( special[ type ] ) {
+							jQuery.event.remove( elem, type );
+
+						} else {
+							removeEvent( elem, type, data.handle );
+						}
+					}
+				}
+				
+				if ( deleteExpando ) {
+					delete elem[ jQuery.expando ];
+
+				} else if ( elem.removeAttribute ) {
+					elem.removeAttribute( jQuery.expando );
+				}
+				
+				delete cache[ id ];
+			}
+		}
+	}
+});
+
+function evalScript( i, elem ) {
+	if ( elem.src ) {
+		jQuery.ajax({
+			url: elem.src,
+			async: false,
+			dataType: "script"
+		});
+	} else {
+		jQuery.globalEval( elem.text || elem.textContent || elem.innerHTML || "" );
+	}
+
+	if ( elem.parentNode ) {
+		elem.parentNode.removeChild( elem );
+	}
+}
+*/
+var rnamespaces = /\.(.*)$/,
+	fcleanup = function( nm ) {
+		return nm.replace(/[^\w\s\.\|`]/g, function( ch ) {
+			return "\\" + ch;
+		});
+	};
+
+/*
+ * A number of helper functions used for managing events.
+ * Many of the ideas behind this code originated from
+ * Dean Edwards' addEvent library.
+ */
+FBjqRY.event = {
+
+	// Bind an event to an element
+	// Original by Dean Edwards
+	add: function( elem, types, handler, data ) {
+		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
+		//	return;
+		//}
+
+		// For whatever reason, IE has trouble passing the window object
+		// around, causing it to be cloned in the process
+		//if ( elem.setInterval && ( elem !== window && !elem.frameElement ) ) {
+		//	elem = window;
+		//}
+
+		if ( handler === false ) handler = returnFalse;
+
+		var handleObjIn, handleObj;
+
+		if ( handler.handler ) {
+			handleObjIn = handler;
+			handler = handleObjIn.handler;
+		}
+
+		// Make sure that the function being executed has a unique ID
+		if ( ! handler.guid ) {
+			handler.guid = FBjqRY.guid++; // @todo ?
+		}
+
+		// Init the element's event structure
+		var elemData = FBjqRY.data( elem );
+
+		// If no elemData is found then we must be trying to bind to one of the
+		// banned noData elements
+		if ( !elemData ) return;
+
+		var events = elemData.events = elemData.events || {},
+			eventHandle = elemData.handle;
+
+		if ( !eventHandle ) {
+			elemData.handle = eventHandle = function() {
+				// Handle the second event of a trigger and when
+				// an event is called after a page has unloaded
+				return typeof FBjqRY !== "undefined" && !FBjqRY.event.triggered ?
+					FBjqRY.event.handle.apply( eventHandle.elem, arguments ) :
+					undefined;
+			};
+		}
+
+		// Add elem as a property of the handle function
+		// This is to prevent a memory leak with non-native events in IE.
+		eventHandle.elem = elem;
+
+		// Handle multiple events separated by a space
+		// jQuery(...).bind("mouseover mouseout", fn);
+		types = types.split(" ");
+
+		var type, i = 0, namespaces;
+
+		while ( (type = types[ i++ ]) ) {
+			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : { handler: handler, data: data };
+
+			// Namespaced event handlers
+			if ( type.indexOf(".") > -1 ) {
+				namespaces = type.split(".");
+				type = namespaces.shift();
+				handleObj.namespace = namespaces.slice(0).sort().join(".");
+
+			} else {
+				namespaces = [];
+				handleObj.namespace = "";
+			}
+
+			handleObj.type = type;
+			if ( !handleObj.guid ) {
+				handleObj.guid = handler.guid;
+			}
+
+			// Get the current list of functions bound to this event
+			var handlers = events[ type ], special = FBjqRY.event.special[ type ] || {};
+
+			// Init the event handler queue
+			if ( !handlers ) {
+				handlers = events[ type ] = [];
+
+				// Check for a special event handler
+				// Only use addEventListener/attachEvent if the special
+				// events handler returns false
+				if ( ! special.setup ||
+                        special.setup.call( elem, data, namespaces, eventHandle ) === false ) {
+					// Bind the global event handler to the element
+					//if (elem.addEventListener) {
+						elem.addEventListener( type, eventHandle, false );
+					//}
+				}
+			}
+			
+			if ( special.add ) { 
+				special.add.call( elem, handleObj ); 
+
+				if ( !handleObj.handler.guid ) {
+					handleObj.handler.guid = handler.guid;
+				}
+			}
+
+			// Add the function to the element's handler list
+			handlers.push( handleObj );
+
+			// Keep track of which events have been used, for global triggering
+			FBjqRY.event.global[ type ] = true;
+		}
+
+		// Nullify elem to prevent memory leaks in IE
+		elem = null;
+	},
+
+	global: {},
+
+	// Detach an event or set of events from an element
+	remove: function( elem, types, handler, pos ) {
+		// don't do events on text and comment nodes
+		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
+		//	return;
+		//}
+
+		if ( handler === false ) handler = returnFalse;
+
+		var ret, type, j, i = 0, all, namespaces, namespace, special, eventType, handleObj, origType,
+			elemData = FBjqRY.data( elem ),
+			events = elemData && elemData.events;
+
+		if ( !elemData || !events ) return;
+
+		// types is actually an event object here
+		if ( types && types.type ) {
+			handler = types.handler;
+			types = types.type;
+		}
+
+		// Unbind all events for the element
+		if ( !types || typeof types === "string" && types.charAt(0) === "." ) {
+			types = types || "";
+
+			for ( type in events ) {
+				FBjqRY.event.remove( elem, type + types );
+			}
+            
+			return;
+		}
+
+		// Handle multiple events separated by a space
+		// jQuery(...).unbind("mouseover mouseout", fn);
+		types = types.split(" ");
+
+		while ( (type = types[ i++ ]) ) {
+			origType = type;
+			handleObj = null;
+			all = type.indexOf(".") < 0;
+			namespaces = [];
+
+			if ( !all ) {
+				// Namespaced event handlers
+				namespaces = type.split(".");
+				type = namespaces.shift();
+
+                namespace = FBjqRY.map( namespaces.slice(0).sort(), fcleanup ).join("\\.(?:.*\\.)?");
+				namespace = new RegExp("(^|\\.)" + namespace + "(\\.|$)");
+			}
+
+			eventType = events[ type ];
+			if ( !eventType ) continue;
+
+			if ( !handler ) {
+				for ( j = 0; j < eventType.length; j++ ) {
+					handleObj = eventType[ j ];
+
+					if ( all || namespace.test( handleObj.namespace ) ) {
+						FBjqRY.event.remove( elem, origType, handleObj.handler, j );
+						eventType.splice( j--, 1 );
+					}
+				}
+
+				continue;
+			}
+
+			special = FBjqRY.event.special[ type ] || {};
+
+			for ( j = pos || 0; j < eventType.length; j++ ) {
+				handleObj = eventType[ j ];
+
+				if ( handler.guid === handleObj.guid ) {
+					// remove the given handler for the given type
+					if ( all || namespace.test( handleObj.namespace ) ) {
+						if ( pos == null ) {
+							eventType.splice( j--, 1 );
+						}
+
+						if ( special.remove ) {
+							special.remove.call( elem, handleObj );
+						}
+					}
+
+					if ( pos != null ) break;
+				}
+			}
+
+			// remove generic event handler if no more handlers exist
+			if ( eventType.length === 0 || pos != null && eventType.length === 1 ) {
+				if ( !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
+                    if (elem.removeEventListener) {
+                        elem.removeEventListener( type, elemData.handle, false );
+                    }
+				}
+
+				ret = null;
+				delete events[ type ];
+			}
+		}
+
+		// Remove the expando if it's no longer used
+		if ( FBjqRY.isEmptyObject( events ) ) {
+			var handle = elemData.handle;
+			if ( handle ) {
+				handle.elem = null;
+			}
+
+			delete elemData.events;
+			delete elemData.handle;
+
+			if ( FBjqRY.isEmptyObject( elemData ) ) {
+				FBjqRY.removeData( elem );
+			}
+		}
+	},
+
+	// bubbling is internal
+	trigger: function( event, data, elem /*, bubbling */ ) {
+		// Event object or event type
+		var type = event.type || event, bubbling = arguments[3];
+
+		if ( !bubbling ) {
+			event = typeof event === "object" ?
+				// jQuery.Event object
+				event[ FBjqRY.expando ] ? event :
+				// Object literal
+				FBjqRY.extend( FBjqRY.Event(type), event ) :
+				// Just the event type (string)
+				FBjqRY.Event(type);
+
+			if ( type.indexOf("!") >= 0 ) {
+				event.type = type = type.slice(0, -1);
+				event.exclusive = true;
+			}
+
+			// Handle a global trigger
+			if ( !elem ) {
+				// Don't bubble custom events when global (to avoid too much overhead)
+				event.stopPropagation(); // supported in FBJS
+
+				// Only trigger if we've ever bound an event for it
+				if ( FBjqRY.event.global[ type ] ) {
+					FBjqRY.each( FBjqRY.cache, function() {
+						if ( this.events && this.events[type] ) {
+							FBjqRY.event.trigger( event, data, this.handle.elem );
+						}
+					});
+				}
+			}
+
+			// Handle triggering a single element
+
+			// don't do events on text and comment nodes
+			//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
+			//	return undefined;
+			//}
+
+			// Clean up in case it is reused
+			event.result = undefined;
+			event.target = elem;
+
+			// Clone the incoming data, if any
+			data = FBjqRY.makeArray( data );
+			data.unshift( event );
+		}
+
+		event.currentTarget = elem;
+
+		// Trigger the event, it is assumed that "handle" is a function
+		var handle = FBjqRY.data( elem, "handle" );
+		if ( handle ) handle.apply( elem, data );
+
+		var parent = elem.getParentNode(); //|| elem.ownerDocument;
+
+		// Trigger an inline bound script
         /*
-        var nodes = [];
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            nodes = nodes.concat( find([], expr, node) );
-        }
-        return this.pushStack( nodes, "find", expr ); */
-        return this.pushStack( find(this.nodes, expr), "find", expr );
-    },
+		try {
+			if ( !(elem && elem.nodeName && FBjqRY.noData[elem.getTagName().toLowerCase()]) ) {
+				if ( elem[ "on" + type ] && elem[ "on" + type ].apply( elem, data ) === false ) {
+					event.result = false;
+				}
+			}
+		// prevent IE from throwing an error for some elements with some event types, see #3533
+		} catch (inlineError) {} */
 
-    is: function( selector ) {
-        return is(selector, this.nodes);
-    },
+		if ( !event.isPropagationStopped() && parent ) { // @todo
+			FBjqRY.event.trigger( event, data, parent, true );
+		}
+        else if ( !event.isDefaultPrevented() ) { // @todo
+			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
+				isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
+				special = FBjqRY.event.special[ targetType ] || {};
 
-    not: function( selector ) { // @todo TEST
-        //filter out specified nodes
-        var notNodes;
-        if ( typeof(selector.selector) !== 'undefined' ) notNodes = selector.nodes;
-        else if ( FBjqRY.isArray(selector) ) notNodes = selector;
+			if ( (!special._default || special._default.call( elem, event ) === false) && 
+				!isClick && !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+                /* @todo ?!
+				try {
+					if ( target[ targetType ] ) {
+						// Make sure that we don't accidentally re-trigger the onFOO events
+						old = target[ "on" + targetType ];
 
-        if ( notNodes ) {
-            var nodes = this.get(); // is a copy already
-            for ( var i = 0, len = notNodes.length; i < len; i++ ) {
-                var idx = indexOf( notNodes[i], nodes );
-                if ( idx != -1 ) nodes.splice(idx, 1); // remove element
-            }
-        }
-        else { // expr assumed to be a selector :
-            notNodes = find(this.nodes, selector);
-        }
-        
-        return this.pushStack( nodes, "not", selector );
-    },
+						if ( old ) {
+							target[ "on" + targetType ] = null;
+						}
 
-	add: function( selector ) {
-        var selNodes = Support.isString(selector) ?
-            //find( null, selector ) :
-            FBjqRY( selector ).nodes : // selector might be a html string !
-                FBjqRY.makeArray( selector );
+						FBjqRY.event.triggered = true;
+						target[ targetType ]();
+					}
 
-		return this.pushStack( FBjqRY.unique( merge(
-			this.get(), // it's a clone
-			selNodes
-		)));
+				// prevent IE from throwing an error for some elements with some event types, see #3533
+				} catch (triggerError) {}
+
+				if ( old ) {
+					target[ "on" + targetType ] = old;
+				} */
+
+				FBjqRY.event.triggered = false;
+			}
+		}
+	},
+
+	handle: function( event ) {
+		var all, handlers, namespaces, namespace_sort = [], namespace_re, events, 
+            args = FBjqRY.makeArray( arguments );
+
+		event = args[0] = FBjqRY.event.fix( event );
+		event.currentTarget = this;
+
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && !event.exclusive;
+
+		if ( !all ) {
+			namespaces = event.type.split(".");
+			event.type = namespaces.shift();
+			namespace_sort = namespaces.slice(0).sort();
+			namespace_re = new RegExp("(^|\\.)" + namespace_sort.join("\\.(?:.*\\.)?") + "(\\.|$)");
+		}
+
+		event.namespace = event.namespace || namespace_sort.join(".");
+
+		events = FBjqRY.data(this, "events");
+		handlers = (events || {})[ event.type ];
+
+		if ( events && handlers ) {
+			// Clone the handlers to prevent manipulation
+			handlers = handlers.slice(0);
+
+			for ( var j = 0, l = handlers.length; j < l; j++ ) {
+				var handleObj = handlers[ j ];
+
+				// Filter the functions by class
+				if ( all || namespace_re.test( handleObj.namespace ) ) {
+					// Pass in a reference to the handler function itself
+					// So that we can later remove it
+					event.handler = handleObj.handler;
+					event.data = handleObj.data;
+					event.handleObj = handleObj;
+	
+					var ret = handleObj.handler.apply( this, args );
+
+					if ( ret !== undefined ) {
+						event.result = ret;
+						if ( ret === false ) {
+							event.preventDefault(); // FBJS ok
+							event.stopPropagation(); // FBJS ok
+						}
+					}
+
+					if ( event.isImmediatePropagationStopped() ) {
+						break;
+					}
+				}
+			}
+		}
+
+		return event.result;
 	},
     /*
-    add: function(expr) {
-        var nodes = FBjqRY(expr);
-        this.nodes = this.nodes.concat(nodes.get());
-        this.nodes = FBjqRY.unique(this.nodes);
-        return this;
-    }, */
+	props: "altKey attrChange attrName bubbles button cancelable charCode " + 
+           "clientX clientY ctrlKey currentTarget data detail eventPhase fromElement " +
+           "handler keyCode layerX layerY metaKey newValue offsetX offsetY " + 
+           "originalTarget pageX pageY prevValue relatedNode relatedTarget " +
+           "screenX screenY shiftKey srcElement target toElement view wheelDelta which".split(" "),
+     */
 
-    children: function(selector) {
-        var children = [];
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            children = children.concat( this.nodes[i].getChildNodes() );
-        }
-        //var ret = FBjqRY(unique(children));
-        //return selector ? ret.filter(selector) : ret;
+	props: "target type pageX pageY ctrlKey keyCode metaKey shiftKey".split(" "), // FBJS event
 
-        var nodes = FBjqRY.unique(children);
-        if ( selector ) nodes = filter(selector, nodes);
-        return this.pushStack( nodes, "children", selector );
-        
+	fix: function( event ) {
+		if ( event[ FBjqRY.expando ] ) return event;
+
+		// store a copy of the original event object
+		// and "clone" to set read-only properties
+		var originalEvent = event;
+		event = FBjqRY.Event( originalEvent );
+
+		for ( var i = this.props.length, prop; i; ) {
+			prop = this.props[ --i ];
+			event[ prop ] = originalEvent[ prop ];
+		}
+
+		// Fix target property, if necessary
+		if ( !event.target ) {
+			//event.target = event.srcElement || document; // Fixes #1925 where srcElement might not be defined either
+		}
+
+		// check if target is a textnode (safari)
+		//if ( event.target.nodeType === 3 ) {
+		//	event.target = event.target.parentNode;
+		//}
+
+		// Add relatedTarget, if necessary
+		//if ( !event.relatedTarget && event.fromElement ) {
+		//	event.relatedTarget = event.fromElement === event.target ? event.toElement : event.fromElement;
+		//}
+
+		// Calculate pageX/Y if missing and clientX/Y available
+		//if ( event.pageX == null && event.clientX != null ) {
+		//	var doc = document.documentElement, body = document.body;
+		//	event.pageX = event.clientX + (doc && doc.scrollLeft || body && body.scrollLeft || 0) - (doc && doc.clientLeft || body && body.clientLeft || 0);
+		//	event.pageY = event.clientY + (doc && doc.scrollTop  || body && body.scrollTop  || 0) - (doc && doc.clientTop  || body && body.clientTop  || 0);
+		//}
+
+		// Add which for key events
+		if ( !event.which && event.keyCode ) {
+			event.which = event.keyCode;
+		}
+
+		// Add metaKey to non-Mac browsers (use ctrl for PC's and Meta for Macs)
+		if ( !event.metaKey && event.ctrlKey ) {
+			event.metaKey = event.ctrlKey;
+		}
+
+		// Add which for click: 1 === left; 2 === middle; 3 === right
+		// Note: button is not normalized, so don't use it
+		//if ( !event.which && event.button !== undefined ) {
+		//	event.which = (event.button & 1 ? 1 : ( event.button & 2 ? 3 : ( event.button & 4 ? 2 : 0 ) ));
+		//}
+
+		return event;
+	},
+
+	// Deprecated, use jQuery.guid instead
+	guid: 100000000, //1E8,
+
+	// Deprecated, use jQuery.proxy instead
+	proxy: FBjqRY.proxy,
+
+	special: {
+		//ready: {
+		//	// Make sure the ready event is setup
+		//	setup: jQuery.bindReady,
+		//	teardown: jQuery.noop
+		//},
+
+		live: {
+			add: function( handleObj ) {
+				FBjqRY.event.add( this,
+					liveConvert( handleObj.origType, handleObj.selector ),
+					FBjqRY.extend({}, handleObj, {handler: liveHandler, guid: handleObj.handler.guid}) );
+			},
+
+			remove: function( handleObj ) {
+				FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
+			}
+		}
+
         /*
-        if (expr) {
-            children = FBjqRY(this.nodes).find(expr).get();
-        } 
+		beforeunload: {
+			setup: function( data, namespaces, eventHandle ) {
+				// We only want to do this special case on windows
+				if ( this.setInterval ) {
+					this.onbeforeunload = eventHandle;
+				}
+			},
+
+			teardown: function( namespaces, eventHandle ) {
+				if ( this.onbeforeunload === eventHandle ) {
+					this.onbeforeunload = null;
+				}
+			}
+		} */
+	}
+};
+
+FBjqRY.Event = function( src ) {
+	// Allow instantiation without the 'new' keyword
+	if ( !this.preventDefault ) {
+		return new FBjqRY.Event( src );
+	}
+
+	// Event object
+	if ( src && src.type ) {
+		this.originalEvent = src;
+		this.type = src.type;
+	// Event type
+	} else {
+		this.type = src;
+	}
+
+	// timeStamp is buggy for some events on Firefox(#3843)
+	// So we won't rely on the native value
+	this.timeStamp = FBjqRY.now();
+
+	// Mark it as fixed
+	this[ FBjqRY.expando ] = true;
+};
+
+function returnFalse() { return false; }
+function returnTrue() { return true; }
+
+// jQuery.Event is based on DOM3 Events as specified by the ECMAScript Language Binding
+// http://www.w3.org/TR/2003/WD-DOM-Level-3-Events-20030331/ecma-script-binding.html
+FBjqRY.Event.prototype = {
+	preventDefault: function() {
+		this.isDefaultPrevented = returnTrue;
+
+		var e = this.originalEvent;
+		if ( !e ) return;
+		
+		// if preventDefault exists run it on the original event
+		if ( e.preventDefault ) e.preventDefault();
+        
+		// otherwise set the returnValue property of the original event to false (IE)
+		e.returnValue = false;
+	},
+	stopPropagation: function() {
+		this.isPropagationStopped = returnTrue;
+
+		var e = this.originalEvent;
+		if ( !e ) return;
+
+		// if stopPropagation exists run it on the original event
+		if ( e.stopPropagation ) e.stopPropagation();
+        
+		// otherwise set the cancelBubble property of the original event to true (IE)
+		e.cancelBubble = true;
+	},
+	stopImmediatePropagation: function() {
+		this.isImmediatePropagationStopped = returnTrue;
+		this.stopPropagation();
+	},
+	isDefaultPrevented: returnFalse,
+	isPropagationStopped: returnFalse,
+	isImmediatePropagationStopped: returnFalse
+};
+
+/*
+// Checks if an event happened on an element within another element
+// Used in jQuery.event.special.mouseenter and mouseleave handlers
+var withinElement = function( event ) {
+	// Check if mouse(over|out) are still within the same parent element
+	var parent = event.relatedTarget;
+
+	// Firefox sometimes assigns relatedTarget a XUL element
+	// which we cannot access the parentNode property of
+	try {
+		// Traverse up the tree
+		while ( parent && parent !== this ) {
+			parent = parent.parentNode;
+		}
+
+		if ( parent !== this ) {
+			// set the correct event type
+			event.type = event.data;
+
+			// handle event if we actually just moused on to a non sub-element
+			jQuery.event.handle.apply( this, arguments );
+		}
+
+	// assuming we've left the element since we most likely mousedover a xul element
+	} catch(e) { }
+},
+
+// In case of event delegation, we only need to rename the event.type,
+// liveHandler will take care of the rest.
+delegate = function( event ) {
+	event.type = event.data;
+	FBjqRY.event.handle.apply( this, arguments );
+};
+
+// Create mouseenter and mouseleave events
+FBjqRY.each({
+	mouseenter: "mouseover",
+	mouseleave: "mouseout"
+}, function( orig, fix ) {
+	jQuery.event.special[ orig ] = {
+		setup: function( data ) {
+			jQuery.event.add( this, fix, data && data.selector ? delegate : withinElement, orig );
+		},
+		teardown: function( data ) {
+			jQuery.event.remove( this, fix, data && data.selector ? delegate : withinElement );
+		}
+	};
+}); */
+
+// submit delegation
+if ( ! FBjqRY.support.submitBubbles ) { // @todo
+    
+	FBjqRY.event.special.submit = {
+		setup: function( data, namespaces ) {
+			if ( this.nodeName.toLowerCase() !== "form" ) {
+				FBjqRY.event.add(this, "click.specialSubmit", function( e ) {
+					var elem = e.target, type = elem.type;
+
+					if ( (type === "submit" || type === "image") &&
+                        FBjqRY( elem ).closest("form").length ) {
+						return trigger( "submit", this, arguments );
+					}
+				});
+	 
+				FBjqRY.event.add(this, "keypress.specialSubmit", function( e ) {
+					var elem = e.target, type = elem.type;
+
+					if ( (type === "text" || type === "password") && 
+                        FBjqRY( elem ).closest("form").length && e.keyCode === 13 ) {
+						return trigger( "submit", this, arguments );
+					}
+				});
+
+			} else {
+				return false;
+			}
+		},
+
+		teardown: function( namespaces ) {
+			FBjqRY.event.remove( this, ".specialSubmit" );
+		}
+	};
+
+}
+
+function getSelectOptions(select) {
+    return FBjqRY('option', select).nodes; // @todo fast-impl
+}
+
+// change delegation, happens here so we have bind.
+if ( ! FBjqRY.support.changeBubbles ) { // @todo
+
+	var formElems = /textarea|input|select/i,
+    
+    changeFilters,
+
+	getVal = function( elem ) {
+		var type = elem.getType(), val = elem.getValue();
+
+		if ( type === "radio" || type === "checkbox" ) {
+			val = elem.getChecked();
+		}
+        else if ( type === "select-multiple" ) {
+			val = elem.getSelectedIndex() > -1 ?
+				FBjqRY.map( getSelectOptions(elem), function( elem ) {
+					return elem.getSelected();
+				}).join("-") :
+				"";
+		}
+        else if ( FBjqRY.nodeName(elem) === "select" ) {
+			val = elem.getSelectedIndex();
+		}
+
+		return val;
+	},
+
+	testChange = function testChange( e ) {
+		var elem = e.target, data, val;
+
+		if ( !formElems.test( elem.getTagName() ) || elem.getReadOnly() ) {
+			return;
+		}
+
+		data = FBjqRY.data( elem, "_change_data" );
+		val = getVal(elem);
+
+		// the current data will be also retrieved by beforeactivate
+		if ( e.type !== "focusout" || elem.getType() !== "radio" ) {
+			FBjqRY.data( elem, "_change_data", val );
+		}
+		
+		if ( data === undefined || val === data ) {
+			return;
+		}
+
+		if ( data != null || val ) {
+			e.type = "change";
+			return FBjqRY.event.trigger( e, arguments[1], elem );
+		}
+	};
+
+	FBjqRY.event.special.change = {
+		filters: {
+			focusout: testChange, 
+
+			click: function( e ) {
+				var elem = e.target, type = elem.getType();
+
+				if ( type === "radio" || type === "checkbox" || FBjqRY.nodeName(elem) === "select" ) {
+					return testChange.call( this, e );
+				}
+			},
+
+			// Change has to be called before submit
+			// Keydown will be called before keypress, which is used in submit-event delegation
+			keydown: function( e ) {
+				var elem = e.target, type = elem.getType();
+
+				if ( (e.keyCode === 13 && FBjqRY.nodeName(elem) !== "textarea") ||
+					(e.keyCode === 32 && (type === "checkbox" || type === "radio")) ||
+					type === "select-multiple" ) {
+					return testChange.call( this, e );
+				}
+			},
+
+			// Beforeactivate happens also before the previous element is blurred
+			// with this event you can't trigger a change event, but you can store
+			// information/focus[in] is not needed anymore
+			beforeactivate: function( e ) {
+				var elem = e.target;
+				FBjqRY.data( elem, "_change_data", getVal(elem) );
+			}
+		},
+
+		setup: function( data, namespaces ) {
+			if ( this.type === "file" ) return false;
+
+			for ( var type in changeFilters ) {
+				FBjqRY.event.add( this, type + ".specialChange", changeFilters[type] );
+			}
+
+			return formElems.test( this.nodeName );
+		},
+
+		teardown: function( namespaces ) {
+			FBjqRY.event.remove( this, ".specialChange" );
+
+			return formElems.test( this.nodeName );
+		}
+	};
+
+	changeFilters = FBjqRY.event.special.change.filters;
+}
+
+function trigger( type, elem, args ) {
+	args[0].type = type;
+	return FBjqRY.event.handle.apply( elem, args );
+}
+
+// Create "bubbling" focus and blur events
+if ( document.addEventListener ) {
+	FBjqRY.each({ focus: "focusin", blur: "focusout" }, function( orig, fix ) {
+		FBjqRY.event.special[ fix ] = {
+			setup: function() {
+				this.addEventListener( orig, handler, true );
+			}, 
+			teardown: function() { 
+				this.removeEventListener( orig, handler, true );
+			}
+		};
+
+		function handler( e ) { 
+			e = FBjqRY.event.fix( e );
+			e.type = fix;
+			return FBjqRY.event.handle.call( this, e );
+		}
+	});
+}
+
+FBjqRY.each(["bind", "one"], function( i, name ) {
+	FBjqRY.fn[ name ] = function( type, data, fn ) {
+		// Handle object literals
+		if ( typeof type === "object" ) {
+			for ( var key in type ) {
+				this[ name ](key, data, type[key], fn);
+			}
+			return this;
+		}
+		
+		if ( FBjqRY.isFunction( data ) || data === false ) {
+			fn = data;
+			data = undefined;
+		}
+
+		var handler = name === "one" ? FBjqRY.proxy( fn, function( event ) {
+			FBjqRY( this ).unbind( event, handler );
+			return fn.apply( this, arguments );
+		}) : fn;
+
+		if ( type === "unload" && name !== "one" ) {
+			this.one( type, data, fn );
+		}
         else {
-            children = [];
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                children = children.concat( this.nodes[i].getChildNodes() );
-            }
-        }
-        return FBjqRY(unique(children));
-        */
-    },
-    contents: function() { // @todo: This doesn't feel right... TEST
-        function grabNodes(node) {
-            var nodes = node.getChildNodes();
-            for (var i = 0, len = nodes.length; i < len; i++) {
-                nodes = nodes.concat(grabNodes(nodes[i]));
-            }
-            return nodes;
-        }
+			for ( var i = 0, l = this.length; i < l; i++ ) {
+				FBjqRY.event.add( this[i], type, handler, data );
+			}
+		}
 
-        var nodes = this.nodes;
-        for (var i = 0; i < nodes.length; i++) {
-            nodes = nodes.concat(grabNodes(nodes[i]));
-        }
-        return FBjqRY(FBjqRY.unique(nodes)); // @todo pushStack
-    },
+		return this;
+	};
+});
 
-    next: function(selector) {
-        var siblings = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "next", selector );
-    },
-    nextAll: function(selector) {
-        var siblings = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getNextSibling();
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "nextAll", selector );
-    },
-    prev: function(selector) {
-        var siblings = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "prev", selector );
-    },
-    prevAll: function(selector) {
-        var siblings = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || is(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getPreviousSibling();
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "prevAll", selector );
-    },
+FBjqRY.fn.extend({
+	unbind: function( type, fn ) {
+		// Handle object literals
+		if ( typeof type === "object" && !type.preventDefault ) {
+			for ( var key in type ) {
+				this.unbind(key, type[key]);
+			}
 
-    parent: function(selector) {
-        var parents = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var node = this.nodes[i].getParentNode(); nodeArray[0] = node;
-            if ( ! selector || is(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
-                parents.push(node);
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(parents));
-        return this.pushStack( FBjqRY.unique(parents), "parent", selector );
-    },
-    parents: function(selector) {
-        var parents = [], len = this.nodes.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var node = this.nodes[i].getParentNode();
-            while ( node ) {
-                 nodeArray[0] = node;
-                if( ! selector || is(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
-                    parents.push(node);
+		} else {
+			for ( var i = 0, l = this.length; i < l; i++ ) {
+				FBjqRY.event.remove( this[i], type, fn );
+			}
+		}
+
+		return this;
+	},
+	
+	delegate: function( selector, types, data, fn ) {
+		return this.live( types, data, fn, selector );
+	},
+	
+	undelegate: function( selector, types, fn ) {
+		if ( arguments.length === 0 ) {
+            return this.unbind( "live" );
+		}
+        else {
+			return this.die( types, null, fn, selector );
+		}
+	},
+	
+	trigger: function( type, data ) {
+		return this.each(function() {
+			FBjqRY.event.trigger( type, data, this );
+		});
+	},
+
+	triggerHandler: function( type, data ) {
+        var node = this.nodes[0];
+		if ( node ) {
+			var event = FBjqRY.Event( type );
+			event.preventDefault();
+			event.stopPropagation();
+			FBjqRY.event.trigger( event, data, node );
+			return event.result;
+		}
+	},
+
+	toggle: function( fn ) {
+		// Save reference to arguments for access in closure
+		var args = arguments, i = 1;
+
+		// link all the functions, so any of them can unbind this click handler
+		while ( i < args.length ) {
+			FBjqRY.proxy( fn, args[ i++ ] );
+		}
+
+		return this.click( FBjqRY.proxy( fn, function( event ) {
+			// Figure out which function to execute
+			var lastToggle = ( FBjqRY.data( this, "lastToggle" + fn.guid ) || 0 ) % i;
+			FBjqRY.data( this, "lastToggle" + fn.guid, lastToggle + 1 );
+
+			// Make sure that clicks stop
+			event.preventDefault();
+
+			// and execute the function
+			return args[ lastToggle ].apply( this, arguments ) || false;
+		}));
+	},
+
+	hover: function( fnOver, fnOut ) {
+		return this.mouseenter( fnOver ).mouseleave( fnOut || fnOver );
+	}
+});
+
+var liveMap = {
+	focus: "focusin",
+	blur: "focusout",
+	mouseenter: "mouseover",
+	mouseleave: "mouseout"
+};
+
+FBjqRY.each(["live", "die"], function( i, name ) {
+	FBjqRY.fn[ name ] = function( types, data, fn, origSelector /* Internal Use Only */ ) {
+		var type, i = 0, match, namespaces, preType,
+			selector = origSelector || this.selector,
+			context = origSelector ? this : FBjqRY( this.context );
+
+		if ( FBjqRY.isFunction( data ) ) {
+			fn = data;
+			data = undefined;
+		}
+
+		types = (types || "").split(" ");
+
+		while ( (type = types[ i++ ]) != null ) {
+			match = rnamespaces.exec( type );
+			namespaces = "";
+
+			if ( match )  {
+				namespaces = match[0];
+				type = type.replace( rnamespaces, "" );
+			}
+
+			if ( type === "hover" ) {
+				types.push( "mouseenter" + namespaces, "mouseleave" + namespaces );
+				continue;
+			}
+
+			preType = type;
+
+			if ( type === "focus" || type === "blur" ) {
+				types.push( liveMap[ type ] + namespaces );
+				type = type + namespaces;
+
+			} else {
+				type = (liveMap[ type ] || type) + namespaces;
+			}
+
+			if ( name === "live" ) {
+				// bind live handler
+				for ( var j = 0, l = context.length; j < l; j++ ) {
+					FBjqRY.event.add( context[j], "live." + liveConvert( type, selector ),
+						{ data: data, selector: selector, handler: fn, origType: type, origHandler: fn, preType: preType } );
+				}
+
+			} else {
+				// unbind live handler
+				context.unbind( "live." + liveConvert( type, selector ), fn );
+			}
+		}
+		
+		return this;
+	};
+});
+
+function liveHandler( event ) {
+	var stop, maxLevel, elems = [], selectors = [],
+		related, match, handleObj, elem, j, i, l, data, close, namespace,
+		events = FBjqRY.data( this, "events" );
+
+	// Make sure we avoid non-left-click bubbling in Firefox (#3861)
+	if ( event.liveFired === this || !events || !events.live || event.button && event.type === "click" ) {
+		return;
+	}
+
+	if ( event.namespace ) {
+		namespace = new RegExp("(^|\\.)" + event.namespace.split(".").join("\\.(?:.*\\.)?") + "(\\.|$)");
+	}
+
+	event.liveFired = this;
+
+	var live = events.live.slice(0);
+
+	for ( j = 0; j < live.length; j++ ) {
+		handleObj = live[j];
+
+		if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
+			selectors.push( handleObj.selector );
+
+		} else {
+			live.splice( j--, 1 );
+		}
+	}
+
+    throw "liveHandler() event.currentTarget not implemented !";
+	match = FBjqRY( event.target ).closest( selectors, event.currentTarget ); // @todo currentTarget ?!
+
+	for ( i = 0, l = match.length; i < l; i++ ) {
+		close = match[i];
+
+		for ( j = 0; j < live.length; j++ ) {
+			handleObj = live[j];
+
+			if ( close.selector === handleObj.selector && (!namespace || namespace.test( handleObj.namespace )) ) {
+				elem = close.elem;
+				related = null;
+
+				// Those two events require additional checking
+				//if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+				//	event.type = handleObj.preType;
+				//	related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
+				//}
+
+				if ( !related || related !== elem ) {
+					elems.push({ elem: elem, handleObj: handleObj, level: close.level });
+				}
+			}
+		}
+	}
+
+	for ( i = 0, l = elems.length; i < l; i++ ) {
+		match = elems[i];
+
+		if ( maxLevel && match.level > maxLevel ) {
+			break;
+		}
+
+		event.currentTarget = match.elem;
+		event.data = match.handleObj.data;
+		event.handleObj = match.handleObj;
+
+		ret = match.handleObj.origHandler.apply( match.elem, arguments );
+
+		if ( ret === false || event.isPropagationStopped() ) {
+			maxLevel = match.level;
+
+			if ( ret === false ) stop = false;
+		}
+	}
+
+	return stop;
+}
+
+var rdot = /\./g, rspace = / /g;
+function liveConvert( type, selector ) {
+	return (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
+}
+
+//var supportedEvents = ("blur focus focusin focusout load resize scroll unload click dblclick " +
+//	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
+//	"change select submit keydown keypress keyup error").split(" ");
+var supportedEvents = ("blur change click dblclick error focus keydown keypress keyup load "  +
+                   "mousedown mousemove mouseout mouseover mouseup resize scroll select " +
+                   "submit unload").split(" ");
+FBjqRY.each( supportedEvents, function( i, name ) {
+
+	// Handle event binding
+	FBjqRY.fn[ name ] = function( data, fn ) {
+		if ( fn == null ) {
+			fn = data;
+			data = null;
+		}
+		return arguments.length > 0 ? this.bind( name, data, fn ) : this.trigger( name );
+	};
+
+	if ( FBjqRY.attrFn ) FBjqRY.attrFn[ name ] = true;
+});
+
+// Prevent memory leaks in IE
+// Window isn't included so as not to unbind existing unload events
+// More info:
+//  - http://isaacschlueter.com/2006/10/msie-memory-leaks/
+/*
+if ( window.attachEvent && !window.addEventListener ) {
+	window.attachEvent("onunload", function() {
+		for ( var id in jQuery.cache ) {
+			if ( jQuery.cache[ id ].handle ) {
+				// Try/Catch is to handle iframes being unloaded, see #4280
+				try {
+					jQuery.event.remove( jQuery.cache[ id ].handle.elem );
+				} catch(e) {}
+			}
+		}
+	});
+} */
+var jsc = FBjqRY.now(),
+	rscript = /<script(.|\s)*?\/script>/gi,
+	rselectTextarea = /select|textarea/i,
+	rinput = /color|date|datetime|email|hidden|month|number|password|range|search|tel|text|time|url|week/i,
+	//jsre = /\=\?(&|$)/,
+	rquery = /\?/,
+	rts = /(\?|&)_=.*?(&|$)/,
+	//rurl = /^(\w+:)?\/\/([^\/?#]+)/,
+	r20 = /%20/g,
+
+	// Keep a copy of the old load method
+	_load = FBjqRY.fn.load;
+
+FBjqRY.fn.extend({
+	load: function( url, params, callback ) {
+		if ( typeof url !== "string" && _load ) {
+			return _load.apply( this, arguments );
+		// Don't do a request if no elements are being requested
+		} else if ( !this.length ) {
+			return this;
+		}
+
+		var off = url.indexOf(" ");
+		if ( off >= 0 ) {
+			var selector = url.slice(off, url.length);
+			url = url.slice(0, off);
+		}
+
+		// Default to a GET request
+		var type = "GET";
+
+		// If the second parameter was provided
+		if ( params ) {
+			// If it's a function
+			if ( FBjqRY.isFunction( params ) ) {
+				// We assume that it's the callback
+				callback = params;
+				params = null;
+			// Otherwise, build a param string
+			} else if ( typeof params === "object" ) {
+				params = FBjqRY.param( params, FBjqRY.ajaxSettings.traditional );
+				type = "POST";
+			}
+		}
+
+		var self = this;
+
+		// Request the remote document
+		FBjqRY.ajax({
+			url: url,
+			type: type,
+			dataType: "html", // @todo ???
+			data: params,
+			complete: function( res, status ) { // @todo non sense !!!
+				// If successful, inject the HTML into all the matched elements
+				if ( status === "success" || status === "notmodified" ) {
+					// See if a selector was specified
+					self.html( selector ?
+						// Create a dummy div to hold the results
+						jQuery("<div />")
+							// inject the contents of the document in, removing the scripts
+							// to avoid any 'Permission Denied' errors in IE
+							.append(res.responseText.replace(rscript, ""))
+
+							// Locate the specified elements
+							.find(selector) :
+
+						// If not, just inject the full result
+						res.responseText );
+				}
+
+				if ( callback ) {
+					self.each( callback, [res.responseText, status, res] );
+				}
+			}
+		});
+
+		return this;
+	},
+
+	serialize: function() {
+		return FBjqRY.param( this.serializeArray() );
+	},
+	serializeArray: function() {
+		//return this.map( function() {
+		//	return this.elements ? jQuery.makeArray(this.elements) : this;
+		//})
+        return this
+		.filter(function() {
+			return this.getName() && ! this.getDisabled() &&
+				( this.getChecked() || rselectTextarea.test(this.getTagName()) ||
+					rinput.test(this.getType()) );
+		})
+		.map(function() {
+			var val = FBjqRY(this).val();
+            if (val == null) return null;
+            var name = this.getName();
+
+            if ( FBjqRY.isArray(val) ) {
+                var ret = [];
+                for ( var i = 0; i < val.length; i++ ) {
+                    ret.push( { name: name, value: val[i] } );
                 }
-                node = node.getParentNode();
+                return ret;
             }
+            else {
+                return { name: name, value: val };
+            }
+		}).get();
+	}
+});
+
+// Attach a bunch of functions for handling common AJAX events
+FBjqRY.each( "ajaxStart ajaxStop ajaxComplete ajaxError ajaxSuccess ajaxSend".split(" "), function( i, o ) {
+	FBjqRY.fn[o] = function( f ) {
+		return this.bind(o, f);
+	};
+});
+
+FBjqRY.extend({
+	get: function( url, data, callback, type ) {
+		// shift arguments if data argument was ommited
+		if ( FBjqRY.isFunction( data ) ) {
+			type = type || callback;
+			callback = data;
+			data = null;
+		}
+		return FBjqRY.ajax({
+			type: "GET", // it will be a POST anyway !
+			url: url,
+			data: data,
+			success: callback,
+			dataType: type
+		});
+	},
+
+	getScript: function( url, callback ) {
+		//return jQuery.get(url, null, callback, "script");
+        return FBjqRY.error("getScript() not supported");
+	},
+
+	getJSON: function( url, data, callback ) {
+        //return jQuery.get(url, data, callback, "json");
+		return FBjqRY.get(url, data, callback, Ajax.JSON);
+	},
+    
+	post: function( url, data, callback, type ) {
+		if ( FBjqRY.isFunction( data ) ) {
+			type = type || callback;
+			callback = data;
+			data = {};
+		}
+		return FBjqRY.ajax({
+			type: "POST",
+			url: url,
+			data: data,
+			success: callback,
+			dataType: type
+		});
+	},
+
+	ajaxSetup: function( settings ) {
+		FBjqRY.extend( FBjqRY.ajaxSettings, settings );
+	},
+
+	ajaxSettings: {
+		url: null, //location.href,
+		global: true,
+		type: "POST", // we can only do a POST !
+		//contentType: "application/x-www-form-urlencoded",
+		//processData: true,
+		//async: true,
+		//accepts: { // @todo only a placeholder
+		//	xml: "application/xml, text/xml",
+		//	html: "text/html",
+		//	script: "text/javascript, application/javascript",
+		//	json: "application/json, text/javascript",
+		//	text: "text/plain",
+		//	_default: "*/*"
+		//}
+        dataType: Ajax.RAW, // FB "extension"
+        retryCount: 1, // FB "extension"
+        requireLogin: null // FB "extension"
+	},
+
+//	ajaxSettings: {
+//		url: location.href,
+//		global: true,
+//		type: "GET",
+//		contentType: "application/x-www-form-urlencoded",
+//		processData: true,
+//		async: true,
+//		/*
+//		timeout: 0,
+//		data: null,
+//		username: null,
+//		password: null,
+//		traditional: false,
+//		*/
+//		// Create the request object; Microsoft failed to properly
+//		// implement the XMLHttpRequest in IE7 (can't request local files),
+//		// so we use the ActiveXObject when it is available
+//		// This function can be overriden by calling jQuery.ajaxSetup
+//		xhr: window.XMLHttpRequest && (window.location.protocol !== "file:" || !window.ActiveXObject) ?
+//			function() {
+//				return new window.XMLHttpRequest();
+//			} :
+//			function() {
+//				try {
+//					return new window.ActiveXObject("Microsoft.XMLHTTP");
+//				} catch(e) {}
+//			},
+//		accepts: {
+//			xml: "application/xml, text/xml",
+//			html: "text/html",
+//			script: "text/javascript, application/javascript",
+//			json: "application/json, text/javascript",
+//			text: "text/plain",
+//			_default: "*/*"
+//		}
+//	},
+
+	ajax: function( origSettings ) {
+		var options = FBjqRY.extend(true, {}, FBjqRY.ajaxSettings, origSettings),
+			type = options.type.toUpperCase();
+
+		options.context = origSettings && origSettings.context || options;
+
+		// convert data if not already a string
+		if ( options.data && options.processData && typeof options.data !== "string" ) {
+			options.data = FBjqRY.param( options.data, options.traditional );
+		}
+
+		if ( options.cache === false && type === "GET" ) {
+			var ts = FBjqRY.now();
+			// try replacing _= if it is there
+			var ret = options.url.replace(rts, "$1_=" + ts + "$2");
+			// if nothing was replaced, add timestamp to the end
+			options.url = ret + ((ret === options.url) ? (rquery.test(options.url) ? "&" : "?") + "_=" + ts : "");
+		}
+
+		// If data is available, append data to url for get requests
+		if ( options.data && type === "GET" ) {
+			options.url += (rquery.test(options.url) ? "&" : "?") + options.data;
+		}
+
+		// Watch for a new set of requests
+		if ( options.global && FBjqRY.ajax.active++ === 0 ) {
+			FBjqRY.event.trigger( "ajaxStart" ); // @todo
+		}
+
+		// Matches an absolute URL, and saves the domain
+		//var parts = rurl.exec( s.url ),
+		//	remote = parts && (parts[1] && parts[1] !== location.protocol || parts[2] !== location.host);
+
+        var ajax = new Ajax();
+        ajax.responseType = options.dataType;
+        ajax.ondone = function( data ) {
+            //options.success();
+            FBjqRY.ajax.handleSuccess( options, ajax, data );
+            // Fire the complete handlers
+            FBjqRY.ajax.handleComplete( options, ajax, data );
+        };
+        ajax.onerror = function() {
+            var retryCount = options.retryCount || 0;
+            FBjqRY.log("ajax() error occurred, retrying ...");
+            if ( retryCount-- > 0 ) {
+                options.retryCount = retryCount;
+                FBjqRY.ajax(options);
+            }
+            else {
+                FBjqRY.ajax.handleError(options, ajax, null);
+                // Fire the complete handlers
+                FBjqRY.ajax.handleComplete( options, ajax, undefined);
+            }
+        };
+		try {
+			ajax.post(options.url, options.data);
+		}
+        catch(e) {
+			FBjqRY.ajax.handleError(options, ajax, e);
+            // Fire the complete handlers
+            FBjqRY.ajax.handleComplete( options, ajax, undefined);
+		}
+
+		// Allow custom headers/mimetypes and early abort
+        // @todo ?!
+//		if ( s.beforeSend && s.beforeSend.call(s.context, xhr, s) === false ) {
+//			// Handle the global AJAX counter
+//			if ( s.global && FBjqRY.ajax.active-- === 1 ) {
+//				FBjqRY.event.trigger( "ajaxStop" ); // @todo
+//			}
+//			// close opended socket
+//			xhr.abort();
+//			return false;
+//		}
+
+		if ( options.global ) {
+			FBjqRY.ajax.triggerGlobal( options, "ajaxSend", [ajax, options] );
+		}
+
+		// return XMLHttpRequest to allow aborting the request etc.
+		return ajax;
+	},
+
+	// Serialize an array of form elements or a set of
+	// key/values into a query string
+	param: function( array, traditional ) {
+		var s = [], add = function( key, value ) {
+			// If value is a function, invoke it and return its value
+			value = FBjqRY.isFunction(value) ? value() : value;
+			s[ s.length ] = encodeURIComponent(key) + "=" + encodeURIComponent(value);
+		};
+		
+		// Set traditional to true for jQuery <= 1.3.2 behavior.
+		if ( traditional === undefined ) {
+			traditional = FBjqRY.ajaxSettings.traditional;
+		}
+		
+		// If an array was passed in, assume that it is an array of form elements.
+		if ( FBjqRY.isArray(array) || array.jquery ) {
+            if ( array.jquery ) array = array.nodes;
+			// Serialize the form elements
+			FBjqRY.each( array, function() {
+				add( this.name, this.value );
+			});
+		} else {
+			// If traditional, encode the "old" way (the way 1.3.2 or older
+			// did it), otherwise encode params recursively.
+			for ( var prefix in array ) {
+				buildParams( prefix, array[prefix], traditional, add );
+			}
+		}
+
+		// Return the resulting serialization
+		return s.join("&").replace(r20, "+");
+	}
+});
+
+var req = /=/g, rand = /&/g;
+function encodeURIComponent(str) {
+    if ( typeof(str) === "string" ) {
+        return str.replace(req,'%3D').replace(rand,'%26');
+    }
+    // checkboxes and radio buttons return objects instead of a string
+    else if( typeof(str) === "object" ){
+        for (var i in str) {
+            return str[i].replace(req,'%3D').replace(rand,'%26');
         }
-        //return FBjqRY(FBjqRY.unique(parents));
-        return this.pushStack( FBjqRY.unique(parents), "parents", selector );
-    },
+    }
+}
 
-    siblings: function(expr) {
-        return this.prevAll(expr).concat(this.nextAll(expr)); // @todo pushStack !
-    },
+function buildParams( prefix, obj, traditional, add ) {
+	if ( FBjqRY.isArray(obj) ) {
+		// Serialize array item.
+		FBjqRY.each( obj, function( i, v ) {
+			if ( traditional || /\[\]$/.test( prefix ) ) {
+				// Treat each array item as a scalar.
+				add( prefix, v );
+			} else {
+				// If array item is non-scalar (array or object), encode its
+				// numeric index to resolve deserialization ambiguity issues.
+				// Note that rack (as of 1.0.0) can't currently deserialize
+				// nested arrays properly, and attempting to do so may cause
+				// a server error. Possible fixes are to modify rack's
+				// deserialization algorithm or to provide an option or flag
+				// to force array serialization to be shallow.
+				buildParams( prefix + "[" + ( typeof v === "object" || FBjqRY.isArray(v) ? i : "" ) + "]", v, traditional, add );
+			}
+		});
+			
+	} else if ( !traditional && obj != null && typeof obj === "object" ) {
+		// Serialize object item.
+		FBjqRY.each( obj, function( k, v ) {
+			buildParams( prefix + "[" + k + "]", v, traditional, add );
+		});
+					
+	} else {
+		// Serialize scalar item.
+		add( prefix, obj );
+	}
+}
 
-    andSelf: function() { // @todo
-        return this.add( this.prevObject );
-    },
-    end: function() { // @todo
-        return this.prevObject || FBjqRY( [] );
-    },
+var ajaxExtend;
+FBjqRY.extend( FBjqRY.ajax, ajaxExtend = {
 
-    //EVENTS:
-    //========================================
+	// Counter for holding the number of active queries
+	active: 0,
 
-    ready: function(fn) {setTimeout( function() {fn();} );},
+	// Last-Modified header cache for next request
+	//lastModified: {},
+	//etag: {},
 
-    bind: function(type, fn) { //removed "data" argument
-        var outerThis = this;
-        each(this.nodes, function() {
-            this.addEventListener(type, function(evt) {
-                return fn.apply(this, [evt]);
-            });
-            return outerThis;
-        }, [type, fn]);
-        return this;
-    },
+	handleError: function( s, xhr, status, e ) {
+		// If a local callback was specified, fire it
+		if ( s.error ) {
+			s.error.call( s.context, xhr, status, e );
+		}
 
-    one: function(type, fn) { //removed "data" argument
-        var outerThis = this;
-        each(this.nodes, function() {
-            this.addEventListener(type, function(evt) {
-                var retVal = fn.apply(this, [evt]);
-                this.purgeEventListeners(type);
-                return retVal;
-            });
-            return outerThis;
-        }, [type, fn]);
-    },
+		// Fire the global callback
+		if ( s.global ) {
+			jQuery.ajax.triggerGlobal( s, "ajaxError", [xhr, s, e] );
+		}
+	},
 
-    trigger: function(type, data) { //the events we can trigger are limited
-        each(this.nodes, function() { this[type](); });
-    },
+	handleSuccess: function( s, xhr, status, data ) {
+		// If a local callback was specified, fire it and pass it the data
+		if ( s.success ) {
+			s.success.call( s.context, data, status, xhr );
+		}
 
-    triggerHandler: function(type, data) {
-        if ( this.get(0) ) {
-            //var event = jQuery.Event(type);
-            //event.preventDefault();
-            //event.stopPropagation();
-            //jQuery.event.trigger( event, data, this[0] );
-            //return event.result;
-            return this[type]();
-        }
-    },
+		// Fire the global callback
+		if ( s.global ) {
+			jQuery.ajax.triggerGlobal( s, "ajaxSuccess", [xhr, s] );
+		}
+	},
 
-    unbind: function(type, data) {
-        each(this.nodes, function() { this.purgeEventListeners(type); }, [type]);
-        return this;
-    },
+	handleComplete: function( s, xhr, status ) {
+		// Process result
+		if ( s.complete ) {
+			s.complete.call( s.context, xhr, status );
+		}
 
-    hover: function(over, out) {
-        this.mouseover(over);
-        this.mouseout(out);
-    },
+		// The request was completed
+		if ( s.global ) {
+			jQuery.ajax.triggerGlobal( s, "ajaxComplete", [xhr, s] );
+		}
 
-    toggle: function() {
-        var allFuncs = arguments;
-        var length = arguments.length;
-        each(this.nodes, function() {
-            var i = 0;
-            FBjqRY(this).click(function() {
-                allFuncs[i].apply(this);
-                i = (i + 1) % length;
-            });
-        });
-        return this;
-    },
+		// Handle the global AJAX counter
+		if ( s.global && jQuery.ajax.active-- === 1 ) {
+			jQuery.event.trigger( "ajaxStop" );
+		}
+	},
+		
+	triggerGlobal: function( s, type, args ) {
+		(s.context && s.context.url == null ? jQuery(s.context) : jQuery.event).trigger(type, args);
+	}
+});
 
-    //All other event handlers defined later
+// For backwards compatibility
+//FBjqRY.extend( FBjqRY.ajax );
+FBjqRY.extend( ajaxExtend );
+var elemdisplay = {},
+	rfxtypes = /toggle|show|hide/,
+	rfxnum = /^([+\-]=)?([\d+.\-]+)(.*)$/,
+	timerId,
+	fxAttrs = [
+		// height animations
+		[ "height", "marginTop", "marginBottom", "paddingTop", "paddingBottom" ],
+		// width animations
+		[ "width", "marginLeft", "marginRight", "paddingLeft", "paddingRight" ],
+		// opacity animations
+		[ "opacity" ]
+	];
 
-    //EFFECTS:
-    //========================================
+FBjqRY.fn.extend({
 	show: function(speed, callback){
         if (FBjqRY.isFunction(speed) && ! callback) {
             callback = speed;
             speed = null;
         }
-        
+
 		if ( speed ) {
 			return this.animate( genFx("show", 3), speed, callback); // @todo genFx
 		}
@@ -2365,12 +4752,12 @@ FBjqRY.fn = FBjqRY.prototype = {
 			return this;
 		}
 	},
-	hide: function(speed,callback) {
+	hide: function(speed, callback) {
         if (FBjqRY.isFunction(speed) && ! callback) {
             callback = speed;
             speed = null;
         }
-        
+
 		if ( speed ) {
 			return this.animate( genFx("hide", 3), speed, callback); // @todo genFx
 		}
@@ -2395,6 +4782,189 @@ FBjqRY.fn = FBjqRY.prototype = {
 		}
 	},
 
+	// Save the old toggle function
+	_toggle: FBjqRY.fn.toggle, // from event.js
+
+	toggle: function( fn, fn2 ) {
+		var bool = typeof fn === "boolean";
+
+		if ( FBjqRY.isFunction(fn) && FBjqRY.isFunction(fn2) ) {
+			this._toggle.apply( this, arguments );
+
+		} else if ( fn == null || bool ) {
+			this.each(function() {
+				var state = bool ? fn : FBjqRY(this).is(":hidden");
+				FBjqRY(this)[ state ? "show" : "hide" ]();
+			});
+
+		} else {
+			this.animate(genFx("toggle", 3), fn, fn2);
+		}
+
+		return this;
+	},
+
+	fadeTo: function( speed, to, callback ) {
+        //return this.animate({ opacity: to }, speed, null, callback);
+		return this.filter(":hidden").css("opacity", 0).show().end()
+					.animate({opacity: to}, speed, callback);
+	},
+
+    animate: function( params, speed, easing, callback, neitherShowHide ) {
+        var parseSpeed = function(speed) { // @todo FBjqRY.speed || fx.speeds ?
+            if ( typeof(speed) == "string" ) {
+                speed = trim(speed).toLowerCase();
+                switch ( speed ) {
+                    case "fast": speed = 200; break;
+                    case "slow": speed = 600; break;
+                    default: speed = 400; break;
+                }
+            }
+            return speed ? speed : 400;
+        }
+
+        speed = parseSpeed(speed);
+        var hide = (neitherShowHide == 2);
+        var show = (neitherShowHide == 1);
+
+        var animObj = function(n) {
+            var obj = Animation(n).duration(speed); // FB Animation
+            for ( var p in params ) {
+                if ( params.hasOwnProperty(p) ) obj = obj.to(p, params[p]);
+            }
+            if ( easing ) obj = obj.ease(easing);
+            if ( hide )   obj = obj.blind().hide();
+            if ( show )   obj = obj.blind().show();
+            return obj;
+        };
+
+        this.stop();
+        each(this.nodes, function() { animObj(this).go(); });
+        if (callback) setTimeout(callback, speed);
+        return this;
+    },
+    /*
+	animate: function( prop, speed, easing, callback ) {
+		var optall = FBjqRY.speed(speed, easing, callback);
+
+		if ( FBjqRY.isEmptyObject( prop ) ) {
+			return this.each( optall.complete );
+		}
+
+		return this[ optall.queue === false ? "each" : "queue" ](function() {
+			var opt = FBjqRY.extend({}, optall), p,
+				hidden = FBjqRY(this).is(":hidden"),
+				self = this;
+
+			for ( p in prop ) {
+				var name = p.replace(rdashAlpha, fcamelCase);
+
+				if ( p !== name ) {
+					prop[ name ] = prop[ p ];
+					delete prop[ p ];
+					p = name;
+				}
+
+				if ( prop[p] === "hide" && hidden || prop[p] === "show" && !hidden ) {
+					return opt.complete.call(this);
+				}
+
+				if ( ( p === "height" || p === "width" ) && this.style ) {
+					// Store display property
+					opt.display = FBjqRY.css(this, "display");
+					// Make sure that nothing sneaks out
+					opt.overflow = this.getStyle('overflow');
+				}
+
+				if ( FBjqRY.isArray( prop[p] ) ) {
+					// Create (if needed) and add to specialEasing
+					(opt.specialEasing = opt.specialEasing || {})[p] = prop[p][1];
+					prop[p] = prop[p][0];
+				}
+			}
+
+			if ( opt.overflow != null ) {
+				this.setStyle('overflow', "hidden");
+			}
+
+			opt.curAnim = FBjqRY.extend({}, prop);
+
+			FBjqRY.each( prop, function( name, val ) {
+				var e = new FBjqRY.fx( self, opt, name );
+
+				if ( rfxtypes.test(val) ) {
+					e[ val === "toggle" ? hidden ? "show" : "hide" : val ]( prop );
+
+				} else {
+					var parts = rfxnum.exec(val),
+						start = e.cur(true) || 0;
+
+					if ( parts ) {
+						var end = parseFloat( parts[2] ),
+							unit = parts[3] || "px";
+
+						// We need to compute starting value
+						if ( unit !== "px" ) {
+							self.setStyle( name, (end || 1) + unit );
+							start = ((end || 1) / e.cur(true)) * start;
+							self.setStyle( name, start + unit );
+						}
+
+						// If a +=/-= token was provided, we're doing a relative animation
+						if ( parts[1] ) {
+							end = ((parts[1] === "-=" ? -1 : 1) * end) + start;
+						}
+
+						e.custom( start, end, unit );
+
+					} else {
+						e.custom( start, val, "" );
+					}
+				}
+			});
+
+			// For JS strict compliance
+			return true;
+		});
+	}, */
+
+    stop: function( clearQueue, gotoEnd ) {
+        each(this.nodes, function() { 
+            Animation(this).stop();
+        });
+    }
+
+    /*
+	stop: function( clearQueue, gotoEnd ) {
+		var timers = jQuery.timers;
+
+		if ( clearQueue ) {
+			this.queue([]);
+		}
+
+		this.each(function() {
+			// go in reverse order so anything added to the queue during the loop is ignored
+			for ( var i = timers.length - 1; i >= 0; i-- ) {
+				if ( timers[i].elem === this ) {
+					if (gotoEnd) {
+						// force the next step to be the last
+						timers[i](true);
+					}
+
+					timers.splice(i, 1);
+				}
+			}
+		});
+
+		// start the next in the queue if the last step wasn't forced
+		if ( !gotoEnd ) {
+			this.dequeue();
+		}
+
+		return this;
+	} */
+
+    /*
     slideDown: function(speed, cb) {
         return this.animate({height: 'auto'}, speed, null, cb, 1);
     },
@@ -2420,707 +4990,78 @@ FBjqRY.fn = FBjqRY.prototype = {
         return this.fadeTo(speed, 0.0, function() {
             each(nodes, function() { FBjqRY(this).css("display", "none"); });
         });
-    },
-
-    fadeTo: function(speed, opacity, cb) {
-        return this.animate({ opacity: opacity }, speed, null, cb);
-    },
-
-    animate: function(params, dur, easing, cb, neitherShowHide) {
-        var parseSpeed = function(speed) { // @todo fx.speeds ?
-            if ( typeof(speed) == "string" ) {
-                speed = trim(speed).toLowerCase();
-                switch ( speed ) {
-                    case "fast": speed = 200; break;
-                    case "slow": speed = 600; break;
-                    default: speed = 400; break;
-                }
-            }
-            return speed ? speed : 400;
-        }
-
-        dur = parseSpeed(dur);
-        var hide = (neitherShowHide == 2);
-        var show = (neitherShowHide == 1);
-
-        var animObj = function(n) {
-            var obj = Animation(n).duration(dur); // FB Animation
-            for ( var p in params ) {
-                if ( params.hasOwnProperty(p) ) obj = obj.to(p, params[p]);
-            }
-            if ( easing ) obj = obj.ease(easing);
-            if ( hide )   obj = obj.blind().hide();
-            if ( show )   obj = obj.blind().show();
-            return obj;
-        };
-
-        this.stop();
-        each(this.nodes, function() { animObj(this).go(); });
-        if (cb) setTimeout(cb, dur);
-        return this;
-    },
-
-    stop: function() {
-        each(this.nodes, function() {Animation(this).stop();});
-    },
-
-    //queue: function(cb_Q) {},
-    //dequeue: function() {},
-
-    //AJAX:
-    //========================================
-    /*
-    serialize: function() {
-        return this.serializeArray().join("&");
-    },
-
-    serializeArray: function() {
-        var obj = this.serializeHash();
-        var ary = [];
-        for ( var o in obj ) {
-            if ( obj.hasOwnProperty(o) ) {
-                ary.push( o + "=" + escape(obj[o]) );
-            }
-        }
-        return ary;
-    },
-
-    serializeHash: function() {
-        // nodes[0] must be a form
-        return this.nodes[0].serialize();
     } */
-	serialize: function() {
-		return FBjqRY.param( this.serializeArray() );
-	},
-	serializeArray: function() {
-		//return this.map( function() {
-		//	return this.elements ? jQuery.makeArray(this.elements) : this;
-		//})
-        return this
-		.filter(function() {
-			return this.getName() && ! this.getDisabled() &&
-				( this.getChecked() || /select|textarea/i.test(this.getTagName()) ||
-					/text|hidden|password|search/i.test(this.getType()) );
-		})
-		.map(function() {
-			var val = FBjqRY(this).val();
-            if (val == null) return null;
-            var name = this.getName();
-            
-            if ( FBjqRY.isArray(val) ) {
-                var ret = [];
-                for ( var i = 0; i < val.length; i++ ) {
-                    ret.push( { name: name, value: val[i] } );
-                }
-                return ret;
-            }
-            else {
-                return { name: name, value: val };
-            }
-		}).get();
-	}
-};
 
-/*
-each({
-    appendTo: "append",
-    prependTo: "prepend",
-    insertBefore: "before",
-    insertAfter: "after",
-    replaceAll: "replaceWith"
-}, function(name, original) {
-//	FBjqRY.fn[ name ] = function() {
-//        var args = arguments;
-//        return this.each(function() {
-//                for ( var i = 0, len = args.length; i < len; i++ )
-//                        FBjqRY( args[i] )[ original ]( this );
-//        });
-//	};
-    FBjqRY.fn[name] = FBjqRY.prototype[name] = function(selector) {
-	//FBjqRY.fn[name] = function(selector) {
-        var ret = [], insert = FBjqRY(selector).nodes;
-
-        for ( var i = 0, len = insert.length; i < len; i++ ) {
-            var elems = (i > 0 ? this.clone(true) : this).get();
-            FBjqRY.fn[ original ].apply( FBjqRY(insert[i]), elems );
-            ret = ret.concat( elems );
-        }
-
-        return this.pushStack( ret, name, selector );
-	};
 });
-*/
 
-//Add all common event handler methods
-var validEvents = ("blur,change,click,dblclick,error,focus,keydown,keypress,keyup,load,"  +
-                   "mousedown,mousemove,mouseout,mouseover,mouseup,resize,scroll,select," +
-                   "submit,unload").split(",");
-for ( var i = validEvents.length - 1; i >= 0; i-- ) {
-    (function() {
-        var ev = validEvents[i];
-        FBjqRY.fn[ev] = function(fn) {return fn ? this.bind(ev, fn) : this.trigger(ev);};
-    })();
+function genFx( type, num ){
+	var obj = {};
+	FBjqRY.each( fxAttrs.concat.apply( [], fxAttrs.slice(0, num) ), function() {
+		obj[ this ] = type;
+	});
+	return obj;
 }
 
-FBjqRY.fn.init.prototype = FBjqRY.fn;
-
-//FBjqRY.extend = FBjqRY.fn.extend = extend;
-/* // 1.4.2 version - requires isPlainObject
-FBjqRY.extend = FBjqRY.fn.extend = function() {
-	// copy reference to target object
-	var target = arguments[0] || {}, i = 1, length = arguments.length,
-        deep = false, options, name, src, copy;
-
-	// Handle a deep copy situation
-	if ( typeof target === "boolean" ) {
-		deep = target;
-		target = arguments[1] || {};
-		// skip the boolean and the target
-		i = 2;
-	}
-
-	// Handle case when target is a string or something (possible in deep copy)
-	if ( typeof target !== "object" && ! Support.isFunction(target) ) {
-		target = {};
-	}
-
-	// extend jQuery itself if only one argument is passed
-	if ( length === i ) { target = this; --i; }
-
-	for ( ; i < length; i++ ) {
-		// Only deal with non-null/undefined values
-		if ( (options = arguments[ i ]) != null ) {
-			// Extend the base object
-			for ( name in options ) {
-				src = target[ name ];
-				copy = options[ name ];
-
-				// Prevent never-ending loop
-				if ( target === copy ) {
-					continue;
-				}
-
-				// Recurse if we're merging object literal values or arrays
-				if ( deep && copy && ( isPlainObject(copy) || isArray(copy) ) ) {
-					var clone = src && ( isPlainObject(src) || isArray(src) ) ? src
-						: isArray(copy) ? [] : {};
-
-					// Never move original objects, clone them
-					target[ name ] = FBjqRY.extend( deep, clone, copy );
-
-				// Don't bring in undefined values
-				} else if ( copy !== undefined ) {
-					target[ name ] = copy;
-				}
-			}
-		}
-	}
-
-	// Return the modified object
-	return target;
-}; */
-FBjqRY.extend = FBjqRY.fn.extend = function() {
-	// copy reference to target object
-	var target = arguments[0] || {}, i = 1, length = arguments.length, deep = false, options;
-
-	// Handle a deep copy situation
-	if ( typeof target === "boolean" ) {
-		deep = target;
-		target = arguments[1] || {};
-		// skip the boolean and the target
-		i = 2;
-	}
-
-	// Handle case when target is a string or something (possible in deep copy)
-	if ( typeof target !== "object" && ! FBjqRY.isFunction(target) ) target = {};
-
-	// extend jQuery itself if only one argument is passed
-	if ( length == i ) {
-		target = this;
-		--i;
-	}
-
-	for ( ; i < length; i++ ) {
-		// Only deal with non-null/undefined values
-		if ( (options = arguments[ i ]) != null )
-			// Extend the base object
-			for ( var name in options ) {
-				var src = target[ name ], copy = options[ name ];
-
-				// Prevent never-ending loop
-				if ( target === copy ) continue;
-
-				// Recurse if we're merging object values
-				if ( deep && copy && typeof copy === "object" && ! isFBNode(copy) ) {
-					target[ name ] = FBjqRY.extend( deep,
-						// Never move original objects, clone them
-						src || ( copy.length != null ? [ ] : { } )
-					, copy );
-                }
-				// Don't bring in undefined values
-				else if ( typeof copy !== 'undefined' ) target[ name ] = copy;
-
-			}
-    }
-
-	// Return the modified object
-	return target;
-};
+// Generate shortcuts for custom animations
+FBjqRY.each({ // @todo do these work correctly with FB Animation ?
+	slideDown: genFx("show", 1),
+	slideUp: genFx("hide", 1),
+	slideToggle: genFx("toggle", 1),
+	fadeIn: { opacity: "show" },
+	fadeOut: { opacity: "hide" }
+}, function( name, props ) {
+	FBjqRY.fn[ name ] = function( speed, callback ) {
+		return this.animate( props, speed, callback );
+	};
+});
 
 FBjqRY.extend({
-    //AJAX:
-    //========================================
-    ajax: function(options) {
-		// Extend the settings, but re-extend 's' so that it can be
-		// checked again later (in the test suite, specifically)
-		options = FBjqRY.extend(true, {}, FBjqRY.ajaxSettings, options);
+	speed: function( speed, easing, fn ) {
+		var opt = speed && typeof speed === "object" ? speed : {
+			complete: fn || !fn && easing || FBjqRY.isFunction( speed ) && speed,
+			duration: speed,
+			easing: fn && easing || easing && !FBjqRY.isFunction(easing) && easing
+		};
 
-		// convert data if not already a string
-		//if ( options.data && options.processData && typeof options.data !== "string" ) {
-		//	options.data = FBjqRY.param(options.data);
-        //}
+		opt.duration = FBjqRY.fx.off ? 0 : typeof opt.duration === "number" ? opt.duration :
+			FBjqRY.fx.speeds[opt.duration] || FBjqRY.fx.speeds._default;
 
-        var ajax = new Ajax();
-        ajax.responseType = options.dataType;
-        ajax.ondone = options.success;
-        ajax.onerror = function() {
-            var retryCount = options.retryCount || 0;
-            Support.log("ajax() error occurred, retrying ...");
-            if ( retryCount-- > 0 ) {
-                options.retryCount = retryCount;
-                FBjqRY.ajax(options);
-            }
-            else {
-                FBjqRY.handleError(options, ajax, null);
-            }
-        };
-		try {
-			ajax.post(options.url, options.data);
-		}
-        catch(e) {
-			FBjqRY.handleError(options, ajax, e);
-		}
-    },
-	// Counter for holding the number of active queries
-	active: 0,
-    
-    //load: function(url, data, cb) {},  //-- defined in EVENTS
-    /*
-    genericAJAX: function(url, data, cb, type, retryCount) {
-        retryCount = retryCount || 3;
-        if( ! cb && FBjqRY.isFunction(data) ) {
-            cb = data;
-            data = null;
-        }
-        var ajax = new Ajax();
-        ajax.responseType = type;
-        ajax.ondone = cb;
-        ajax.onerror = function() {
-            console.error("AJAX error occurred! Retrying...");
-            if ( retryCount > 0 ) FBjqRY.genericAJAX(url, data, cb, type, retryCount-1);
-        };
-        ajax.post(url, data);
-    }, */
-	post: function( url, data, callback, type ) {
-		if ( FBjqRY.isFunction( data ) ) {
-			callback = data;
-			data = {};
-		}
-		return FBjqRY.ajax({
-			type: "POST",
-			url: url,
-			data: data,
-			success: callback,
-			dataType: type
-		});
-	},
-	get: function( url, data, callback, type ) {
-		// shift arguments if data argument was ommited
-		if ( FBjqRY.isFunction( data ) ) {
-			callback = data;
-			data = null;
-		}
-		return FBjqRY.ajax({
-			type: "GET", // it will be a POST anyway !
-			url: url,
-			data: data,
-			success: callback,
-			dataType: type
-		});
-	},
-	getJSON: function( url, data, callback ) {
-		return FBjqRY.get(url, data, callback, Ajax.JSON);
-	},
-    
-    getScript: function(url, cb) {
-        return Support.error("getScript() not supported in FBJS");
-    },
-
-	ajaxSetup: function( settings ) {
-		FBjqRY.extend( FBjqRY.ajaxSettings, settings );
-	},
-	ajaxSettings: {
-		url: null, //location.href,
-		global: true,
-		type: "POST", // we can only do a POST !
-		//contentType: "application/x-www-form-urlencoded",
-		//processData: true,
-		//async: true,
-		//accepts: { // @todo only a placeholder
-		//	xml: "application/xml, text/xml",
-		//	html: "text/html",
-		//	script: "text/javascript, application/javascript",
-		//	json: "application/json, text/javascript",
-		//	text: "text/plain",
-		//	_default: "*/*"
-		//}
-        dataType: Ajax.RAW, // FB "extension"
-        retryCount: 1, // FB "extension"
-        requireLogin: null // FB "extension"
-	},
-
-	handleError: function( options, ajax, e ) {
-		// If a local callback was specified, fire it
-		if ( options.error ) options.error( ajax, e );
-		// Fire the global callback
-		//if ( options.global ) jQuery.event.trigger( "ajaxError", [xhr, s, e] );
-	},
-    
-	// Serialize an array of form elements or a set of
-	// key/values into a query string
-	param: function( a ) {
-		var s = [];
-		function add( key, value ){
-			s.push( encodeURIComponent(key) + '=' + encodeURIComponent(value) );
-		}
-
-        if ( typeof(a.selector) !== 'undefined' ) a = a.nodes;
-		// If an array was passed in, assume that it is an array of form elements
-		if ( FBjqRY.isArray(a) ) {
-			// Serialize the form elements
-			FBjqRY.each( a, function() { add( this.name, this.value ); });
-        }
-		// Otherwise, assume that it's an object of key/value pairs
-		else {
-			// Serialize the key/values
-			for ( var j in a )
-				// If the value is an array then the key names need to be repeated
-				if ( FBjqRY.isArray( a[j] ) ) {
-					jQuery.each( a[j], function(){ add( j, this ); });
-                }
-				else add( j, FBjqRY.isFunction(a[j]) ? a[j]() : a[j] );
-        }
-		// Return the resulting serialization
-		return s.join("&").replace(/%20/g, "+");
-	},
-
-    //UTILITIES:
-    //========================================
-
-    isFunction: Support.isFunction,
-    isArray: Support.isArray,
-    isEmptyObject: Support.isEmptyObject,
-
-    trim: Support.trim,
-    
-    each: Support.each,
-    map: Support.map,
-    grep: Support.grep,
-    merge: Support.merge,
-    
-    /*
-    map: function( elems, callback ) {
-        if ( FBjqRY.isFunction(elems) ) {
-            callback = elems;
-            elems = this.nodes;
-        }
-        var ret = [];
-
-        for (var i = 0, length = elems.length; i < length; i++) {
-            var value = callback(elems[i], i);
-            if ( value !== null ) ret[ ret.length ] = value;
-        }
-
-        return ret.concat.apply([], ret);
-    }, */
-
-	makeArray: function( array, results ) { // results is for internal usage only
-		var ret = results || [];
-
-		if( array != null ) {
-			var i = array.length;
-			// The window, strings (and functions) also have 'length'
-			if( i == null || isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
-				ret[0] = array;
-            } else {
-                if ( typeof(array.selector) !== 'undefined' ) {
-                    array = array.nodes;
-                }
-                FBjqRY.merge( ret, array ); // while ( i ) ret[--i] = array[i];
-            }
-		}
-
-		return ret;
-	},
-
-    /*
-    inArray: function(value, array) { // array.indexOf
-        if ( array.indexOf ) return array.indexOf( value );
-
-        var fn = function(a, b) { return a === b; };
-        if ( value.equals ) fn = function(a, b) { return a.equals(b); };
-
-        for ( var i = 0, len = array.length; i < len; i++ ) {
-            if ( fn(value, array[i]) ) return i;
-        }
-        
-        return -1;
-    },
-    indexOf: function(value, arr) { return this.inArray(value, arr); },
-    */
-    inArray: indexOf,
-    indexOf: indexOf,
-
-    unique: function(array) {
-        // @todo ?
-        // swap to jQuery version if we ever implement "data" method
-        return unique(array);
-    },
-
-	parseJSON: function(data) {
-		if ( ! isString(data) || ! data ) return null;
-
-		// Make sure leading/trailing whitespace is removed (IE can't handle it)
-		//data = jQuery.trim( data );
-
-		// Make sure the incoming data is actual JSON
-		// Logic borrowed from http://json.org/json2.js
-		if ( /^[\],:{}\s]*$/.test(data.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, "@")
-			.replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, "]")
-			.replace(/(?:^|:|,)(?:\s*\[)+/g, "")) ) {
-
-			return Support.json(data);
-
-		} else {
-			FBjqRY.error( "Invalid JSON: " + data ); // @ todo error function !
-		}
-	},
-
-	nodeName: function(elem, name) {
-		return elem.getTagName && elem.getTagName().toUpperCase() === name.toUpperCase();
-	},
-    
-	css: function( elem, name, force, extra ) {
-		if ( name === "width" || name === "height" ) {
-            var props = { position: "absolute", visibility: "hidden", display:"block" },
-                which = name === "width" ? [ "Left", "Right" ] : [ "Top", "Bottom" ];
-            var val;
-			function getWH() {
-				val = name === "width" ? elem.getOffsetWidth() : elem.getOffsetHeight();
-				if ( extra === "border" ) return;
-
-				FBjqRY.each( which, function() {
-					if ( !extra ) {
-						val -= parseFloat(FBjqRY.curCSS( elem, "padding" + this, true)) || 0;
-					}
-					if ( extra === "margin" ) {
-						val += parseFloat(FBjqRY.curCSS( elem, "margin" + this, true)) || 0;
-					}
-                    else {
-						val -= parseFloat(FBjqRY.curCSS( elem, "border" + this + "Width", true)) || 0;
-					}
-				});
+		// Queueing
+		opt.old = opt.complete;
+		opt.complete = function() {
+			if ( opt.queue !== false ) {
+				FBjqRY(this).dequeue();
 			}
-
-			if (elem.getOffsetWidth() !== 0) getWH();
-			else FBjqRY.swap( elem, props, getWH );
-
-			return Math.max(0, Math.round(val));
-		}
-
-		return FBjqRY.curCSS( elem, name, force );
-	},
-
-	curCSS: function( elem, name, force ) {
-		var ret;
-		// We need to handle opacity special in IE
-		if ( name == 'opacity' /* && ! FBjqRY.support.opacity*/ ) {
-			ret = elem.getStyle('opacity');
-			return ret == "" ? "1" : ret;
-		}
-		// Make sure we're using the right name for getting the float value
-		if ( name.match( /float/i ) ) {
-            name = 'cssFloat'; //FBjqRY.support.cssFloat ? "cssFloat" : "styleFloat";
-        }
-        
-		//if ( ! force && elem.getStyle && elem.getStyle(name) ) {
-        //    ret = elem.getStyle(name);
-        //}
-		//else
-        if ( elem.getStyle ) {
-			ret = elem.getStyle( Support.camelCase(name) );
-
-			// From the awesome hack by Dean Edwards
-			// http://erik.eae.net/archives/2007/07/27/18.54.15/#comment-102291
-
-			// If we're not dealing with a regular pixel number
-			// but a number that has a weird ending, we need to convert it to pixels
-            /*
-			if ( !/^\d+(px)?$/i.test( ret ) && /^\d/.test( ret ) ) {
-				// Remember the original values
-				var left = style.left, rsLeft = elem.runtimeStyle.left;
-
-				// Put in the new values to get a computed value out
-				elem.runtimeStyle.left = elem.currentStyle.left;
-				style.left = ret || 0;
-				ret = style.pixelLeft + "px";
-
-				// Revert the changed values
-				style.left = left;
-				elem.runtimeStyle.left = rsLeft;
-			} */
-		}
-
-		return ret;
-	},
-
-	// A method for quickly swapping in/out CSS properties to get correct calculations
-	swap: function( elem, options, callback ) {
-		var old = {}, name;
-
-		// Remember the old values, and insert the new ones
-		for ( name in options ) {
-            var camelName = Support.camelCase(name);
-			old[ camelName ] = elem.getStyle( camelName );
-			//elem.style[ name ] = options[ name ];
-            elem.setStyle( camelName, options[ name ] );
-		}
-
-		callback.call( elem );
-
-		// Revert the old values
-        elem.setStyle( old );
-		//for ( name in options ) {
-		//	elem.style[ name ] = old[ name ];
-		//}
-	},
-
-	// A global GUID counter for objects
-	guid: 1,
-	proxy: function( fn, proxy, thisObject ) {
-		if ( arguments.length === 2 ) {
-			if ( typeof proxy === "string" ) {
-				thisObject = fn;
-				fn = thisObject[ proxy ];
-				proxy = undefined;
+			if ( FBjqRY.isFunction( opt.old ) ) {
+				opt.old.call( this );
 			}
-            else if ( proxy && !jQuery.isFunction( proxy ) ) {
-				thisObject = proxy;
-				proxy = undefined;
-			}
-		}
+		};
 
-		if ( ! proxy && fn ) {
-			proxy = function() {
-				return fn.apply( thisObject || this, arguments );
-			};
-		}
+		return opt;
+	},
 
-		// Set the guid of unique handler to the same of original handler, so it can be removed
-		if ( fn ) {
-			proxy.guid = fn.guid = fn.guid || proxy.guid || jQuery.guid++;
+	easing: {
+		linear: function( p, n, firstNum, diff ) {
+			return firstNum + diff * p;
+		},
+		swing: function( p, n, firstNum, diff ) {
+			return ((-Math.cos(p*Math.PI)/2) + 0.5) * diff + firstNum;
 		}
+	},
 
-		// So proxy can be declared as an argument
-		return proxy;
+	timers: [],
+
+	fx: function( elem, options, prop ) {
+		this.options = options;
+		this.elem = elem;
+		this.prop = prop;
+
+		if ( !options.orig ) options.orig = {};
 	}
 
 });
 
-// innerHeight/innerWidth, outerHeight/outerWidth, height/width methods :
-FBjqRY.each([ "Height", "Width" ], function(i, name) {
-
-	var tl = i ? "Left"  : "Top",  // top or left
-		br = i ? "Right" : "Bottom", // bottom or right
-		lower = name.toLowerCase();
-
-	// innerHeight and innerWidth
-	FBjqRY.fn["inner" + name] = function(){
-        var node = this.nodes[0];
-		return node ? jQuery.css( node, lower, false, "padding" ) : null;
-	};
-
-	// outerHeight and outerWidth
-	FBjqRY.fn["outer" + name] = function(margin) {
-        var node = this.nodes[0];
-		return node ? jQuery.css( node, lower, false, margin ? "margin" : "border" ) : null;
-	};
-
-	var type = lower;
-    
-	FBjqRY.fn[ type ] = function( size ) {
-
-		if ( jQuery.isFunction( size ) ) {
-			return this.each( function(i) {
-				var self = jQuery( this );
-				self[ type ]( size.call( this, i, self[ type ]() ) );
-			});
-		}
-        
-		// Get or set width or height on the element
-        return size === undefined ?
-            // Get width or height on the element
-            (this.length ? FBjqRY.css( this.nodes[0], type ) : null) :
-            // Set the width or height on the element (default to pixels if value is unitless)
-            this.css( type, typeof size === "string" ? size : size + "px" );
-	};
-
-});
-
-// ============================================================================
-/** jQuery FX */
-// ============================================================================
-FBjqRY.extend({
-    speed: function(speed, easing, fn) {
-        var opt = speed && speed.constructor == Object ? speed : {
-            complete: fn || !fn && easing || FBjqRY.isFunction( speed ) && speed,
-            duration: speed,
-            easing: fn && easing || easing && easing.constructor != Function && easing
-        };
-
-        opt.duration =
-            ( opt.duration && typeof(opt.duration) == 'number' ?
-                opt.duration : FBjqRY.fx.speeds[opt.duration] )
-                    || FBjqRY.fx.speeds.def;
-
-        // Queueing
-        opt.old = opt.complete;
-        opt.complete = function() {
-            if ( opt.queue !== false ) FBjqRY(this).dequeue();
-            if ( FBjqRY.isFunction( opt.old ) ) opt.old.call( this );
-        };
-
-        return opt;
-    },
-
-    easing: {
-        linear: function( p, n, firstNum, diff ) {return firstNum + diff * p;},
-        swing: function( p, n, firstNum, diff ) {return ((-Math.cos(p*Math.PI)/2) + 0.5) * diff + firstNum;}
-    },
-
-    timers: [],
-    timerId: null,
-    
-    fx: function( elem, options, prop ){
-        this.options = options;
-        this.elem = elem;
-        this.prop = prop;
-
-        if ( !options.orig ) options.orig = {};
-    }
-
-});
-
+/* @todo except for this.elem[this.prop] it should work !!!
 FBjqRY.fx.prototype = {
 	// Simple function for setting a style value
 	update: function(){
@@ -3129,75 +5070,61 @@ FBjqRY.fx.prototype = {
 		(FBjqRY.fx.step[this.prop] || FBjqRY.fx.step._default)( this );
 
 		// Set display property to block for height/width animations
-		if ( this.prop == "height" || this.prop == "width" )
+		if ( this.prop == "height" || this.prop == "width" ) {
 			this.elem.setStyle('display', "block");
+        }
 	},
+    
 	// Get the current size
-	cur: function(force){
-		if ( this.elem[this.prop] != null && this.elem.getStyle(this.prop) == null )
+	cur: function( force ) {
+		if ( this.elem[this.prop] != null && (this.elem.getStyle(this.prop) == null) ) {
 			return this.elem[ this.prop ];
+		}
 
-		var r = parseFloat(FBjqRY.css(this.elem, this.prop, force)); // @todo curCSS :
-		return r && r > -10000 ? r : parseFloat(jQuery.curCSS(this.elem, this.prop)) || 0;
+		var r = parseFloat(FBjqRY.css(this.elem, this.prop, force));
+		return r && r > -10000 ? r : parseFloat(FBjqRY.curCSS(this.elem, this.prop)) || 0;
 	},
+
 	// Start an animation from one number to another
-	custom: function(from, to, unit){
-		this.startTime = +new Date; //now();
+	custom: function( from, to, unit ) {
+		this.startTime = jQuery.now();
 		this.start = from;
 		this.end = to;
 		this.unit = unit || this.unit || "px";
 		this.now = this.start;
 		this.pos = this.state = 0;
-		this.update();
 
 		var self = this;
-		var t = function(gotoEnd) {
+		function t( gotoEnd ) {
 			return self.step(gotoEnd);
 		}
+
 		t.elem = this.elem;
 
-		FBjqRY.timers.push(t);
-
-		if ( FBjqRY.timerId == null ) {
-			FBjqRY.timerId = setInterval(function(){
-				var timers = FBjqRY.timers;
-
-				for ( var i = 0; i < timers.length; i++ )
-					if ( !timers[i]() )
-						timers.splice(i--, 1);
-
-				if ( !timers.length ) {
-					clearInterval( FBjqRY.timerId );
-					FBjqRY.timerId = null;
-				}
-			}, 13);
+		if ( t() && FBjqRY.timers.push(t) && !timerId ) {
+			timerId = setInterval(FBjqRY.fx.tick, 13);
 		}
 	},
+
 	// Simple 'show' function
-	show: function(){
+	show: function() {
 		// Remember where we started, so that we can go back to it later
-		//this.options.orig[this.prop] = jQuery.attr( this.elem.style, this.prop );
-        this.options.orig[this.prop] = this.elem.getStyle(this.prop);
+		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
 		this.options.show = true;
 
 		// Begin the animation
-		this.custom(0, this.cur());
-
 		// Make sure that we start at a small width/height to avoid any
 		// flash of content
-		if ( this.prop == "width" || this.prop == "height" ) {
-			this.elem.setStyle(this.prop, "1px");
-        }
+		this.custom(this.prop === "width" || this.prop === "height" ? 1 : 0, this.cur());
 
 		// Start by showing the element
-		FBjqRY(this.elem).show();
+		FBjqRY( this.elem ).show();
 	},
 
 	// Simple 'hide' function
-	hide: function(){
+	hide: function() {
 		// Remember where we started, so that we can go back to it later
-		//this.options.orig[this.prop] = jQuery.attr( this.elem.style, this.prop );
-        this.options.orig[this.prop] = this.elem.getStyle(this.prop);
+		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
 		this.options.hide = true;
 
 		// Begin the animation
@@ -3205,20 +5132,21 @@ FBjqRY.fx.prototype = {
 	},
 
 	// Each step of an animation
-	step: function(gotoEnd){
-		var t = +new Date; //now();
+	step: function( gotoEnd ) {
+		var t = FBjqRY.now(), done = true;
 
-		if ( gotoEnd || t > this.options.duration + this.startTime ) {
+		if ( gotoEnd || t >= this.options.duration + this.startTime ) {
 			this.now = this.end;
 			this.pos = this.state = 1;
 			this.update();
 
 			this.options.curAnim[ this.prop ] = true;
 
-			var done = true;
-			for ( var i in this.options.curAnim )
-				if ( this.options.curAnim[i] !== true )
+			for ( var i in this.options.curAnim ) {
+				if ( this.options.curAnim[i] !== true ) {
 					done = false;
+				}
+			}
 
 			if ( done ) {
 				if ( this.options.display != null ) {
@@ -3226,40 +5154,40 @@ FBjqRY.fx.prototype = {
 					this.elem.setStyle('overflow', this.options.overflow);
 
 					// Reset the display
-					this.elem.setStyle('display', this.options.display);
-					//if ( jQuery.css(this.elem, "display") == "none" ) {
-                    if (this.elem.getStyle("display") == "none") {
-						this.elem.setStyle('display', "block");
-                    }
+					var old = FBjqRY.data(this.elem, "olddisplay");
+					this.elem.setStyle('display', old ? old : this.options.display);
+
+					if ( FBjqRY.css(this.elem, "display") === "none" ) {
+                        this.elem.setStyle('display', "block");
+					}
 				}
 
 				// Hide the element if the "hide" operation was done
-				if ( this.options.hide )
-                    this.elem.setStyle('display', "none");
+				if ( this.options.hide ) {
+					FBjqRY(this.elem).hide();
+				}
 
 				// Reset the properties, if the item has been hidden or shown
 				if ( this.options.hide || this.options.show ) {
-					//for ( var p in this.options.curAnim )
-						//jQuery.attr(this.elem.style, p, this.options.orig[p]);
-                    var style = {}
-                    for ( var p in this.options.curAnim ) {
-                        style[p] = this.options.orig[p]
-                    }
-                    FBjqRY.attr('style', style);
-                }
-			}
+					for ( var p in this.options.curAnim ) {
+						FBjqRY.style(this.elem, p, this.options.orig[p]);
+					}
+				}
 
-			if ( done )
 				// Execute the complete function
 				this.options.complete.call( this.elem );
+			}
 
 			return false;
+
 		} else {
 			var n = t - this.startTime;
 			this.state = n / this.options.duration;
 
 			// Perform the easing function, defaults to swing
-			this.pos = FBjqRY.easing[this.options.easing || (FBjqRY.easing.swing ? "swing" : "linear")](this.state, n, 0, 1, this.options.duration);
+			var specialEasing = this.options.specialEasing && this.options.specialEasing[this.prop];
+			var defaultEasing = this.options.easing || (FBjqRY.easing.swing ? "swing" : "linear");
+			this.pos = FBjqRY.easing[specialEasing || defaultEasing](this.state, n, 0, 1, this.options.duration);
 			this.now = this.start + ((this.end - this.start) * this.pos);
 
 			// Perform the next step of the animation
@@ -3268,151 +5196,352 @@ FBjqRY.fx.prototype = {
 
 		return true;
 	}
-
 };
 
 FBjqRY.extend( FBjqRY.fx, {
-    speeds: {
-        slow: 600,
-        fast: 200,
-        // Default speed
-        def: 400
-    },
-    step: {
-        scrollLeft: function(fx) {fx.elem.scrollLeft = fx.now;},
-        scrollTop: function(fx) {fx.elem.scrollTop = fx.now;},
-        opacity: function(fx) {
-            //jQuery.attr(fx.elem.style, "opacity", fx.now);
-            FBjqRY.attr('style', {"opacity": fx.now});
-        },
-        _default: function(fx) {
-            //fx.elem.style[ fx.prop ] = fx.now + fx.unit;
-            fx.elem.setStyle(fx.prop, fx.now + fx.unit);
-        }
-    }
-});
+	tick: function() {
+		var timers = FBjqRY.timers;
 
-// ============================================================================
-/** jQuery data */
-// ============================================================================
-
-//var expando = "jQuery" + (+ new Date), uuid = 0; //windowData = {};
-FBjqRY.extend({
-    cache: {},
-    data: function( elem, name, data ) {
-//        var id = getFBNodeId(elem, true), cache = FBjqRY.cache, thisCache;
-//        if ( ! id ) {
-//            if ( typeof(name) === "string" && typeof(data) === 'undefined' ) return null;
-//        }
-//        else {
-//            id = getFBNodeId(elem, false);
-//        }
-        var id = getFBNodeId(elem), cache = FBjqRY.cache, thisCache;
-
-		// Avoid generating a new cache unless none exists and we
-		// want to manipulate it.
-		if ( typeof name === "object" ) {
-			cache[ id ] = FBjqRY.extend(true, {}, name);
+		for ( var i = 0; i < timers.length; i++ ) {
+			if ( !timers[i]() ) timers.splice(i--, 1);
 		}
-        else if ( ! cache[ id ] ) {
-			cache[ id ] = {};
-		}
-		thisCache = cache[ id ];
 
-		// Prevent overriding the named cache with undefined values
-		if ( typeof(data) !== 'undefined' ) thisCache[ name ] = data;
+		if ( !timers.length ) FBjqRY.fx.stop();
+	},
+		
+	stop: function() {
+		clearInterval( timerId );
+		timerId = null;
+	},
+	
+	speeds: {
+		slow: 600,
+		fast: 200,
+		// Default speed
+		_default: 400
+	},
 
-		return typeof(name) === "string" ? thisCache[ name ] : thisCache;
-    },
-    removeData: function( elem, name ) {
-        var id = getFBNodeId(elem, true), cache = FBjqRY.cache; 
-        var thisCache = id ? cache[ id ] : undefined;
-        
-		// If we want to remove a specific section of the element's data
-		if ( name ) {
-			if ( thisCache ) {
-				// Remove the section of cache data
-				delete thisCache[ name ];
-				// If we've removed all the data, remove the element's cache
-				if ( FBjqRY.isEmptyObject(thisCache) ) {
-					FBjqRY.removeData( elem );
-				}
+	step: {
+		opacity: function( fx ) {
+			FBjqRY.style(fx.elem, "opacity", fx.now);
+		},
+
+		_default: function( fx ) {
+			if ( fx.elem.getStyle && fx.elem.getStyle(fx.prop) != null ) {
+				fx.elem.setStyle( fx.prop, (fx.prop === "width" || fx.prop === "height" ? Math.max(0, fx.now) : fx.now) + fx.unit );
+			} else {
+				fx.elem[ fx.prop ] = fx.now;
 			}
-		} // Otherwise, we want to remove all of the element's data
-        else {
-			// Completely remove the data cache
-			if ( id ) delete cache[ id ];
 		}
-    },
+	}
+}); */
 
-    queue: function( elem, type, data ) {
-        if ( elem ) {
-            type = (type || "fx") + "queue";
-            var q = FBjqRY.data( elem, type );
+if ( FBjqRY.expr && FBjqRY.expr.filters ) {
+	FBjqRY.expr.filters.animated = function( elem ) {
+		return FBjqRY.grep(FBjqRY.timers, function( fn ) {
+			return elem === fn.elem;
+		}).length;
+	};
+}
+//if ( "getBoundingClientRect" in document.documentElement ) {
+//	jQuery.fn.offset = function( options ) {
+//		var elem = this[0];
+//
+//		if ( options ) {
+//			return this.each(function( i ) {
+//				jQuery.offset.setOffset( this, options, i );
+//			});
+//		}
+//
+//		if ( !elem || !elem.ownerDocument ) {
+//			return null;
+//		}
+//
+//		if ( elem === elem.ownerDocument.body ) {
+//			return jQuery.offset.bodyOffset( elem );
+//		}
+//
+//		var box = elem.getBoundingClientRect(),
+//			doc = elem.ownerDocument,
+//			body = doc.body,
+//			docElem = doc.documentElement,
+//			win = getWindow(doc),
+//			clientTop  = docElem.clientTop  || body.clientTop  || 0,
+//			clientLeft = docElem.clientLeft || body.clientLeft || 0,
+//			scrollTop  = (win.pageYOffset || jQuery.support.boxModel && docElem.scrollTop  || body.scrollTop ),
+//			scrollLeft = (win.pageXOffset || jQuery.support.boxModel && docElem.scrollLeft || body.scrollLeft),
+//			top  = box.top  + scrollTop  - clientTop,
+//			left = box.left + scrollLeft - clientLeft;
+//
+//		return { top: top, left: left };
+//	};
+//
+//} else {
 
-            if ( !q || FBjqRY.isArray(data) ) {
-                q = FBjqRY.data( elem, type, FBjqRY.makeArray(data) );
-            }
-            else if ( data ) q.push( data );
-        }
-        return q;
-    },
-    dequeue: function( elem, type ) {
-        var queue = FBjqRY.queue( elem, type ), fn = queue.shift();
+FBjqRY.fn.offset = function( options ) {
+    var node = this.nodes[0];
 
-        if ( !type || type === "fx" ) fn = queue[0];
-        if ( typeof(fn) !== 'undefined' ) fn.call(elem);
+    if ( options ) {
+        return this.each(function( i ) {
+            FBjqRY.offset.setOffset( this, options, i );
+        });
     }
-});
+
+    if ( ! node /* || ! node.ownerDocument */ ) return null;
+
+    //if ( /*node === node.ownerDocument.body*/
+    //    FBjqRY.fbjs.sameNode(node, document.getRootElement()) ) {
+    //    return FBjqRY.offset.bodyOffset( node );
+    //}
+
+    //FBjqRY.offset.initialize();
+
+    return { top: node.getAbsoluteTop(), left: node.getAbsoluteLeft() };
+
+//    var offsetParent = elem.offsetParent, prevOffsetParent = elem,
+//        doc = elem.ownerDocument, computedStyle, docElem = doc.documentElement,
+//        body = doc.body, defaultView = doc.defaultView,
+//        prevComputedStyle = defaultView ? defaultView.getComputedStyle( elem, null ) : elem.currentStyle,
+//        top = elem.offsetTop, left = elem.offsetLeft;
+//
+//    while ( (elem = elem.parentNode) && elem !== body && elem !== docElem ) {
+//        if ( jQuery.offset.supportsFixedPosition && prevComputedStyle.position === "fixed" ) {
+//            break;
+//        }
+//
+//        computedStyle = defaultView ? defaultView.getComputedStyle(elem, null) : elem.currentStyle;
+//        top  -= elem.scrollTop;
+//        left -= elem.scrollLeft;
+//
+//        if ( elem === offsetParent ) {
+//            top  += elem.offsetTop;
+//            left += elem.offsetLeft;
+//
+//            if ( jQuery.offset.doesNotAddBorder && !(jQuery.offset.doesAddBorderForTableAndCells && /^t(able|d|h)$/i.test(elem.nodeName)) ) {
+//                top  += parseFloat( computedStyle.borderTopWidth  ) || 0;
+//                left += parseFloat( computedStyle.borderLeftWidth ) || 0;
+//            }
+//
+//            prevOffsetParent = offsetParent;
+//            offsetParent = elem.offsetParent;
+//        }
+//
+//        if ( jQuery.offset.subtractsBorderForOverflowNotVisible && computedStyle.overflow !== "visible" ) {
+//            top  += parseFloat( computedStyle.borderTopWidth  ) || 0;
+//            left += parseFloat( computedStyle.borderLeftWidth ) || 0;
+//        }
+//
+//        prevComputedStyle = computedStyle;
+//    }
+//
+//    if ( prevComputedStyle.position === "relative" || prevComputedStyle.position === "static" ) {
+//        top  += body.offsetTop;
+//        left += body.offsetLeft;
+//    }
+//
+//    if ( jQuery.offset.supportsFixedPosition && prevComputedStyle.position === "fixed" ) {
+//        top  += Math.max( docElem.scrollTop, body.scrollTop );
+//        left += Math.max( docElem.scrollLeft, body.scrollLeft );
+//    }
+//
+//    return { top: top, left: left };
+};
+
+FBjqRY.offset = {
+	initialize: function() {
+		var body = document.getRootElement(), div = document.createElement("div"),
+            innerDiv, checkDiv, table, td, bodyMarginTop = parseFloat( FBjqRY.curCSS(body, "marginTop", true) ) || 0,
+			html = "<div style='position:absolute;top:0;left:0;margin:0;border:5px solid #000;padding:0;width:1px;height:1px;'>" +
+                   "<div></div></div>";
+            //<table style='position:absolute;top:0;left:0;margin:0;border:5px solid #000;padding:0;width:1px;height:1px;' cellpadding='0' cellspacing='0'><tr><td></td></tr></table>
+
+		div.setStyle( { position: "absolute", top: 0, left: 0, margin: 0, border: 0, width: "1px", height: "1px", visibility: "hidden" } );
+
+		div.setInnerXHTML(html);
+		body.insertBefore( div, body.getFirstChild() );
+		innerDiv = div.getFirstChild();
+		checkDiv = innerDiv.getFirstChild();
+		//td = innerDiv.nextSibling.firstChild.firstChild;
+
+		this.doesNotAddBorder = (checkDiv.getOffsetTop() !== 5);
+		//this.doesAddBorderForTableAndCells = (td.offsetTop === 5); // @todo
+
+		checkDiv.setStyle('position', "fixed");
+		checkDiv.setStyle('top', "20px");
+
+		// safari subtracts parent border width here which is 5px
+		this.supportsFixedPosition = (checkDiv.getOffsetTop() === 20 || checkDiv.getOffsetTop() === 15);
+		checkDiv.setStyle('position', "");
+        checkDiv.setStyle('top', "");
+
+		innerDiv.setStyle('overflow', "hidden");
+		innerDiv.setStyle('position', "relative");
+
+		this.subtractsBorderForOverflowNotVisible = (checkDiv.getOffsetTop() === -5);
+
+		this.doesNotIncludeMarginInBodyOffset = (body.getOffsetTop() !== bodyMarginTop);
+
+		body.removeChild( div );
+		body = div = innerDiv = checkDiv = table = td = null;
+		FBjqRY.offset.initialize = FBjqRY.noop;
+	},
+
+    /*
+	bodyOffset: function( body ) {
+		var top = body.getOffsetTop(), left = body.getOffsetLeft();
+
+		FBjqRY.offset.initialize();
+
+		if ( FBjqRY.offset.doesNotIncludeMarginInBodyOffset ) {
+			top  += parseFloat( FBjqRY.curCSS(body, "marginTop",  true) ) || 0;
+			left += parseFloat( FBjqRY.curCSS(body, "marginLeft", true) ) || 0;
+		}
+
+		return { top: top, left: left };
+	}, */
+	
+	setOffset: function( elem, options, i ) {
+		var position = FBjqRY.curCSS( elem, "position" );
+
+		// set position first, in-case top/left are set even on static elem
+		if ( position === "static" ) {
+			elem.setStyle('position', "relative");
+		}
+
+		var curElem    = FBjqRY( elem ),
+			curOffset  = curElem.offset(),
+			curCSSTop  = FBjqRY.curCSS( elem, "top", true ),
+			curCSSLeft = FBjqRY.curCSS( elem, "left", true ),
+			calculatePosition = (position === "absolute" && FBjqRY.inArray('auto', [curCSSTop, curCSSLeft]) > -1),
+			props = {}, curPosition = {}, curTop, curLeft;
+
+		// need to be able to calculate position if either top or left is auto and position is absolute
+		if ( calculatePosition ) {
+			curPosition = curElem.position();
+		}
+
+		curTop  = calculatePosition ? curPosition.top  : parseInt( curCSSTop,  10 ) || 0;
+		curLeft = calculatePosition ? curPosition.left : parseInt( curCSSLeft, 10 ) || 0;
+
+		if ( FBjqRY.isFunction( options ) ) {
+			options = options.call( elem, i, curOffset );
+		}
+
+		if (options.top != null) {
+			props.top = (options.top - curOffset.top) + curTop;
+		}
+		if (options.left != null) {
+			props.left = (options.left - curOffset.left) + curLeft;
+		}
+		
+		if ( "using" in options ) {
+			options.using.call( elem, props );
+		} else {
+			curElem.css( props );
+		}
+	}
+};
+
 
 FBjqRY.fn.extend({
-    data: function( key, value ) {
-        if ( typeof(key) === 'undefined' && this.length ) {
-            return FBjqRY.data( this.nodes[0] );
-        }
-        else if ( typeof key === "object" ) {
-            return this.each(function() {FBjqRY.data( this, key );});
-        }
+	position: function() {
+        var elem = this.nodes[0];
+		if ( ! elem ) return null;
 
-        var parts = key.split(".");
-        parts[1] = parts[1] ? "." + parts[1] : "";
+		// Get *real* offsetParent
+		var offsetParent = this.offsetParent(),
+		// Get correct offsets
+		offset       = this.offset(),
+		parentOffset = /* ^body|html$/i.test(offsetParent[0].getNodeName()) ? { top: 0, left: 0 } :*/ offsetParent.offset();
 
-        if ( typeof(value) === 'undefined' ) {
-            //var data = this.triggerHandler("getData" + parts[1] + "!", [parts[0]]);
-            if ( typeof(data) === 'undefined' && this.length ) {
-                var data = FBjqRY.data( this.nodes[0], key );
-            }
-            return (typeof(data) === 'undefined' && parts[1]) ? this.data( parts[0] ) : data;
-        }
-        else {
-            //return this.trigger("setData" + parts[1] + "!", [parts[0], value])
-            return this.each(function() {
-                FBjqRY.data( this, key, value );
-            });
-        }
-    },
-    removeData: function( key ) {
-        return this.each(function(){FBjqRY.removeData( this, key );});
-    },
+		// Subtract element margins
+		// note: when an element has margin: auto the offsetLeft and marginLeft
+		// are the same in Safari causing offset.left to incorrectly be 0
+		offset.top  -= parseFloat( FBjqRY.curCSS(elem, "marginTop",  true) ) || 0;
+		offset.left -= parseFloat( FBjqRY.curCSS(elem, "marginLeft", true) ) || 0;
 
-    queue: function(type, data) {
-        if ( typeof type !== "string" ) {
-            data = type; type = "fx";
-        }
+		// Add offsetParent borders
+		parentOffset.top  += parseFloat( FBjqRY.curCSS(offsetParent[0], "borderTopWidth",  true) ) || 0;
+		parentOffset.left += parseFloat( FBjqRY.curCSS(offsetParent[0], "borderLeftWidth", true) ) || 0;
 
-        if ( typeof(data) === 'undefined' ) return FBjqRY.queue( this.get(0), type );
+		// Subtract the two offsets
+		return {
+			top:  offset.top  - parentOffset.top,
+			left: offset.left - parentOffset.left
+		};
+	},
 
-        return this.each(function() {
-            var queue = FBjqRY.queue( this, type, data );
-            if ( type == "fx" && queue.length == 1 ) queue[0].call(this);
-        });
-    },
-    dequeue: function(type) {
-        return this.each(function(){FBjqRY.dequeue( this, type );});
-    }
+	offsetParent: function() {
+		return this.map(function() {
+            var root = document.getRootElement(); //sameNode = FBjqRY.fbjs.sameNode;
+			var offsetParent = this.getParentNode(); //this.offsetParent || document.body;
+            var position = FBjqRY.css(offsetParent, "position");
+            
+			while ( ( offsetParent &&
+                /* (!/^body|html$/i.test(offsetParent.nodeName) */
+                ! sameNode(root, offsetParent) &&
+                position === "static" ) ||
+                // we'll have to search for the offsetParent ourselves in FBJS :
+                ( position !== "absolute" && position !== "relative" ) ) {
+
+				offsetParent = offsetParent.getParentNode();
+                position = FBjqRY.css(offsetParent, "position");
+			}
+			return offsetParent || root;
+		});
+	}
 });
 
-})();
 
+// Create scrollLeft and scrollTop methods
+FBjqRY.each( ["Left", "Top"], function( i, name ) {
+	var getter = "getScroll" + name;
+    var setter = "setScroll" + name;
+    var method = "scroll" + name;
+
+	FBjqRY.fn[ method ] = function(val) {
+		var elem = this.nodes[0], win;
+		if ( ! elem ) return null;
+
+		if ( val !== undefined ) {
+			// Set the scroll offset
+			return this.each(function() {
+				win = getWindow( this );
+				if ( win ) { // not implemented
+					win.scrollTo(
+						!i ? val : FBjqRY(win).scrollLeft(),
+						 i ? val : FBjqRY(win).scrollTop()
+					);
+				}
+                else {
+					this[ setter ](val);
+				}
+			});
+		}
+        else {
+			win = getWindow( elem );
+            if ( win ) { // not implemented
+                return ("pageXOffset" in win) ?
+                            win[ i ? "pageYOffset" : "pageXOffset" ] :
+                                FBjqRY.support.boxModel && win.document.documentElement[ method ] ||
+                                    win.document.body[ method ]
+            }
+            else {
+                // Return the scroll offset
+                return elem[ getter ]();
+            }
+		}
+	};
+});
+
+function getWindow( elem ) {
+    return null; // not supported in FBJS !
+//	return ("scrollTo" in elem && elem.document) ?
+//		elem :
+//		elem.nodeType === 9 ?
+//			elem.defaultView || elem.parentWindow :
+//			false;
+}
+})();
 //set $ and jQuery to be shortcuts to FBjqRY
 var jQuery = FBjqRY, $ = FBjqRY;

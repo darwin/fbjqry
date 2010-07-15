@@ -91,7 +91,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "@VERSION", // @todo
+	jquery: "0.4.0", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
