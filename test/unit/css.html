@@ -33,7 +33,7 @@
 </fb:js-string>
 
 <script type="text/javascript">
-    var cssSuite = { suiteName: "css" };
+    var cssSuite = createTestSuite('css');
 
     cssSuite.setUp = function () {
         document.getRootElement().setInnerFBML(cssFBML);

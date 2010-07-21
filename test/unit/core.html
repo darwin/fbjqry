@@ -30,7 +30,7 @@
 </fb:js-string>
 
 <script type="text/javascript">
-    var coreSuite = { suiteName: "core" };
+    var coreSuite = createTestSuite('core');
 
     coreSuite.setUp = function () {
         document.getRootElement().setInnerFBML(coreFBML);

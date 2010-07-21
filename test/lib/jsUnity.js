@@ -57,137 +57,137 @@ jsUnity = (function () {
             catch (e) {
                 return;
             }
-            throw format("?: (?) does not raise an exception or not a function",
-                message || "assertException", fn);
+            this.fail( format("?: (?) does not raise an exception or not a function",
+                message || "assertException", fn) );
         },
 
         assertTrue: function (actual, message) {
             if (!actual) {
-                throw format("?: (?) does not evaluate to true",
-                    message || "assertTrue", actual);
+                this.fail( format("?: (?) does not evaluate to true",
+                    message || "assertTrue", actual), actual );
             }
         },
         
         assertFalse: function (actual, message) {
             if (actual) {
-                throw format("?: (?) does not evaluate to false",
-                    message || "assertFalse", actual);
+                this.fail( format("?: (?) does not evaluate to false",
+                    message || "assertFalse", actual), actual );
             }
         },
         
         assertIdentical: function (expected, actual, message) {
             if (expected !== actual) {
-                throw format("?: (?) is not identical to (?)",
-                    message || "assertIdentical", actual, expected);
+                this.fail( format("?: (?) is not identical to (?)",
+                    message || "assertIdentical", actual, expected), expected, actual );
             }
         },
 
         assertNotIdentical: function (expected, actual, message) {
             if (expected === actual) {
-                throw format("?: (?) is identical to (?)",
-                    message || "assertNotIdentical", actual, expected);
+                this.fail( format("?: (?) is identical to (?)",
+                    message || "assertNotIdentical", actual, expected), expected, actual );
             }
         },
 
         assertEqual: function (expected, actual, message) {
             if (hash(expected) != hash(actual)) {
-                throw format("?: (?) is not equal to (?)",
-                    message || "assertEqual", actual, expected);
+                this.fail( format("?: (?) is not equal to (?)",
+                    message || "assertEqual", actual, expected), expected, actual );
             }
         },
         
         assertNotEqual: function (expected, actual, message) {
             if (hash(expected) == hash(actual)) {
-                throw format("?: (?) is equal to (?)",
-                    message || "assertNotEqual", actual, expected);
+                this.fail( format("?: (?) is equal to (?)",
+                    message || "assertNotEqual", actual, expected), expected, actual );
             }
         },
         
         assertMatch: function (re, actual, message) {
             if (!re.test(actual)) {
-                throw format("?: (?) does not match (?)",
-                    message || "assertMatch", actual, re);
+                this.fail( format("?: (?) does not match (?)",
+                    message || "assertMatch", actual, re), re, actual );
             }
         },
         
         assertNotMatch: function (re, actual, message) {
             if (re.test(actual)) {
-                throw format("?: (?) matches (?)",
-                    message || "assertNotMatch", actual, re);
+                this.fail( format("?: (?) matches (?)",
+                    message || "assertNotMatch", actual, re), re, actual );
             }
         },
         
-        assertTypeOf: function (typ, actual, message) {
-            if (typeof actual !== typ) {
-                throw format("?: (?) is not of type (?)",
-                    message || "assertTypeOf", actual, typ);
+        assertTypeOf: function (type, actual, message) {
+            if (typeof actual !== type) {
+                this.fail( format("?: (?) is not of type (?)",
+                    message || "assertTypeOf", actual, type), type, actual );
             }
         },
 
-        assertNotTypeOf: function (typ, actual, message) {
-            if (typeof actual === typ) {
-                throw format("?: (?) is of type (?)",
-                    message || "assertNotTypeOf", actual, typ);
+        assertNotTypeOf: function (type, actual, message) {
+            if (typeof actual === type) {
+                this.fail( format("?: (?) is of type (?)",
+                    message || "assertNotTypeOf", actual, type), type, actual );
             }
         },
         
-        assertInstanceOf: function (cls, actual, message) {
-            if (!(actual instanceof cls)) {
-                throw format("?: (?) is not an instance of (?)",
-                    message || "assertInstanceOf", actual, cls);
+        assertInstanceOf: function (clazz, actual, message) {
+            if (!(actual instanceof clazz)) {
+                this.fail( format("?: (?) is not an instance of (?)",
+                    message || "assertInstanceOf", actual, clazz), clazz, actual );
             }
         },
 
-        assertNotInstanceOf: function (cls, actual, message) {
-            if (actual instanceof cls) {
-                throw format("?: (?) is an instance of (?)",
-                    message || "assertNotInstanceOf", actual, cls);
+        assertNotInstanceOf: function (clazz, actual, message) {
+            if (actual instanceof clazz) {
+                this.fail( format("?: (?) is an instance of (?)",
+                    message || "assertNotInstanceOf", actual, clazz), clazz, actual );
             }
         },
 
         assertNull: function (actual, message) {
             if (actual !== null) {
-                throw format("?: (?) is not null",
-                    message || "assertNull", actual);
+                this.fail( format("?: (?) is not null",
+                    message || "assertNull", actual), actual );
             }
         },
         
         assertNotNull: function (actual, message) {
             if (actual === null) {
-                throw format("?: (?) is null",
-                    message || "assertNotNull", actual);
+                this.fail( format("?: (?) is null",
+                    message || "assertNotNull", actual), actual );
             }
         },
         
         assertUndefined: function (actual, message) {
             if (typeof(actual) !== 'undefined') {
-                throw format("?: (?) is not undefined",
-                    message || "assertUndefined", actual);
+                this.fail( format("?: (?) is not undefined",
+                    message || "assertUndefined", actual), actual );
             }
         },
         
         assertNotUndefined: function (actual, message) {
             if (typeof(actual) === 'undefined') {
-                throw format("?: (?) is undefined",
-                    message || "assertNotUndefined", actual);
+                this.fail( format("?: (?) is undefined",
+                    message || "assertNotUndefined", actual), actual );
             }
         },
         
         assertNaN: function (actual, message) {
             if (!isNaN(actual)) {
-                throw format("?: (?) is not NaN",
-                    message || "assertNaN", actual);
+                this.fail( format("?: (?) is not NaN",
+                    message || "assertNaN", actual), actual );
             }
         },
         
         assertNotNaN: function (actual, message) {
             if (isNaN(actual)) {
-                throw format("?: (?) is NaN",
-                    message || "assertNotNaN", actual);
+                this.fail( format("?: (?) is NaN",
+                    message || "assertNotNaN", actual), actual );
             }
         },
         
-        fail: function (message) {
+        fail: function (message) { // optional args: [expected,] actual
             throw message || "fail";
         }
     };
@@ -307,13 +307,13 @@ jsUnity = (function () {
             this.passed = 0;
             this.failed = 0;
             this.duration = 0;
+            this.asserts = 0;
         },
 
         assertions: defaultAssertions,
 
         env: {
             defaultScope: this,
-
             getDate: function () {
                 return new Date();
             }
@@ -372,7 +372,8 @@ jsUnity = (function () {
             for (var i = 0; i < arguments.length; i++) {
                 try {
                     var suite = jsUnity.compile(arguments[i]);
-                } catch (e) {
+                }
+                catch (e) {
                     this.log('[ERROR] invalid test suite: "' + arguments[i] + '" ' + e);
                     return false;
                 }
@@ -388,11 +389,12 @@ jsUnity = (function () {
                 results.total += cnt;
 
                 for (var j = 0; j < cnt; j++) {
-                    var test = suite.tests[j];
+                    var test = suite.tests[j], tearedDown;
     
                     try {
                         suite.setUp && suite.setUp();
                         test.fn.call(suite.scope);
+                        tearedDown = true; // don't call tearDown() twice
                         suite.tearDown && suite.tearDown();
 
                         results.passed++;
@@ -400,7 +402,7 @@ jsUnity = (function () {
                         this.result(true, test.name); // passed
                     }
                     catch (e) {
-                        suite.tearDown && suite.tearDown();
+                        tearedDown || ( suite.tearDown && suite.tearDown() );
                         
                         this.result(false, test.name, e); // failed
                     }
@@ -412,7 +414,7 @@ jsUnity = (function () {
             results.suiteName = suiteNames.join(",");
             results.failed = results.total - results.passed;
             results.duration = jsUnity.env.getDate() - start;
-
+            
             this.log( plural(results.passed, "test") + " passed" );
             this.log( plural(results.failed, "test") + " failed" );
             this.log( plural(results.duration, "millisecond") + " elapsed" );

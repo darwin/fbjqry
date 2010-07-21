@@ -1,4 +1,4 @@
-<fb:js-string var="selectors1FBML">
+<fb:js-string var="selector1FBML">
 
 <div id="id1" class="class1">
     <span class="class2"></span>
@@ -20,90 +20,90 @@
 </fb:js-string>
 
 <script type="text/javascript">
-    var selectors1Suite = { suiteName: "selectors1" };
+    var selector1Suite = createTestSuite('selector1');
     
-    selectors1Suite.setUp = function () {
-        document.getRootElement().setInnerFBML(selectors1FBML);
+    selector1Suite.setUp = function () {
+        document.getRootElement().setInnerFBML(selector1FBML);
     };
 
-    selectors1Suite.testExistingId = function () {
+    selector1Suite.testExistingId = function () {
         Asserts.assertEqual(1, $('#id1').length);
     };
-    selectors1Suite.testMissingId = function () {
+    selector1Suite.testMissingId = function () {
         Asserts.assertEqual(0, $('#idx').length);
     };
-    selectors1Suite.testIdWithCorrectTagName = function () {
+    selector1Suite.testIdWithCorrectTagName = function () {
         Asserts.assertEqual(1, $('div#id1').length);
     };
-    selectors1Suite.testIdWithWrongTagName = function () {
+    selector1Suite.testIdWithWrongTagName = function () {
         Asserts.assertEqual(0, $('span#id1').length);
     };
-    selectors1Suite.testIdWithExistingContext = function () {
+    selector1Suite.testIdWithExistingContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(1, $('#id2', context).length);
     };
-    selectors1Suite.testIdWithMisingContext = function () {
+    selector1Suite.testIdWithMisingContext = function () {
         var context = document.getElementById('id3');
         Asserts.assertEqual(0, $('#id2', context).length);
     };
 
-    selectors1Suite.testExistingClass1 = function () {
+    selector1Suite.testExistingClass1 = function () {
         Asserts.assertEqual(3, $('.class1').length);
     };
-    selectors1Suite.testExistingClass2 = function () {
+    selector1Suite.testExistingClass2 = function () {
         Asserts.assertEqual(3, $('.class2').length);
     };
-    selectors1Suite.testMissingClass = function () {
+    selector1Suite.testMissingClass = function () {
         Asserts.assertEqual(0, $('.class3').length);
     };
-    selectors1Suite.testExistingClassWithContext = function () {
+    selector1Suite.testExistingClassWithContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(1, $('.class2', context).length);
     };
-    selectors1Suite.testMissingClassWithContext = function () {
+    selector1Suite.testMissingClassWithContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(0, $('.class3', context).length);
     };
-    selectors1Suite.testExistingClassWithTagName1 = function () {
+    selector1Suite.testExistingClassWithTagName1 = function () {
         Asserts.assertEqual(1, $('span.class1').length);
     };
-    selectors1Suite.testExistingClassWithTagName2 = function () {
+    selector1Suite.testExistingClassWithTagName2 = function () {
         Asserts.assertEqual(1, $('div.class2').length);
     };
 
-    selectors1Suite.testExistingTagName1 = function () {
+    selector1Suite.testExistingTagName1 = function () {
         Asserts.assertEqual(3, $('a').length);
     };
-    selectors1Suite.testExistingTagName2 = function () {
+    selector1Suite.testExistingTagName2 = function () {
         Asserts.assertEqual(4, $('div').length);
     };
-    selectors1Suite.testExistingTagNameWithContext = function () {
+    selector1Suite.testExistingTagNameWithContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(1, $('a', context).length);
     };
-    selectors1Suite.testMissingTagName = function () {
+    selector1Suite.testMissingTagName = function () {
         Asserts.assertEqual(0, $('h4').length);
     };
-    selectors1Suite.testMissingTagNameWithContext = function () {
+    selector1Suite.testMissingTagNameWithContext = function () {
         var context = $('div.class2');
         Asserts.assertEqual(1, context.length, "non-unique context");
         Asserts.assertEqual(0, $('span', context).length);
     };
-    selectors1Suite.testExistingTagNameWithClass = function () {
+    selector1Suite.testExistingTagNameWithClass = function () {
         Asserts.assertEqual(1, $('A.class2').length);
     };
 
-    selectors1Suite.testNestedExistingTagNameWithContextAndClass = function () {
+    selector1Suite.testNestedExistingTagNameWithContextAndClass = function () {
         Asserts.assertEqual(1, $('#id1 SPAN.class1').length);
     };
-    selectors1Suite.testNestedMissingTagNameWithContextAndClass = function () {
+    selector1Suite.testNestedMissingTagNameWithContextAndClass = function () {
         Asserts.assertEqual(0, $('#id2 SPAN.class1').length);
     };
 
-    selectors1Suite.testAllTagName = function () {
+    selector1Suite.testAllTagName = function () {
         Asserts.assertEqual(10, $('*').length);
     };
-    selectors1Suite.testAllTagNameWithContext = function () {
+    selector1Suite.testAllTagNameWithContext = function () {
         var context = document.getElementById('id1');
         Asserts.assertEqual(5, $('*', context).length);
     };

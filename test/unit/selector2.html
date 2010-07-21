@@ -1,4 +1,4 @@
-<fb:js-string var="selectors2FBML">
+<fb:js-string var="selector2FBML">
 
 <div id="id11">
     <div class="class11">
@@ -47,103 +47,103 @@
 </fb:js-string>
 
 <script type="text/javascript">
-    var selectors2Suite = { suiteName: "selectors2" };
+    var selector2Suite = createTestSuite('selector2');
 
-    selectors2Suite.setUp = function () {
-        document.getRootElement().setInnerFBML(selectors2FBML);
+    selector2Suite.setUp = function () {
+        document.getRootElement().setInnerFBML(selector2FBML);
     };
 
-    selectors2Suite.testNestedTagSelector = function () {
+    selector2Suite.testNestedTagSelector = function () {
         Asserts.assertEqual(4, $('#id11 span').length);
         Asserts.assertEqual(7, $('div.class11 span').length);
     };
-    selectors2Suite.testNestedSelectorWithContext1 = function () {
+    selector2Suite.testNestedSelectorWithContext1 = function () {
         var context = $('#id11').get(0);
         Asserts.assertEqual(4, $('div span', context).length);
     };
-    selectors2Suite.testNestedSelectorWithContext2 = function () {
+    selector2Suite.testNestedSelectorWithContext2 = function () {
         var context = $('#id11').get(0); // should not match the div.class11 :
         Asserts.assertEqual(3, $('div .class11', context).length);
     };
-    selectors2Suite.testNestedSelectorWithContext3 = function () {
+    selector2Suite.testNestedSelectorWithContext3 = function () {
         var context = $('#id11').get(0);
         Asserts.assertEqual(2, $('div span.class11', context).length);
     };
-    selectors2Suite.testNestedClassSelector1 = function () {
+    selector2Suite.testNestedClassSelector1 = function () {
         Asserts.assertEqual(4, $('#id11 .class11').length);
     };
-    selectors2Suite.testNestedClassSelector2 = function () {
+    selector2Suite.testNestedClassSelector2 = function () {
         Asserts.assertEqual(1, $('#id11 .class12').length);
     };
-    selectors2Suite.testNestedClassSelector3 = function () {
+    selector2Suite.testNestedClassSelector3 = function () {
         Asserts.assertEqual(0, $('#id11 .class13').length);
     };
 
-    selectors2Suite.testDoubleNestedClassSelector1 = function () {
+    selector2Suite.testDoubleNestedClassSelector1 = function () {
         Asserts.assertEqual(1, $('#id11 .class11.class14').length);
     };
-    selectors2Suite.testDoubleNestedClassSelector2 = function () {
+    selector2Suite.testDoubleNestedClassSelector2 = function () {
         Asserts.assertEqual(2, $('.class11.class14').length);
     };
-    selectors2Suite.testDoubleNestedClassSelector3 = function () {
+    selector2Suite.testDoubleNestedClassSelector3 = function () {
         Asserts.assertEqual(1, $('.class14.class11.class12').length);
     };
-    selectors2Suite.testDoubleNestedClassSelector4 = function () {
+    selector2Suite.testDoubleNestedClassSelector4 = function () {
         Asserts.assertEqual(0, $('.class13.class11.class12').length);
     };
-    selectors2Suite.testDoubleNestedClassSelector5 = function () {
+    selector2Suite.testDoubleNestedClassSelector5 = function () {
         Asserts.assertEqual(0, $('#id11 .class11.class12').length);
     };
 
-    selectors2Suite.testSiblingTagSelector1 = function () {
+    selector2Suite.testSiblingTagSelector1 = function () {
         Asserts.assertEqual(3, $('#id12 ~ span').length);
     };
-    selectors2Suite.testSiblingTagSelector2 = function () {
+    selector2Suite.testSiblingTagSelector2 = function () {
         Asserts.assertEqual(3, $('#id12 ~ div').length);
     };
-    selectors2Suite.testSiblingTagSelector3 = function () {
+    selector2Suite.testSiblingTagSelector3 = function () {
         Asserts.assertEqual(2, $('#id13 ~ span').length);
     };
-    selectors2Suite.testSiblingTagSelector4 = function () {
+    selector2Suite.testSiblingTagSelector4 = function () {
         Asserts.assertEqual(0, $('#id13 ~ div').length);
     };
-    selectors2Suite.testSiblingClassSelector1 = function () {
+    selector2Suite.testSiblingClassSelector1 = function () {
         Asserts.assertEqual(3, $('div#id12 ~ .class14').length);
     };
-    selectors2Suite.testSiblingClassSelector2 = function () {
+    selector2Suite.testSiblingClassSelector2 = function () {
         Asserts.assertEqual(0, $('div#id12 ~ .class11').length);
     };
     
-    selectors2Suite.testSiblingClassTagSelector = function () {
+    selector2Suite.testSiblingClassTagSelector = function () {
         //$('.class14 ~ span').each(function() {
         //    console.log('classTag span', this.getTitle(), this.__instance, this);
         //});
         Asserts.assertEqual(6, $('.class14 ~ span').length);
     };
-    selectors2Suite.testSiblingTagTagSelector = function () {
+    selector2Suite.testSiblingTagTagSelector = function () {
         Asserts.assertEqual(11, $('span ~ span').length);
     };
-    selectors2Suite.testSiblingTagTagSelectorWithContext = function () {
+    selector2Suite.testSiblingTagTagSelectorWithContext = function () {
         Asserts.assertEqual(1, $('form').length);
         var context = $('form').get(0);
         Asserts.assertEqual(8, $('span ~ span', context).length);
     };
-    selectors2Suite.testSiblingClassSelectorWithTag = function () {
+    selector2Suite.testSiblingClassSelectorWithTag = function () {
         Asserts.assertEqual(1, $('#id12 ~ div.class14').length);
     };
-    selectors2Suite.testAdjancedTagSelector1 = function () {
+    selector2Suite.testAdjancedTagSelector1 = function () {
         Asserts.assertEqual(1, $('#id12 + span').length);
     };
-    selectors2Suite.testAdjancedTagSelector2 = function () {
+    selector2Suite.testAdjancedTagSelector2 = function () {
         Asserts.assertEqual(0, $('#id12 + div').length);
     };
-    selectors2Suite.testAdjancedClassSelector1 = function () {
+    selector2Suite.testAdjancedClassSelector1 = function () {
         Asserts.assertEqual(4, $('.class14 + div').length);
     };
-    selectors2Suite.testAdjancedClassSelector2 = function () {
+    selector2Suite.testAdjancedClassSelector2 = function () {
         Asserts.assertEqual(1, $('span.class14 + span').length);
     };
-    selectors2Suite.testAdjancedTagTagSelector = function () {
+    selector2Suite.testAdjancedTagTagSelector = function () {
         Asserts.assertEqual(7, $('span + span').length);
     };
 

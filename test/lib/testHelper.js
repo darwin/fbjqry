@@ -2,9 +2,13 @@
 // assertion functions shortcut :
 var Asserts = jsUnity.assertions;
 Asserts.assertEqualNode = function(expected, actual, message) {
+    if ( ! FBjqRY.fbjs.isNode(actual) ) {
+        this.fail( jsUnity.format("?: (?) is not a FB node",
+            message || "assertEqualNode", actual), expected, actual );
+    }
     if ( ! FBjqRY.fbjs.sameNode(expected, actual) ) {
-        throw jsUnity.format("?: (?) is not equal to node (?)",
-            message || "assertEqualNode", actual, expected);
+        this.fail( jsUnity.format("?: (?) is not equal to node (?)",
+            message || "assertEqualNode", actual, expected), expected, actual );
     }
 };
 
@@ -35,11 +39,31 @@ var removeAllElements = function() {
     };
 
     FBjqRY.error = function(msg) {
-        try { throw msg; }
+        try {throw msg;}
         catch (e) {
             FBjqRY.log('[ERROR]', e);
         }
         return undefined;
+    };
+
+    // customize assertion failure :
+    var fail = Asserts.fail;
+    Asserts.fail = function(message) {
+        if ( arguments.length > 1 ) {
+            var expected = arguments[1], actual = arguments[2];
+            if ( arguments.length === 2 ) {
+                expected = undefined; actual = arguments[1];
+            }
+            if (consoleLog) {
+                if ( expected === undefined ) {
+                    consoleLog(message, 'actual:', actual);
+                }
+                else {
+                    consoleLog(message, 'expected:', expected, 'actual:', actual);
+                }
+            }
+        }
+        fail.apply(this, arguments);
     };
 
     jsUnity.log = function() {
@@ -100,11 +124,22 @@ var removeAllElements = function() {
         result.call(this, passed, name, e);
         if ( e ) console.log(name, e);
         // keep the test result for the "green - red" test bar :
-        currentSuite.push({ name: name, passed: passed, e: e });
+        currentSuite.push({name: name, passed: passed, e: e});
         // count the assetrions in a given suite :
         //incrementAssertionCount();
     };
 })();
+
+var testSuites = [];
+function createTestSuite(name) {
+    var suite = {suiteName: name};
+    testSuites.push( suite );
+    return suite;
+}
+
+function allTestSuites() {
+    return testSuites;
+}
 
 // qUnit compatibility :
 
@@ -124,8 +159,33 @@ function equals(actual, expected, message) {
     Asserts.assertEqual(expected, actual, message);
 }
 function same(actual, expected, message) {
-    Asserts.assertEqual(expected, actual, message);
+    message = message ? message : '';
+    if ( FBjqRY.fbjs.isNode(expected) ) {
+        return Asserts.assertEqualNode(expected, actual, message || 'same()')
+    }
+    if ( typeof(expected.length) === 'number' ) {
+        Asserts.assertTypeOf( 'number', actual.length, message + ' same() ('+ actual +') is not an array' );
+        Asserts.assertEqual( expected.length, actual.length, message + ' same() expected.length !== actual.length' );
+        for (var i=0; i<expected.length; i++) {
+            same( actual[i], expected[i], message /*+ ' same() failed on '+ i +'-th array element'*/ );
+        }
+        return undefined;
+    }
+    return Asserts.assertEqual(expected, actual, message);
 }
 function ok(actual, message) {
     Asserts.assertTrue(actual, message);
+}
+
+function q() {
+    var ret = [];
+    for ( var i = 0; i < arguments.length; i++ ) {
+        if ( arguments[i] == ':root' ) {
+            ret.push( document.getRootElement() );
+        }
+        else {
+            ret.push( document.getElementById( arguments[i] ) );
+        }
+    }
+    return ret;
 }

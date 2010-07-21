@@ -91,7 +91,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "0.4.0", //"@VERSION",
+	jquery: "0.5.0-SNAPSHOT", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
@@ -492,12 +492,13 @@ FBjqRY.extend({
 	makeArray: function( array, results ) {
 		var ret = results || [];
 
-		if( array != null ) {
+		if ( array != null ) {
 			var i = array.length;
 			// The window, strings (and functions) also have 'length'
-			if( i == null || FBjqRY.isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
+			if ( i == null || FBjqRY.isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
 				ret[0] = array;
-            } else {
+            }
+            else {
                 if ( array.jquery ) array = array.nodes;
                 FBjqRY.merge( ret, array ); // while ( i ) ret[--i] = array[i];
             }
@@ -517,8 +518,10 @@ FBjqRY.extend({
             else cmpFn = function(v) { return (elem === v); };
         }
 
+        array = array.jquery ? array.nodes : array;
+        
         for (var i = 0, len = array.length; i < len; i++) {
-            if ( cmpFn(array[i]) ) return i;
+            if ( cmpFn( array[i] ) ) return i;
         }
         return -1;
     },
