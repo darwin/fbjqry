@@ -71,43 +71,45 @@ FBjqRY.find = (function() {
 
     function selectByClass(nodes, cssClass, sel, recurse) {
         //if ( nodes.length === 0 ) {
-        if ( nodes == null ) {
-            nodes = [ document.getRootElement() ];
-        }
+        if ( nodes == null ) nodes = [ document.getRootElement() ];
+        
         return filterNodes( nodes,
             function() { return this.hasClassName(cssClass); },
             recurse
         );
     }
 
-    function selectByTag(nodes, tag, sel, recurse) {
+    function selectByTag(nodes, tagName, sel, recurse) {
         //if ( nodes.length === 0 ) {
         if ( nodes == null ) {
-            nodes = document.getRootElement().getElementsByTagName(tag);
+            return document.getRootElement().getElementsByTagName(tagName);
         }
-        else { // @todo optimize !
-//            if ( hierarchy === true ) { // optimization for the "most" case :
-//                var tagNodes = [];
-//                //console.log('selectByTag() nodes: ', nodes);
-//                for (var i = 0, len = nodes.length; i < len; i++) {
-//                    tagNodes = tagNodes.concat( nodes[i].getElementsByTagName(tag) );
-//                }
-//                //console.log('selectByTag() len: ', tagNodes.length);
-//                nodes = tagNodes;
-//            }
-//            else {
-                tag = tag.toUpperCase();
-                nodes = filterNodes( nodes,
-                    function() { return tag === '*' || this.getTagName() == tag; },
+        else { // @todo optimize :
+            tagName = tagName.toUpperCase();
+            /*
+            if ( recurse ) { // optimization for a "common" case :
+                var tagNodes1 = [], tagNodes2 = [];
+                for ( var i = 0, len = nodes.length; i < len; i++ ) {
+                    var node = nodes[i];
+                    if ( node.getTagName() === tagName || tagName === '*' ) {
+                        tagNodes1.push( node );
+                    }
+                    tagNodes2 = tagNodes2.concat( node.getElementsByTagName(tagName) );
+                }
+                nodes = tagNodes1.concat( tagNodes2 );
+            } */
+            //else {
+                //if ( tagName === '*' ) return nodes; // ok cause recurse == false
+                var allTags = tagName === '*';
+                return filterNodes( nodes,
+                    function() { return tagName === this.getTagName() || allTags; },
                     recurse
                 );
-//            }
+            //}
         }
-        return nodes;
     }
 
     function selectByAttribute(nodes, name, type, value, sel, recurse) {
-        //console.log('selectByAttribute() name, type, value, recurse: ', name, type, value, recurse);
         if ( nodes == null ) {
             nodes = [ document.getRootElement() ];
         }
@@ -133,6 +135,160 @@ FBjqRY.find = (function() {
             },
             recurse
         );
+    }
+
+    function selectByPseudo(nodes, pseudo, innerVal, sel, recurse) {
+        //if ( nodes.length === 0 ) {
+        if ( nodes == null ) {
+            nodes = document.getRootElement().getElementsByTagName('*');
+        }
+
+        var innerValInt = innerVal ? parseInt(innerVal, 10) : null;
+        var retNodes;
+        
+        switch ( pseudo ) {
+            case "first":
+                retNodes = [ nodes[0] ]; break;
+            case "last":
+                retNodes = [ nodes[nodes.length - 1] ]; break;
+            case "eq":
+                retNodes = [ nodes[innerValInt] ]; break;
+            case "lt":
+                retNodes = nodes.splice(0, innerValInt); break;
+            case "gt":
+                retNodes = nodes.splice(innerValInt + 1, (nodes.length - innerValInt)); break;
+            case "even":
+                retNodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
+            case "odd":
+                retNodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
+            case "contains":
+                retNodes = null;
+                return FBjqRY.error("find() :contains pseudo selector not supported");
+                break;
+            case "hidden":
+                retNodes = FBjqRY.grep(nodes, _isHidden); break;
+            case "visible":
+                retNodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
+            case "has":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var matches = FBjqRY.find(innerVal, node);
+                    return matches.length > 0;
+                });
+                break;
+            case "not":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    //console.log('not1', innerVal, node);
+                    var notMatches = FBjqRY.find(innerVal, false, [ node ]);
+                    //console.log('not2', innerVal, notMatches);
+
+                    // if smt is matched return false :
+                    return notMatches.length === 0;
+                });
+                break;
+            case "nth-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function(node) {
+                    var childs = node.getChildNodes();
+                    if ( childs && childs[innerValInt] ) retNodes.push( childs[innerValInt] );
+                });
+                break;
+            case "first-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function(node) {
+                    var childs = node.getChildNodes();
+                    if ( childs && childs[0] ) retNodes.push( childs[0] );
+                });
+                break;
+            case "last-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function(node) {
+                    var childs = node.getChildNodes();
+                    var length = childs && childs.length;
+                    if ( length ) retNodes.push( childs[length - 1] );
+                });
+                break;
+            case "only-child":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var parentChilds = node.getParentNode().getChildNodes();
+                    return parentChilds.length === 1;
+                });
+                break;
+            case "parent": // all elements that are the parent of another element :
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var childNodes = node.getChildNodes();
+                    return childNodes && childNodes.length > 0;
+                });
+                break;
+            case "empty": // all elements that have no children :
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var childNodes = node.getChildNodes();
+                    return ! childNodes || childNodes.length === 0;
+                });
+                break;
+            case "disabled":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var disabled = node.getDisabled();
+                    return !! disabled; // @todo disabled === 'disabled'
+                });
+                break;
+            case "enabled":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var disabled = node.getDisabled();
+                    return ! disabled;
+                });
+                break;
+            case "selected":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var selected = node.getSelected();
+                    return !! selected; // @todo selected === 'selected'
+                });
+                break;
+            case "checked":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var checked = node.getChecked();
+                    return !! checked; // @todo checked === 'checked'
+                });
+                break;
+            case "input": // all input, textarea, select and button elements
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var tagName = node.getTagName().toLowerCase();
+                    return tagName === 'input' || tagName === 'textarea'
+                        || tagName === 'select' || tagName === 'button';
+                });
+                break;
+            case "text":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
+                break;
+            case "password":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
+                break;
+            case "radio":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
+                break;
+            case "file":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
+                break;
+            case "image": // all image inputs
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
+                break;
+            case "reset":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
+                break;
+            case "submit":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var type = node.getType(), tagName = node.getTagName().toLowerCase();
+                    return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
+                           (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
+                });
+                break;
+            case "header":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var tagName = node.getTagName().toLowerCase();
+                    return tagName.length === 2 && tagName.charAt(0) === 'h';
+                });
+                break;
+        }
+        return retNodes;
     }
 
     return function(sel, context, nodes) { // the find function
@@ -162,32 +318,39 @@ FBjqRY.find = (function() {
                 return FBjqRY.error("find() invalid context: " + context);
             }
         }
+        else {
+            var filter = context === false; // special case to handle filter-ing
+        }
 
-        var recurse, match,
-            prevSel, selectors = sel.split(","),
+        var recurse, match, prevSel,
+            selectors = sel.split( /([^,]*\(.*?\))|,/ ),
+            //selectors = sel.split(","),
             allNodes = [], origNodes = nodes;
 
         var trim = FBjqRY.trim;
         for ( i = 0, len = selectors.length; i < len; i++ ) {
-            sel = trim(selectors[i]);
+            
+            if ( ! selectors[i] ) continue;
+
+            sel = trim( selectors[i] );
             prevSel = "";
-            recurse = true;
+            recurse = ! filter; //true;
             while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
                     recurse = (sel.charAt(0) === ' ');
                     if ( recurse ) {
-                        sel = trim(sel);
+                        sel = trim( sel );
                         var nextNodes = [], j, sibling;
                         switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
                             case '>':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
                                 }
                                 recurse = false; // only 1st level childs
                                 break;
                             case '~':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     while ( sibling ) {
@@ -198,7 +361,7 @@ FBjqRY.find = (function() {
                                 recurse = false;
                                 break;
                             case '+':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     if ( sibling ) {
@@ -219,30 +382,26 @@ FBjqRY.find = (function() {
                 prevSel = sel;
 
                 //We should start with one of these first 3 cases (id, tag, class)
-                match = idCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = idCheck.exec(sel) ) ) {
                     nodes = selectById(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
-                match = classCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = classCheck.exec(sel) ) ) {
                     nodes = selectByClass(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
-                match = tagCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = tagCheck.exec(sel) ) ) {
                     nodes = selectByTag(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
                 //The remaining is subfiltering on nodes
-                match = attributeCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = attributeCheck.exec(sel) ) ) {
                     match[3] = match[3] || true; //if m[3] does not exist we are just checking if attribute exists
                     nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, recurse);
                     sel = sel.substr( sel.indexOf("]") + 1 );
@@ -254,144 +413,9 @@ FBjqRY.find = (function() {
                 if ( match ) {
                     var matchStr = match[0];
                     var pseudo = match[1];
-                    var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
-                    var intValue = value ? parseInt(value, 10) : null;
+                    var innerVal = match.length > 2 ? match[2] : null; // the value in the parenthesis
 
-                    var _nodes = nodes;
-
-                    switch ( pseudo ) {
-                        case "first":
-                            nodes = [ nodes[0] ]; break;
-                        case "last":
-                            nodes = [ nodes[nodes.length - 1] ]; break;
-                        case "eq":
-                            nodes = [ nodes[intValue] ]; break;
-                        case "lt":
-                            nodes = nodes.splice(0, intValue); break;
-                        case "gt":
-                            nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
-                        case "even":
-                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
-                        case "odd":
-                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
-                        case "contains":
-                            nodes = null;
-                            return FBjqRY.error("find() :contains pseudo selector not supported");
-                            //break;
-                        case "hidden":
-                            nodes = FBjqRY.grep(nodes, _isHidden); break;
-                        case "visible":
-                            nodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
-                        case "has":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var matches = FBjqRY.find(value, null, [ node ]);
-                                return matches.length > 0;
-                            });
-                            break;
-                        case "not":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var notMatches = FBjqRY.find(value, null, [ node ]);
-                                // if smt is matched return false :
-                                return notMatches.length == 0;
-                            });
-                            break;
-                        case "nth-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
-                            });
-                            break;
-                        case "first-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[0] ) nodes.push( childs[0] );
-                            });
-                            break;
-                        case "last-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                var length = childs && childs.length;
-                                if ( length ) nodes.push( childs[length - 1] );
-                            });
-                            break;
-                        case "only-child":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var parentChilds = node.getParentNode().getChildNodes();
-                                return parentChilds.length === 1;
-                            });
-                            break;
-                        case "parent": // all elements that are the parent of another element :
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return childNodes && childNodes.length > 0;
-                            });
-                            break;
-                        case "empty": // all elements that have no children :
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return ! childNodes || childNodes.length === 0;
-                            });
-                            break;
-                        case "disabled":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return !! disabled; // @todo disabled === 'disabled'
-                            });
-                            break;
-                        case "enabled":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return ! disabled;
-                            });
-                            break;
-                        case "selected":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var selected = node.getSelected();
-                                return !! selected; // @todo selected === 'selected'
-                            });
-                            break;
-                        case "input": // all input, textarea, select and button elements
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName === 'input' || tagName === 'textarea'
-                                    || tagName === 'select' || tagName === 'button';
-                            });
-                            break;
-                        case "text":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
-                            break;
-                        case "password":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
-                            break;
-                        case "radio":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
-                            break;
-                        case "file":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
-                            break;
-                        case "image": // all image inputs
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
-                            break;
-                        case "reset":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
-                            break;
-                        case "submit":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var type = node.getType(), tagName = node.getTagName().toLowerCase();
-                                return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
-                                       (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
-                            });
-                            break;
-                        case "header":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName.length === 2 && tagName.charAt(0) === 'h';
-                            });
-                            break;
-                    }
+                    nodes = selectByPseudo(nodes, pseudo, innerVal, sel, recurse);
 
                     sel = sel.substr(matchStr.length);
                     continue;
