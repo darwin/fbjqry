@@ -11,23 +11,6 @@ FBjqRY.fn.extend({
     },
 
     not: function(selector) {
-        /*
-        var notNodes;
-        if ( selector.jquery ) notNodes = selector.nodes;
-        else if ( FBjqRY.isArray(selector) ) notNodes = selector;
-
-        if ( notNodes ) {
-            var nodes = this.get(); // is a copy already
-            for ( var i = 0, len = notNodes.length; i < len; i++ ) {
-                var idx = FBjqRY.inArray( notNodes[i], nodes ); // indexOf
-                if ( idx != -1 ) nodes.splice(idx, 1); // remove element
-            }
-        }
-        else { // expr assumed to be a selector :
-            notNodes = FBjqRY.find(selector, this.nodes);
-        }
-
-        return this.pushStack( nodes, "not", selector ); */
         
         var nodes;
         if ( typeof(selector) === "string" ) {
@@ -158,71 +141,41 @@ FBjqRY.fn.extend({
 });
 
 FBjqRY.fn.extend({
+
     parent: function(selector) {
         return this.pushStack( collectParents(this.nodes, selector, false), "parent", selector || '' );
     },
     parents: function(selector) {
         return this.pushStack( collectParents(this.nodes, selector, true), "parents", selector || '' );
     },
+    parentsUntil: function(until, selector) {
+        return this.pushStack( collectParents(this.nodes, selector, until), "parentsUntil", selector || '' );
+    },
 
     next: function(selector) {
-        /*
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-        }
-        return this.pushStack( FBjqRY.unique(siblings), "next", selector );
-        */
         var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', false );
         return this.pushStack( siblings, "next", selector || '' );
     },
     nextAll: function(selector) {
-        /*
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getNextSibling();
-            }
-        }
-        return this.pushStack( FBjqRY.unique(siblings), "nextAll", selector );
-        */
         var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', true );
         return this.pushStack( siblings, "nextAll", selector || '' );
     },
-    
+    nextUntil: function(until, selector) {
+        var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', until );
+        return this.pushStack( siblings, "nextUntil", selector || '' );
+    },
+
     prev: function(selector) {
-        /*
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-        }
-        return this.pushStack( FBjqRY.unique(siblings), "prev", selector );
-        */
         var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', false );
         return this.pushStack( siblings, "prev", selector || '' );
     },
     prevAll: function(selector) {
-        /*
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getPreviousSibling();
-            }
-        }
-        return this.pushStack( FBjqRY.unique(siblings), "prevAll", selector );
-        */
         var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', true );
         return this.pushStack( siblings, "prevAll", selector || '' );
+    },
+    prevUntil: function(until, selector) {
+        var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', until );
+        return this.pushStack( siblings, "prevUntil", selector || '' );
     },
 
     siblings: function(selector) {
@@ -231,58 +184,62 @@ FBjqRY.fn.extend({
         siblings = siblings.concat( collectSiblings( this.nodes, selector, 'getNextSibling', true ) );
         return this.pushStack( siblings, "siblings", selector || '' );
     },
-
     children: function(selector) {
         return this.pushStack( collectChildren(this.nodes, selector), "children", selector || '' );
-        /*
-        if (expr) {
-            children = FBjqRY(this.nodes).find(expr).get();
-        }
-        else {
-            children = [];
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                children = children.concat( this.nodes[i].getChildNodes() );
-            }
-        }
-        return FBjqRY(unique(children));
-        */
     },
-    
     contents: function() { // same as children()
         return this.pushStack( collectChildren(this.nodes), "contents", '' );
     }
 
 });
 
-var collectSiblings = function(nodes, selector, getSiblings, recurse) {
+var collectSiblings = function(nodes, selector, getSiblings, until) {
     var siblings = [], len = nodes.length, nodeArray = [];
+    var doUntil = ( typeof(until) !== 'boolean' );
+    var recurse = doUntil || until; /// until if not used means recurse (true/false)
+
     for ( var i = 0; i < len; i++ ) {
         var sibling = nodes[i][ getSiblings ](); // nodes[0].getNextSibling()
+        
         while ( sibling ) {
             nodeArray[0] = sibling;
-            if ( ! selector || isNodes(selector, nodeArray) ) {
+
+            if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
+                break;
+            }
+
+            if ( ! selector || matchesNodes(selector, nodeArray) ) {
                 siblings.push(sibling);
             }
+            
             sibling = recurse ? sibling[ getSiblings ]() : null;
         }
     }
     return FBjqRY.unique(siblings);
 }
 
-var rootElement = document.getRootElement();
-var collectParents = function(nodes, selector, recurse) {
+var collectParents = function(nodes, selector, until) {
     var parents = [], len = nodes.length, nodeArray = [];
     var sameNode = FBjqRY.fbjs.sameNode;
-    
+    var doUntil = ( typeof(until) !== 'boolean' );
+    var recurse = doUntil || until; /// until if not used means recurse (true/false)
+
+    var rootElement = document.getRootElement();
+
     for ( var i = 0; i < len; i++ ) {
         var node = nodes[i].getParentNode();
         while ( node ) {
+            nodeArray[0] = node;
+
+            if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
+                break;
+            }
+
             if ( selector ) {
                 // do not add the root element - might get confusing :
                 if ( sameNode(rootElement, node) ) break;
-                
-                nodeArray[0] = node;
-                if ( isNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
+
+                if ( matchesNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
                     parents.push(node);
                 }
             }
@@ -322,7 +279,7 @@ var selector2Function = function(selector) {
     return selector;
 };
 
-var isNodes = function(selector, nodes) {
+var matchesNodes = function(selector, nodes) {
     return !! selector && FBjqRY.filter( selector, nodes ).length > 0;
 };
 

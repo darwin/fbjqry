@@ -88,11 +88,26 @@
         Asserts.assertEqual(3, FBjqRY( [1, 2, 3] ).length);
         Asserts.assertEqual(2, FBjqRY( [1, 2, 3] ).get(1));
     };
+    coreSuite.testFBjqRY4 = function () {
+        var v;
+        FBjqRY( function() { v = 1; } );
+
+        setTimeout(function() {
+           Asserts.assertEqual(1, v, "Ready function got executed 1");
+        }, 10);
+    };
+    coreSuite.testFBjqRY5 = function () {
+        var v;
+        function readyFn() {
+            v = 'ready';
+        }
+        $(document).ready(readyFn);
+        setTimeout(function() {
+           Asserts.assertEqual('ready', v, "Ready function got executed 2");
+        }, 10);
+    };
 
     coreSuite.testSelectorState1 = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         var test, root = document.getRootElement();
 
         test = jQuery();
@@ -122,9 +137,6 @@
     };
 
     coreSuite.testSelectorState2 = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
 
         var root = document.getRootElement();
         var test = jQuery("#main", root);
@@ -163,9 +175,6 @@
     };
 
     coreSuite.testIsFunction = function () {
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
 
         // Make sure that false values return false
         ok( !jQuery.isFunction(), "No Value" );
@@ -246,12 +255,12 @@
     coreSuite.testGet = function () {
         var spans = jQuery("span").get();
         Asserts.assertEqual(6, spans.length);
-        Asserts.assertEqualNode(document.getElementById('span1'), spans[0]);
-        Asserts.assertEqualNode(document.getElementById('span2'), spans[1]);
-        Asserts.assertEqualNode(document.getElementById('span3'), spans[2]);
-        Asserts.assertEqualNode(document.getElementById('span4'), spans[3]);
-        Asserts.assertEqualNode(document.getElementById('span5'), spans[4]);
-        Asserts.assertEqualNode(document.getElementById('span6'), spans[5]);
+        Asserts.assertEqual(document.getElementById('span1'), spans[0]);
+        Asserts.assertEqual(document.getElementById('span2'), spans[1]);
+        Asserts.assertEqual(document.getElementById('span3'), spans[2]);
+        Asserts.assertEqual(document.getElementById('span4'), spans[3]);
+        Asserts.assertEqual(document.getElementById('span5'), spans[4]);
+        Asserts.assertEqual(document.getElementById('span6'), spans[5]);
     };
     coreSuite.testGet0 = function () {
         var span = jQuery("span").get(0);
@@ -269,9 +278,6 @@
         Asserts.assertTrue(pass, "Execute a function, Relative" );
     };
     coreSuite.testEachObject = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         jQuery.each( [0,1,2], function(i, n){
             equals( i, n, "Check array iteration" );
@@ -310,18 +316,15 @@
         var array = jQuery("span").toArray();
         Asserts.assertTrue(array.length, 'has length');
         Asserts.assertEqual(6, array.length);
-        Asserts.assertEqualNode(document.getElementById('span1'), array[0], 'array[0]');
-        Asserts.assertEqualNode(document.getElementById('span2'), array[1], 'array[1]');
-        Asserts.assertEqualNode(document.getElementById('span3'), array[2], 'array[2]');
-        Asserts.assertEqualNode(document.getElementById('span4'), array[3], 'array[3]');
-        Asserts.assertEqualNode(document.getElementById('span5'), array[4], 'array[4]');
-        Asserts.assertEqualNode(document.getElementById('span6'), array[5], 'array[5]');
+        Asserts.assertEqual(document.getElementById('span1'), array[0], 'array[0]');
+        Asserts.assertEqual(document.getElementById('span2'), array[1], 'array[1]');
+        Asserts.assertEqual(document.getElementById('span3'), array[2], 'array[2]');
+        Asserts.assertEqual(document.getElementById('span4'), array[3], 'array[3]');
+        Asserts.assertEqual(document.getElementById('span5'), array[4], 'array[4]');
+        Asserts.assertEqual(document.getElementById('span6'), array[5], 'array[5]');
     };
 
     coreSuite.testSlice = function () {
-        var same = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
 
         var span1 = document.getElementById('span1');
         var span2 = document.getElementById('span2');
@@ -343,9 +346,6 @@
     };
 
     coreSuite.testFirstLast = function () {
-        var same = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
 
         var span1 = document.getElementById('span1');
         var span6 = document.getElementById('span6');
@@ -373,18 +373,18 @@
         //console.log(jQuery("div span").size());
 
         var map1 = jQuery("div span").map( function() { return this.getNextSibling(); }).get();
-        Asserts.assertEqualNode( map1[0], div1 );
-        Asserts.assertEqualNode( map1[1], span3 );
-        Asserts.assertEqualNode( map1[2], div2 );
+        Asserts.assertEqual( map1[0], div1 );
+        Asserts.assertEqual( map1[1], span3 );
+        Asserts.assertEqual( map1[2], div2 );
         //Asserts.assertNull( map1[3] );
         //Asserts.assertNull( map1[4] );
         Asserts.assertFalse( map1[3] ); // @ todo is undefined ok ?
         Asserts.assertFalse( map1[4] );
 
         var map2 = jQuery("#main div > span").map( function() { return this.getParentNode(); }).get();
-        Asserts.assertEqualNode( map2[0], div1 );
-        Asserts.assertEqualNode( map2[1], div1 );
-        Asserts.assertEqualNode( map2[2], div2 );
+        Asserts.assertEqual( map2[0], div1 );
+        Asserts.assertEqual( map2[1], div1 );
+        Asserts.assertEqual( map2[2], div2 );
         
     };
 
@@ -513,9 +513,6 @@
     };
 
     coreSuite.testIsEmptyObject = function() {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         equals(true, jQuery.isEmptyObject({}), "isEmptyObject on empty object literal" );
         equals(false, jQuery.isEmptyObject({a:1}), "isEmptyObject on non-empty object literal" );
@@ -525,9 +522,6 @@
     };
 
     coreSuite.testAdd = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
 
         //isSet( jQuery("#sndp").add("#en").add("#sap").get(), q("sndp", "en", "sap"), "Check elements from document" );
         //isSet( jQuery("#sndp").add( jQuery("#en")[0] ).add( jQuery("#sap") ).get(), q("sndp", "en", "sap"), "Check elements from document" );
@@ -554,9 +548,6 @@
     };
 
     coreSuite.testIndex = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
 
         var elements = jQuery([ document.getRootElement(), document.getElementById('main') ]),
         spanElements = jQuery('#span1,#span2,#span6,#span5');
@@ -581,9 +572,6 @@
     };
 
     coreSuite.testTrim = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         var nbsp = String.fromCharCode(160);
 
@@ -600,9 +588,6 @@
     };
 
     coreSuite.testProxy = function () {
-        var equals = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
         
         var test = function(){ equals( this, thisObject, "Make sure that scope is set properly." ); };
         var thisObject = { foo: "bar", method: test };
@@ -621,12 +606,6 @@
     };
 
     coreSuite.testParseJSON = function () {
-        var equals = same = function(actual, expected, message) {
-            Asserts.assertEqual(expected, actual, message);
-        };
-        var ok = function(actual, message) {
-            Asserts.assertTrue(actual, message);
-        };
 
         equals( jQuery.parseJSON(), null, "Nothing in, null out." );
         equals( jQuery.parseJSON( null ), null, "Nothing in, null out." );

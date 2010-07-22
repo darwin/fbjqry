@@ -1,16 +1,6 @@
 
 // assertion functions shortcut :
 var Asserts = jsUnity.assertions;
-Asserts.assertEqualNode = function(expected, actual, message) {
-    if ( ! FBjqRY.fbjs.isNode(actual) ) {
-        this.fail( jsUnity.format("?: (?) is not a FB node",
-            message || "assertEqualNode", actual), expected, actual );
-    }
-    if ( ! FBjqRY.fbjs.sameNode(expected, actual) ) {
-        this.fail( jsUnity.format("?: (?) is not equal to node (?)",
-            message || "assertEqualNode", actual, expected), expected, actual );
-    }
-};
 
 /**
  * Removes all elements (nodes) from the canvas.
@@ -44,6 +34,23 @@ var removeAllElements = function() {
             FBjqRY.log('[ERROR]', e);
         }
         return undefined;
+    };
+
+    var assertEqual = Asserts.assertEqual;
+    Asserts.assertEqual = function(expected, actual, message) {
+        if ( FBjqRY.fbjs.isNode(expected) ) {
+            if ( ! FBjqRY.fbjs.isNode(actual) ) {
+                Asserts.fail( jsUnity.format("?: (?) is not a FB node",
+                    message || "assertEqual", actual), expected, actual );
+            }
+            if ( ! FBjqRY.fbjs.sameNode(expected, actual) ) {
+                Asserts.fail( jsUnity.format("?: (?) is not equal to FB node (?)",
+                    message || "assertEqual", actual, expected), expected, actual );
+            }
+        }
+        else {
+            assertEqual.call(this, expected, actual, message);
+        }
     };
 
     // customize assertion failure :
@@ -156,25 +163,32 @@ function reset() {
 }
 
 function equals(actual, expected, message) {
-    Asserts.assertEqual(expected, actual, message);
+    Asserts.assertEqual(expected, actual, message || 'equals');
 }
 function same(actual, expected, message) {
+    //console.log('same() start', message);
     message = message ? message : '';
-    if ( FBjqRY.fbjs.isNode(expected) ) {
-        return Asserts.assertEqualNode(expected, actual, message || 'same()')
-    }
-    if ( typeof(expected.length) === 'number' ) {
-        Asserts.assertTypeOf( 'number', actual.length, message + ' same() ('+ actual +') is not an array' );
-        Asserts.assertEqual( expected.length, actual.length, message + ' same() expected.length !== actual.length' );
-        for (var i=0; i<expected.length; i++) {
-            same( actual[i], expected[i], message /*+ ' same() failed on '+ i +'-th array element'*/ );
+    if ( expected && typeof(expected.length) === 'number' ) {
+        if ( ! actual || typeof(actual.length) !== 'number' ) {
+            Asserts.fail( jsUnity.format("?: (?) is not an array",
+                message || "same", actual), expected, actual );
         }
-        return undefined;
+        if ( actual.length !== expected.length ) {
+            Asserts.fail( jsUnity.format("?: length of (?) is not equal to the expected length of (?)",
+                message || "same", actual, expected), expected, actual );
+        }
+        for ( var i = 0, len = expected.length; i < len; i++ ) {
+            //console.log('same() check', i);
+            Asserts.assertEqual( expected[i], actual[i], message + ' failed on ['+ i +']' );
+        }
     }
-    return Asserts.assertEqual(expected, actual, message);
+    else {
+        //console.log('same() assertEqual', expected);
+        Asserts.assertEqual(expected, actual, message);
+    }
 }
 function ok(actual, message) {
-    Asserts.assertTrue(actual, message);
+    Asserts.assertTrue(actual, message || 'ok');
 }
 
 function q() {

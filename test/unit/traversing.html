@@ -1,0 +1,660 @@
+<fb:js-string var="traversingFBML">
+
+<div id="foo" class="foo" style="display: none;">
+    <span id="span1"></span>
+    <div id="ltr" dir="ltr">
+        <span class="bar" title="BAR"></span>
+        <span id="bar" class="fooBar">bar-bar</span>
+        <p id="par">a paragraph</p>
+    </div>
+    <span id="bar2" class="foo2 fooBar">bar 2</span>
+    
+    text nodes are not supported in FBJS
+    <!-- comment nodes are not supported in FBJS -->
+</div>
+
+<div id="muu" class="huu">
+    <span>blah blah blah</span>
+</div>
+
+<form id="form" action="/" style="display: none;">
+    <input id="text1" type="text" value="TEXT" />
+    <input id="text2" type="text" disabled />
+
+    <input id="radio1" type="radio" value="" />
+    <input id="radio2" type="radio" checked />
+
+    <input id="check1" type="checkbox" value="ON" />
+    <input id="check2" type="checkbox" checked />
+
+    <select id="select" name="select-name">
+        <option id="option1">option1</option>
+        <option id="option2" selected>option2</option>
+        <option id="option3">option3</option>
+    </select>
+</form>
+
+</fb:js-string>
+
+<script type="text/javascript">
+    var traversingSuite = createTestSuite('traversing');
+
+    traversingSuite.setUp = function () {
+        document.getRootElement().setInnerFBML(traversingFBML);
+    };
+
+    test("find(String)", function() {
+        expect(2);
+        var fooBar = jQuery('#foo').find('.bar');
+        equals( 1, fooBar.size() );
+        equals( 'BAR', fooBar.attr('title'), 'Check for find' );
+        //equals( 'BAR', jQuery('#foo').find('.bar').text(), 'Check for find' );
+
+        var j = $("#foo");
+        equals( j.find("div").length, 1, "Check node to find 1 div" );
+        equals( j.find("span").length, 4, "Check node to find 4 spans" );
+
+        // using contents will get comments regular, text, and comment nodes
+        // only gets regular nodes in FBJS !
+        var j = jQuery("#foo").contents();
+        equals( j.length, 3, "Check node,textnode,comment to find 5 nodes" );
+        equals( j.find("div").length, 0, "Check node,textnode,comment to find 0 div" );
+        equals( j.find("span").length, 2, "Check node,textnode,comment to find 2 spans" );
+    }, traversingSuite);
+
+    test("is(String)", function() {
+        expect(26);
+        ok( jQuery('#form').is('form'), 'Check for element: A form must be a form' );
+        ok( !jQuery('#form').is('div'), 'Check for element: A form is not a div' );
+        ok( jQuery('#bar').is('.fooBar'), 'Check for class: Expected class "fooBar"' );
+        ok( !jQuery('#bar').is('.link'), 'Check for class: Did not expect class "link"' );
+        ok( jQuery('#bar2').is('.foo2.fooBar'), 'Check for multiple classes: Expected classes "foo2" and "fooBar"' );
+        ok( !jQuery('#bar2').is('.foo'), 'Check for multiple classes: Expected classes "foo2" and "fooBar", but not "foo"' );
+
+        ok( jQuery('#ltr').is('[dir="ltr"]'), 'Check for attribute: Expected attribute dir to be "ltr"' );
+        ok( !jQuery('#ltr').is('[dir="rtl"]'), 'Check for attribute: Expected attribute dir to be "ltr", not "rtl"' );
+
+        ok( jQuery('#text1').is('[type="text"]'), 'Check for attribute: Expected attribute type to be "text"' );
+        ok( !jQuery('#text1').is('[type="radio"]'), 'Check for attribute: Expected attribute type to be "text", not "radio"' );
+        ok( jQuery('#text2').is(':disabled'), 'Check for pseudoclass: Expected to be disabled' );
+        ok( !jQuery('#text1').is(':disabled'), 'Check for pseudoclass: Expected not disabled' );
+        
+        ok( jQuery('#radio2').is(':checked'), 'Check for pseudoclass: Expected to be checked' );
+        ok( !jQuery('#radio1').is(':checked'), 'Check for pseudoclass: Expected not checked' );
+        
+        ok( jQuery('#foo').is(':has(p)'), 'Check for child: Expected a child "p" element' );
+        ok( !jQuery('#foo').is(':has(ul)'), 'Check for child: Did not expect "ul" element' );
+        ok( jQuery('#foo').is(':has(p):has(span):has(div)'), 'Check for childs: Expected "p", "span" and "div" child elements' );
+        ok( !jQuery('#foo').is(':has(p):has(span):has(div):has(ol)'), 'Check for childs: Expected "p", "span" and "div" child elements, but no "ol"' );
+        ok( !jQuery('#foo').is(0), 'Expected false for an invalid expression - 0' );
+        ok( !jQuery('#foo').is(null), 'Expected false for an invalid expression - null' );
+        ok( !jQuery('#foo').is(''), 'Expected false for an invalid expression - ""' );
+        ok( !jQuery('#foo').is(undefined), 'Expected false for an invalid expression - undefined' );
+
+        // test is() with comma-seperated expressions
+        ok( jQuery('#ltr').is('[dir="ltr"],[dir="rtl"]'), 'Comma-seperated; Check for dir attribute: Expect ltr or rtl' );
+        ok( jQuery('#ltr').is('[dir="rtl"],[dir="ltr"]'), 'Comma-seperated; Check for dir attribute: Expect rtl or ltr' );
+        ok( jQuery('#ltr').is('[dir="ltr"] , [dir="rtl"]'), 'Comma-seperated; Check for dir attribute: Expect ltr or rtl' );
+        ok( jQuery('#ltr').is('[dir="rtl"] , [dir="ltr"]'), 'Comma-seperated; Check for dir attribute: Expect rtl or ltr' );
+    }, traversingSuite);
+
+    test("index()", function() {
+        expect(1);
+
+        console.log('index() #text1 parent nodes:', jQuery("#text1").parent().children().nodes );
+
+        // @todo
+        //equals( jQuery("#text1").index(), 0, "Returns the index of a child amongst its siblings 0" );
+        //equals( jQuery("#text2").index(), 1, "Returns the index of a child amongst its siblings 1" );
+    }, traversingSuite);
+
+    test("index(Object|String|undefined)", function() {
+        expect(16);
+
+        //var elements = jQuery([window, document]),
+        var elements = jQuery([ document.getRootElement(), document ]);
+        var inputElements = jQuery('#radio1,#radio2,#check1,#check2');
+
+        // Passing a node
+        //equals( elements.index(window), 0, "Check for index of elements" );
+        equals( elements.index(document.getRootElement()), 0, "Check for index of elements" );
+        equals( elements.index(document), 1, "Check for index of elements" );
+
+        equals( inputElements.index(document.getElementById('radio1')), 0, "Check for index of elements 0" );
+        equals( inputElements.index(document.getElementById('radio2')), 1, "Check for index of elements 1" );
+        equals( inputElements.index(document.getElementById('check1')), 2, "Check for index of elements 2" );
+        equals( inputElements.index(document.getElementById('check2')), 3, "Check for index of elements 3" );
+        //equals( inputElements.index(window), -1, "Check for not found index" );
+        equals( inputElements.index(document), -1, "Check for not found index" );
+
+        // Passing a jQuery object
+        // enabled since [5500]
+        equals( elements.index( elements ), 0, "Pass in a jQuery object" );
+        equals( elements.index( elements.eq(1) ), 1, "Pass in a jQuery object" );
+        
+        equals( jQuery("#form :radio").index( jQuery("#radio2") ), 1, "Pass in a jQuery object" );
+
+        // Passing a selector or nothing
+        // enabled since [6330]
+        equals( jQuery('#form').children().eq(4).index(), 4, "Check for index amongst siblings" );
+        equals( jQuery('#radio2').index('#form :radio') , 1, "Check for index within a selector" );
+        equals( jQuery('#form :radio').index( jQuery('#radio2') ), 1, "Check for index within a selector" );
+        equals( jQuery('#radio2').index('#form :text') , -1, "Check for index not found within a selector" );
+    }, traversingSuite);
+
+    test("filter(Selector)", function() {
+        expect(5);
+        
+        same( jQuery("#form input").filter(":checked").get(), q("radio2", "check2"), "filter(String)" );
+        same( jQuery("span").filter("#bar, #bar2").get(), q("bar", "bar2"), "filter('String, String')" );
+        same( jQuery("span").filter("#bar2,#bar").get(), q("bar", "bar2"), "filter('String,String')" );
+
+        // using contents will get comments regular, text, and comment nodes
+        var j = jQuery("#foo").contents();
+        equals( j.filter("span").length, 2, "Check node,textnode,comment to filter the 2 spans" );
+        equals( j.filter("[name]").length, 0, "Check node,textnode,comment to filter name attribute" );
+        
+    }, traversingSuite);
+
+    test("filter(Function)", function() {
+        expect(2);
+
+        same( jQuery("div").filter(function() {
+            return ! jQuery("p", this).length
+        }).get(), q("muu"), "filter(Function)" );
+
+        same( jQuery("div").filter(function(i, elem) {
+            return jQuery("p", elem).length
+        }).get(), q("foo", "ltr"), "filter(Function) using arg" );
+        
+    }, traversingSuite);
+
+
+    test("filter(Element)", function() {
+        expect(1);
+
+        var element = document.getElementById("text1");
+        same( jQuery("#form input").filter(element).get(), q("text1"), "filter(Element)" );
+        
+    }, traversingSuite);
+
+    test("filter(Array)", function() {
+        expect(1);
+
+        var elements = [ document.getElementById("text1") ];
+        same( jQuery("#form input").filter(elements).get(), q("text1"), "filter(Array)" );
+        
+    }, traversingSuite);
+
+    test("filter(jQuery)", function() {
+        expect(1);
+
+        var elements = jQuery("#text1");
+        same( jQuery("#form input").filter(elements).get(), q("text1"), "filter(jQuery)" );
+
+    }, traversingSuite);
+
+    test("not(Selector)", function() {
+        expect(7);
+
+        equals( jQuery("div > span").not(".fooBar").length, 3, "not('selector')" );
+
+        same( jQuery("div").not(".huu").get(), q("foo", "ltr"), "not('.class')" );
+
+        //console.log('#ltr, .huu', jQuery('#ltr, .huu').nodes);
+        //console.log(':not(#ltr, .huu)', jQuery(':not(#ltr, .huu)').nodes);
+        
+        //console.log('div:not(#ltr)', jQuery('div:not(#ltr)').nodes);
+        //console.log('div:not(.huu)', jQuery('div:not(.huu)').nodes);
+        //console.log('div:not(#ltr, .huu)', jQuery('div:not(#ltr, .huu)').nodes);
+
+        same( jQuery("div").not("#ltr, .huu").get(), q("foo"), "not('selector, selector')" );
+        
+        //same( jQuery("#form option").not("option.emptyopt:contains('Nothing'),[selected],[value='1']").get(), q("option1c", "option1d", "option2c", "option3d", "option3e" ), "not('complex selector')");
+
+        same( jQuery('#foo *').not('span').get(), q("ltr", "par"), "not('tag selector')" );
+        same( jQuery('#foo *').not('span, #ltr').get(), q("par"), "not('tag, ID selector')" );
+        same( jQuery('#foo *').not('#par, span').get(), q("ltr"), "not('ID, tag selector')");
+        
+    }, traversingSuite);
+
+    test("not(Element)", function() {
+        expect(1);
+
+        var options = jQuery("#form select option");
+        same( options.not( options.get(1) ).get(), q("option1", "option3"), "filter out DOM element");
+
+    }, traversingSuite);
+
+    test("not(Function)", function() {
+
+        same( jQuery("div").not(function() {
+            return jQuery("span.foo2", this).length
+        }).get(), q("ltr", "muu"), "not(Function)" );
+
+    }, traversingSuite);
+
+    test("not(Array)", function() {
+        expect(2);
+
+        equals( jQuery("#foo > span").not( document.getElementById("bar2") ).length, 1, "not(DOMElement)" );
+        var root = document.getRootElement();
+        equals( jQuery("span").not( root.getElementsByTagName("span") ).length, 0, "not(Array-like DOM collection)" );
+
+    }, traversingSuite);
+
+    test("not(jQuery)", function() {
+        expect(1);
+
+        equals( jQuery("span").not(jQuery("#bar, .bar")).length, 3, "not(jQuery)" );
+
+    }, traversingSuite);
+
+    test("has(Element)", function() {
+        expect(2);
+
+        var obj = jQuery("#foo").has( jQuery("#par").get(0) );
+        same( obj.get(), q("foo"), "Keeps elements that have the element as a descendant 1" );
+        obj = jQuery("#foo").has( document.getElementById('ltr') );
+        same( obj.get(), q("foo"), "Keeps elements that have the element as a descendant 2" );
+
+        obj = jQuery("#muu, #foo").has( jQuery("#par").get(0) );
+        same( obj.get(), q("foo"), "Does not include elements that do not have the element as a descendant" );
+    }, traversingSuite);
+
+    test("has(Selector)", function() {
+        expect(3);
+
+        var obj = jQuery("#foo").has("#par");
+        same( obj.get(), q("foo"), "Keeps elements that have any element matching the selector as a descendant" );
+
+        var multipleParent = jQuery("#muu, #ltr, #foo").has("#par");
+        same( multipleParent.get(), q("ltr", "foo"), "Does not include elements that do not have the element as a descendant" );
+
+        var multipleHas = jQuery("#foo").has("#par, #ltr");
+        same( multipleHas.get(), q("foo"), "Only adds elements once" );
+        
+    }, traversingSuite);
+
+    test("has(Arrayish)", function() {
+        expect(3);
+
+        var simple = jQuery("#foo").has( jQuery("#ltr") );
+        same( simple.get(), q("foo"), "Keeps elements that have any element in the jQuery list as a descendant" );
+
+        var multipleParent = jQuery("#foo, #ltr").has( jQuery("#ltr") );
+        same( multipleParent.get(), q("foo"), "Does not include elements that do not have an element in the jQuery list as a descendant 1" );
+
+        multipleParent = jQuery("#foo, #ltr").has( jQuery("#par") );
+        same( multipleParent.get(), q("foo", "ltr"), "Does not include elements that do not have an element in the jQuery list as a descendant 2" );
+
+        var multipleHas = jQuery("#foo").has( jQuery("#par, #ltr") );
+        same( multipleHas.get(), q("foo"), "Only adds elements once" );
+    }, traversingSuite);
+
+//    test("closest()", function() {
+//        expect(9);
+//
+//        same( jQuery("body").closest("body").get(), q("body"), "closest(body)" );
+//        same( jQuery("body").closest("html").get(), q("html"), "closest(html)" );
+//        same( jQuery("body").closest("div").get(), [], "closest(div)" );
+//        same( jQuery("#main").closest("span,#html").get(), q("html"), "closest(span,#html)" );
+//
+//        same( jQuery("div:eq(1)").closest("div:first").get(), [], "closest(div:first)" );
+//        same( jQuery("div").closest("body:first div:last").get(), q("fx-tests"), "closest(body:first div:last)" );
+//
+//        // Test .closest() limited by the context
+//        var jq = jQuery("#nothiddendivchild");
+//        var root = document.getRootElement();
+//        same( jq.closest("html", document.body).get(), [], "Context limited." );
+//        same( jq.closest("body", document.body).get(), [], "Context limited." );
+//        same( jq.closest("#nothiddendiv", document.body).get(), q("nothiddendiv"), "Context not reached." );
+//    }, traversingSuite);
+
+//    test("closest(Array)", function() {
+//        expect(6);
+//        same( jQuery("body").closest(["body"]), [{selector:"body", elem:document.body, level:1}], "closest([body])" );
+//        same( jQuery("body").closest(["html"]), [{selector:"html", elem:document.documentElement, level:2}], "closest([html])" );
+//        same( jQuery("body").closest(["div"]), [], "closest([div])" );
+//        same( jQuery("#main").closest(["span,#html"]), [{selector:"span,#html", elem:document.documentElement, level:4}], "closest([span,#html])" );
+//
+//        same( jQuery("body").closest(["body","html"]), [{selector:"body", elem:document.body, level:1}, {selector:"html", elem:document.documentElement, level:2}], "closest([body, html])" );
+//        same( jQuery("body").closest(["span","html"]), [{selector:"html", elem:document.documentElement, level:2}], "closest([body, html])" );
+//    }, traversingSuite);
+
+    test("children([String])", function() {
+        expect(3);
+
+        same( jQuery("#foo").children().get(), q("span1", "ltr", "bar2"), "Check for children" );
+
+        same( jQuery("#foo").children("span").get(), q("span1", "bar2"), "Check for filtered children 1" );
+        
+        same( jQuery("#foo").children(":has(span)").get(), q("ltr"), "Check for filtered children 2" );
+        same( jQuery("#foo").children("#ltr, #bar2").get(), q("ltr", "bar2"), "Check for multiple filters" );
+
+    }, traversingSuite);
+
+    test("parent([String])", function() {
+        expect(5);
+
+        equals( jQuery("#bar").parent().get(0).getId(), "ltr", "Simple parent check 1" );
+        equals( jQuery("#span1").parent().get(0).getId(), "foo", "Simple parent check 2" );
+
+        equals( jQuery("#par").parent("div").get(0).getId(), "ltr", "Filtered parent check" );
+        equals( jQuery("#par").parent("span").length, 0, "Filtered parent check, no match" );
+        equals( jQuery("#par").parent("div, span").get(0).getId(), "ltr", "Check for multiple filters" );
+
+        var p = jQuery("#bar, #ltr").parent();
+        equals( p.size(), 2, "Check for parent of 2 nodes - returned size" );
+        same( p.get(), q("ltr", "foo"), "Check for parent of 2 nodes" );
+        var p = jQuery("#bar, #par").parent();
+        equals( p.size(), 1, "Check for unique results from parent - returned size" );
+        equals( p.get(0), document.getElementById("ltr"), "Check for unique results from parent" );
+
+    }, traversingSuite);
+
+    test("parents([String])", function() {
+        expect(6);
+
+        equals( jQuery("#bar").parents().get(0).getId(), "ltr", "Simple parents check" );
+        equals( jQuery("#bar").parents(".foo").get(0).getId(), "foo", "Filtered parents check 1" );
+        equals( jQuery("#bar").parents("span").length, 0, "Filtered parents check 2" );
+        // NOTE: does not include the root element :
+        equals( jQuery("#bar").parents("div").length, 2, "Filtered parents check 3" );
+        
+        same( jQuery("#option1").parents("form, div, select").get(), q("select", "form"), "Check for multiple filters" );
+        //var expectParents = q("select", "form", ":root", "ltr", "foo");
+        //same( jQuery("#option1, #par, #bar, #ltr").parents().get(), expectParents, "Check for unique results from parents" );
+
+        equals( jQuery("#option1, #par, #bar, #ltr").parents().size(), 5, "Check for unique results from parents size" );
+        var p = jQuery("#option1, #par, #bar, #ltr").parents().get();
+        equals( p[0], document.getElementById('select'), "Check for unique results from parents 0" );
+        equals( p[1], document.getElementById('form'), "Check for unique results from parents 1" );
+        equals( p[2], document.getRootElement(), "Check for unique results from parents 2" );
+        equals( p[3], document.getElementById('ltr'), "Check for unique results from parents 3" );
+        equals( p[4], document.getElementById('foo'), "Check for unique results from parents 4" );
+        
+    }, traversingSuite);
+
+    test("parentsUntil([String])", function() {
+        //expect(9);
+
+        var parents = jQuery("#bar").parents();
+
+        same( jQuery("#bar").parentsUntil().get(), parents.get(), "parentsUntil with no selector (nextAll)" );
+
+        same( jQuery("#bar").parentsUntil(".xxx").get(), parents.get(), "parentsUntil with invalid selector (nextAll)" );
+        same( jQuery("#bar").parentsUntil(".foo").get(), $('#ltr').get(), "Simple parentsUntil check" );
+        equals( jQuery("#ltr").parentsUntil("#foo").length, 0, "Empty parentsUntil check" );
+
+        same( jQuery("#bar").parentsUntil("#muu, #foo").get(), $('#ltr').get(), "Less simple parentsUntil check" );
+        same( jQuery("#bar").parentsUntil("#foo", "div").get(), $("#ltr").get(), "Filtered parentsUntil check" );
+        equals( jQuery("#bar").parentsUntil("#foo", "span").length, 0, "Filtered parentsUntil check, no match" );
+        //same( jQuery("#groups").parentsUntil("#html", "p,div,dl").get(), parents.slice( 0, 3 ).get(), "Multiple-filtered parentsUntil check" );
+        //same( jQuery("#groups, #ap").parentsUntil("#html", "p,div,dl").get(), parents.slice( 0, 3 ).get(), "Multi-source, multiple-filtered parentsUntil check" );
+        
+    }, traversingSuite);
+
+    test("next([String])", function() {
+        //expect(4);
+        
+        equals( jQuery("#foo").next().get(0).getId(), "muu", "Simple next check" );
+        equals( jQuery("#foo").next("div").get(0).getId(), "muu", "Filtered next check" );
+        equals( jQuery("#foo").next("p").length, 0, "Filtered next check, no match" );
+        equals( jQuery("#foo").next("div, p").get(0).getId(), "muu", "Multiple filters" );
+
+        same( jQuery("#foo, #muu").next().get(), q("muu", "form"), "Multiple next check" );
+
+    }, traversingSuite);
+
+    test("prev([String])", function() {
+        //expect(4);
+
+        equals( jQuery("#form").prev().get(0).getId(), "muu", "Simple prev check" );
+        equals( jQuery("#form").prev("div").get(0).getId(), "muu", "Filtered prev check" );
+        equals( jQuery("#form").prev("p").length, 0, "Filtered prev check, no match" );
+        equals( jQuery("#form").prev("p, div").get(0).getId(), "muu", "Multiple filters" );
+
+        same( jQuery("#muu, #form").prev().get(), q("foo", "muu"), "Multiple prev check" );
+
+    }, traversingSuite);
+
+    test("nextAll([String])", function() {
+        expect(4);
+
+        //var elems = jQuery('#form').children();
+
+        same( jQuery("#text1").nextAll().get(), q('text2', 'radio1', 'radio2', 'check1', 'check2', 'select'),
+            "Simple nextAll check" );
+        same( jQuery("#text1").nextAll('input').get(), q('text2', 'radio1', 'radio2', 'check1', 'check2'),
+            "Filtered nextAll check" );
+        same( jQuery("#text1").nextAll(':radio,select').get(), q('radio1', 'radio2', 'select'),
+            "Multiple-filtered nextAll check" );
+
+        //same( jQuery("#text2, #radio1").nextAll().get(), q('radio1', 'radio2', 'check1', 'check2', 'select'),
+        //    "Multi-source nextAll check" );
+        var n = jQuery("#text2, #radio1").nextAll();
+        equals( n.size(), 5, "Multi-source nextAll check size" );
+        equals( n.get(0), document.getElementById('radio1'), "Multi-source nextAll check size 0" );
+        equals( n.get(1), document.getElementById('radio2'), "Multi-source nextAll check size 1" );
+        equals( n.get(2), document.getElementById('check1'), "Multi-source nextAll check size 2" );
+        equals( n.get(3), document.getElementById('check2'), "Multi-source nextAll check size 3" );
+        equals( n.get(4), document.getElementById('select'), "Multi-source nextAll check size 4" );
+            
+    }, traversingSuite);
+
+    test("prevAll([String])", function() {
+        //expect(4);
+        
+        // NOTE: FB includes it's hidden crap :
+        var p = jQuery("#select").prevAll();
+        //same( p.get(), q('check2', 'check1', 'radio2', 'radio1', 'text2', 'text1'), "Simple prevAll check" );
+        ok( p.length >= 6, "Simple prevAll check" );
+        same( p.get(0), document.getElementById('check2'), "Filtered prevAll check 0" );
+        same( p.get(1), document.getElementById('check1'), "Filtered prevAll check 1" );
+        same( p.get(2), document.getElementById('radio2'), "Filtered prevAll check 2" );
+        same( p.get(3), document.getElementById('radio1'), "Filtered prevAll check 3" );
+        same( p.get(4), document.getElementById('text2'), "Filtered prevAll check 4" );
+        same( p.get(5), document.getElementById('text1'), "Filtered prevAll check 5" );
+
+        same( jQuery("#select").prevAll('input:text').get(), q('text2', 'text1'), "Filtered prevAll check" );
+        same( jQuery("#select").prevAll(':text,:radio').get(), q('radio2', 'radio1', 'text2', 'text1'), "Multiple-filtered prevAll check" );
+
+        // NOTE: FB includes it's hidden crap :
+        var p = jQuery("#check1, #radio1").prevAll('input');
+        //same( p.get(), q('radio2', 'radio1', 'text2', 'text1'), "Multi-source, multiple-filtered prevAll check" );
+        ok( p.length >= 4, "Multi-source, multiple-filtered prevAll check" );
+        same( p.get(0), document.getElementById('radio2'), "Multi-source, multiple-filtered prevAll check 0" );
+        same( p.get(1), document.getElementById('radio1'), "Multi-source, multiple-filtered prevAll check 1" );
+        same( p.get(2), document.getElementById('text2'), "Multi-source, multiple-filtered prevAll check 2" );
+        same( p.get(3), document.getElementById('text1'), "Multi-source, multiple-filtered prevAll check 3" );
+
+    }, traversingSuite);
+
+    test("siblings([String])", function() {
+        //expect(5);
+
+        equals( jQuery("#ltr").siblings().length, 2, "Check for siblings length" );
+        same( jQuery("#ltr").siblings().get(), q("span1", "bar2"), "Check for siblings" );
+        same( jQuery("#ltr").siblings("span.foo2").get(), q("bar2"), "Check for filtered siblings (has anchor child element)" );
+
+        same( jQuery("#text2").siblings(":has(option)").get(), q("select"), "Check for filtered siblings (has code child element)" );
+        same( jQuery("#text2").siblings(":radio, div, select").get(), q("radio1", "radio2", "select"), "Check for multiple filters" );
+
+        equals( jQuery("#foo, #muu").siblings().length, 3, "Check for unique results from siblings length" );
+        //console.log( jQuery("#foo, #muu").siblings().get() );
+        var s = jQuery("#foo, #muu").siblings().get();
+        //same( s, q("foo", "muu", "form"), "Check for unique results from siblings" );
+        Asserts.assertEqual( s[0], document.getElementById('foo'), "Check for unique results from siblings" );
+        
+    }, traversingSuite);
+
+    test("nextUntil([String])", function() {
+        //expect(11);
+
+        //var elems = jQuery('#form').children().slice( 2, 12 );
+
+        //console.log('nextUntil:', jQuery("#text1").nextUntil().get() );
+        same( jQuery("#text1").nextUntil().get(), jQuery("#text1").nextAll().get(),
+            "nextUntil with no selector (nextAll)" );
+        same( jQuery("#text1").nextUntil(".foo").get(), jQuery("#text1").nextAll().get(),
+            "nextUntil with invalid selector (nextAll)" );
+        same( jQuery("#text1").nextUntil("select").get(), q('text2', 'radio1', 'radio2', 'check1', 'check2'),
+            "Simple nextUntil check" );
+
+        equals( jQuery("#text1").nextUntil("#text2").length, 0, "Simple nextUntil check" );
+
+        same( jQuery("#text1").nextUntil("#check1, #radio1").get(), $("#text2").get(),
+            "Less simple nextUntil check" );
+        same( jQuery("#text1").nextUntil("#check2", ":radio").get(), $("#radio1, #radio2").get(),
+            "Filtered nextUntil check" );
+        same( jQuery("#text1").nextUntil("#radio2", "input:check, [type='radio']").get(), q('text2', 'radio1'),
+            "Multiple-filtered nextUntil check" );
+            
+        equals( jQuery("#text1").nextUntil("#radio2", "div").length, 0, "Filtered nextUntil check, no match" );
+
+        //same( jQuery("#text1").nextUntil("[class=foo]").get(), jQuery("#text1").nextAll().get(), "Non-element nodes must be skipped, since they have no attributes" );
+    }, traversingSuite);
+
+    test("prevUntil([String])", function() {
+        //expect(10);
+
+        //var elems = jQuery("#area1").prevAll();
+
+        same( jQuery("#select").prevUntil().get(), jQuery("#select").prevAll().get(),
+            "prevUntil with no selector (prevAll)" );
+        same( jQuery("#select").prevUntil(".foo").get(), jQuery("#select").prevAll().get(),
+            "prevUntil with invalid selector (prevAll)" );
+        same( jQuery("#select").prevUntil("input[type='text']").get(), q('check2', 'check1', 'radio2', 'radio1'),
+            "Simple prevUntil check" );
+        
+        equals( jQuery("#radio2").prevUntil("#radio1").length, 0, "Simple prevUntil check" );
+        
+        same( jQuery("#select").prevUntil("#check1, #radio1").get(), $("#check2").get(),
+            "Less simple prevUntil check" );
+        same( jQuery("#select").prevUntil("#text1", "[type='checkbox']").get(), $("#check2, #check1").get(),
+            "Filtered prevUntil check" );
+        same( jQuery("#select").prevUntil("#text1", ":checked, :radio").get(), q('check2', 'radio2', 'radio1'),
+            "Multiple-filtered prevUntil check" );
+        
+        equals( jQuery("#select").prevUntil("text1", "div").length, 0, "Filtered prevUntil check, no match" );
+
+    }, traversingSuite);
+
+    test("contents()", function() {
+        //expect(12);
+
+        equals( jQuery("#foo").contents().length, 3, "Check element contents length" );
+        equals( jQuery("#foo").contents().get(0), document.getElementById('span1'), "Check element contents 0" );
+        equals( jQuery("#foo").contents().get(1), document.getElementById('ltr'), "Check element contents 1" );
+        equals( jQuery("#foo").contents().get(2), document.getElementById('bar2'), "Check element contents 2" );
+
+        equals( jQuery("#muu, #foo").contents().length, 4, "Check multiple elements contents length" );
+
+        //ok( jQuery("#iframe").contents()[0], "Check existance of IFrame document" );
+        //var ibody = jQuery("#loadediframe").contents()[0].body;
+        //ok( ibody, "Check existance of IFrame body" );
+
+        //equals( jQuery("span", ibody).text(), "span text", "Find span in IFrame and check its text" );
+
+        //jQuery(ibody).append("<div>init text</div>");
+        //equals( jQuery("div", ibody).length, 2, "Check the original div and the new div are in IFrame" );
+
+        //equals( jQuery("div:last", ibody).text(), "init text", "Add text to div in IFrame" );
+
+        //jQuery("div:last", ibody).text("div text");
+        //equals( jQuery("div:last", ibody).text(), "div text", "Add text to div in IFrame" );
+
+        //jQuery("div:last", ibody).remove();
+        //equals( jQuery("div", ibody).length, 1, "Delete the div and check only one div left in IFrame" );
+
+        //equals( jQuery("div", ibody).text(), "span text", "Make sure the correct div is still left after deletion in IFrame" );
+
+        //jQuery("<table/>", ibody).append("<tr><td>cell</td></tr>").appendTo(ibody);
+        //jQuery("table", ibody).remove();
+        //equals( jQuery("div", ibody).length, 1, "Check for JS error on add and delete of a table in IFrame" );
+
+        // using contents will get comments regular, text, and comment nodes
+        //var c = jQuery("#nonnodes").contents().contents();
+        //equals( c.length, 1, "Check node,textnode,comment contents is just one" );
+        //equals( c[0].nodeValue, "hi", "Check node,textnode,comment contents is just the one from span" );
+        
+    }, traversingSuite);
+
+    test("add(String|Element|Array|undefined)", function() {
+        expect(16);
+
+        same( jQuery("#foo").add("#muu").add("#ltr").get(), q("foo", "muu", "ltr"), "Check elements from document 1" );
+        same( jQuery("#muu").add( jQuery("#ltr").get(0) ).add( jQuery("#foo") ).get(), q("muu", "ltr", "foo"), "Check elements from document 2" );
+        ok( jQuery([]).add( jQuery("#form").get(0).getChildNodes() ).length >= 7, "Check elements from array" );
+
+        // For the time being, we're discontinuing support for jQuery(form.elements) since it's ambiguous in IE
+        // use jQuery([]).add(form.elements) instead.
+        //equals( jQuery([]).add(jQuery("#form")[0].elements).length, jQuery(jQuery("#form")[0].elements).length, "Array in constructor must equals array in add()" );
+
+        var divs = jQuery("<div/>").add("#muu");
+        equals( divs.size(), 2, "Added element to disconnected div element 1" );
+        ok( ! divs.get(0).getParentNode(), "Make sure the first element is still the disconnected div. 1" );
+
+        divs = jQuery("<div class='xxxxx'>test</div>").add("#foo");
+        equals( divs.size(), 2, "Added element to disconnected div element 2" );
+        equals( divs.get(0).getClassName(), 'xxxxx', "Make sure the first element is still the disconnected node. 2" );
+
+        divs = jQuery("#muu").add("<div/>");
+        ok( ! divs.get(1).getParentNode(), "Make sure the first element is still the disconnected node. 3" );
+
+        var tmp = jQuery("<div/>");
+
+        var x = jQuery([]).add( jQuery("<p id='x1'>xxx</p>").appendTo(tmp) )
+                          .add( jQuery("<p id='x2'>xxx</p>").appendTo(tmp) );
+        equals( x.get(0).getId(), "x1", "Check on-the-fly element1" );
+        equals( x.get(1).getId(), "x2", "Check on-the-fly element2" );
+
+        var x = jQuery([]).add( jQuery("<p id='y1'>xxx</p>").appendTo(tmp).get(0) )
+                          .add( jQuery("<p id='y2'>xxx</p>").appendTo(tmp).get(0) );
+        equals( x.get(0).getId(), "y1", "Check on-the-fly element1" );
+        equals( x.get(1).getId(), "y2", "Check on-the-fly element2" );
+
+        var x = jQuery([]).add( jQuery("<p id='z1'>xxx</p>") )
+                          .add( jQuery("<p id='z2'>xxx</p>") );
+        equals( x.get(0).getId(), "z1", "Check on-the-fly element1" );
+        equals( x.get(1).getId(), "z2", "Check on-the-fly element2" );
+
+        var x = jQuery([]).add("<p id='t1'>xxx</p>").add("<p id='t2'>xxx</p>");
+        equals( x.get(0).getId(), "t1", "Check on-the-fly element1" );
+        equals( x.get(1).getId(), "t2", "Check on-the-fly element2" );
+
+        var notDefined;
+        equals( jQuery([]).add(notDefined).length, 0, "Check that undefined adds nothing" );
+
+        // @todo not yet implemented !
+        //ok( jQuery([]).add( document.getElementById('form') ).length >= 7, "Add a form (adds the elements)" );
+        
+    }, traversingSuite);
+
+    test("add(String, Context)", function() {
+        expect(6);
+
+        var root = document.getRootElement();
+        //equals( jQuery(document).add("#form").length, 2, "Make sure that using regular context document still works." );
+        equals( jQuery(root).add("#form").length, 2, "Using a body context." );
+        equals( jQuery(root).add(root).length, 1, "Using a body context." );
+
+        //equals( jQuery(document).add("#form", document).length, 2, "Use a passed in document context." );
+        equals( jQuery(root).add("#form", root).length, 2, "Use a passed in body context." );
+        //equals( jQuery(document).add("#html", document.body).length, 1, "Use a passed in body context." );
+        
+    }, traversingSuite);
+
+    test("andSelf()", function() {
+        expect(4);
+
+        same( jQuery("#ltr").siblings().andSelf().get(), q("span1", "bar2", "ltr"), "Check for siblings and self" );
+        same( jQuery("#foo").children().andSelf().get(), q("span1", "ltr", "bar2", "foo"), "Check for children and self" );
+
+        same( jQuery("#foo, #ltr").parent().andSelf().get(), q(":root", "foo", "ltr"), "Check for parent and self" );
+        same( jQuery("#option1").parents("form, div").andSelf().get(), q("form", "option1"), "Check for parents and self" );
+
+    }, traversingSuite);
+
+</script>
