@@ -1,0 +1,35 @@
+This is a RingoJS application. To run it launch ringo with the main script:
+
+    cd fbjqry/test;
+    ringo main.js [CANVAS_CALLBACK_URL]
+
+Then point your browser to this url to verify the server works:
+
+    http://localhost:8080/
+
+The returned content is FBML and is meaningless in a "normal" browser, You
+need the FBML interpreter to process the returned markup content.
+Setup a facebook application with the callback url pointing to the server :
+
+    http://[YOUR_PUBLIC_IP]:8080/
+
+If You don't have a public ip address, You might use ssh to tunnel Your traffic
+to a host with public ip. There are sites providing ssh tunneling as a service
+such as http://tunnlr.com/. Sample ssh tunnel setup with tunnlr.com :
+
+    ssh -v -nNT4 -R *:[TUNNLR_PORT]:localhost:8080 [TUNNLR_USER]@ssh1.tunnlr.com
+
+Restart the server with the correct canvas callback url for development e.g. :
+
+    ringo main.js http://web1.tunnlr.com:11164
+
+Now verify Your facebook application works by going to :
+
+    http://apps.facebook.com/[CANVAS_PATH]/
+
+By default all test suites will run, if You want to limit to a particular suite
+(useful during development) use the run parameter e.g. :
+
+    http://apps.facebook.com/[CANVAS_PATH]/?run=traversingSuite
+
+This assumes a <code>traversingSuite</code> exists and is a valid test suite.
