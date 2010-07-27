@@ -12,8 +12,8 @@ FBjqRY.find = (function() {
         classCheck = /^\.([\w\-]+)/,
         tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*|~|\|)?=?["|']?([^\]]+?)?["|']?\]/,
-        pseudoCheckParen = /^:((:?\w|\-)+)\("?'?([^\)]+)'?"?\)/,
-        pseudoCheck = /^:((:?\w|\-)+)/;
+        pseudoCheckParen = /^:([\w\-]+)\("?'?([^\)]+)'?"?\)/,
+        pseudoCheck = /^:([\w\-]+)/;
 
     // Elements can be considered hidden for several reasons :
     // * They have a CSS display value of none.
@@ -171,6 +171,7 @@ FBjqRY.find = (function() {
             case "visible":
                 retNodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
             case "has":
+                //console.log('has', innerVal, nodes);
                 retNodes = FBjqRY.grep(nodes, function(node) {
                     var matches = FBjqRY.find(innerVal, node);
                     return matches.length > 0;
@@ -178,10 +179,7 @@ FBjqRY.find = (function() {
                 break;
             case "not":
                 retNodes = FBjqRY.grep(nodes, function(node) {
-                    //console.log('not1', innerVal, node);
                     var notMatches = FBjqRY.find(innerVal, false, [ node ]);
-                    //console.log('not2', innerVal, notMatches);
-
                     // if smt is matched return false :
                     return notMatches.length === 0;
                 });
@@ -210,7 +208,6 @@ FBjqRY.find = (function() {
                 break;
             case "last-child":
                 retNodes = [];
-                //console.log(' nodes:', nodes);
                 FBjqRY.each(nodes, function() {
                     //var child = this.getLastChild();
                     //if ( child ) retNodes.push( child );
@@ -220,7 +217,6 @@ FBjqRY.find = (function() {
                         if ( child ) retNodes.push( child );
                     }
                 });
-                //console.log(' retNodes:', retNodes);
                 break;
             case "only-child":
                 retNodes = FBjqRY.grep(nodes, function(node) {

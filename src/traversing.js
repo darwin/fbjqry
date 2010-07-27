@@ -37,9 +37,11 @@ FBjqRY.fn.extend({
 	has: function( selector ) {
 		var matches = FBjqRY( selector ).nodes;
 		return this.filter( function() {
+            var self = this;
 			for ( var i = 0, len = matches.length; i < len; i++ ) {
-				if ( FBjqRY.contains( this, matches[i] ) ) return true;
+				if ( FBjqRY.contains( self, matches[i] ) ) return true;
 			}
+            return false;
 		});
 	},
 
@@ -47,9 +49,6 @@ FBjqRY.fn.extend({
         var nodes;
         if ( typeof(selector) === "string" ) {
             nodes = FBjqRY.filter( selector, this.nodes );
-            //fn = function() {
-            //    return FBjqRY.find( selector, null, [ this ] ).length > 0;
-            //};
         }
         else {
             selector = selector2Function(selector);
@@ -179,16 +178,33 @@ FBjqRY.fn.extend({
     },
 
     siblings: function(selector) {
-        //return this.prevAll(selector).concat(this.nextAll(selector));
         var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', true );
         siblings = siblings.concat( collectSiblings( this.nodes, selector, 'getNextSibling', true ) );
         return this.pushStack( siblings, "siblings", selector || '' );
     },
     children: function(selector) {
-        return this.pushStack( collectChildren(this.nodes, selector), "children", selector || '' );
+        var children = [], len = this.length;
+        for ( var i = 0, nodes = this.nodes; i < len; i++ ) {
+            var child = nodes[i].getFirstChild();
+            while ( child ) {
+                ( child.getNodeType() === 1 ) && children.push( child );
+                child = child.getNextSibling();
+            }
+        }
+
+        if ( selector ) children = FBjqRY.filter( selector, children );
+
+        children = len === 1 ? children : FBjqRY.unique(children);
+        return this.pushStack( children, "children", selector || '' );
     },
     contents: function() { // same as children()
-        return this.pushStack( collectChildren(this.nodes), "contents", '' );
+        var children = [], len = this.length;
+        for ( var i = 0, nodes = this.nodes; i < len; i++ ) {
+            children = children.concat( nodes[i].getChildNodes() );
+        }
+        
+        children = len === 1 ? children : FBjqRY.unique(children);
+        return this.pushStack( children, "contents", '' );
     }
 
 });
@@ -202,6 +218,7 @@ var collectSiblings = function(nodes, selector, getSiblings, until) {
         var sibling = nodes[i][ getSiblings ](); // nodes[0].getNextSibling()
         
         while ( sibling ) {
+
             nodeArray[0] = sibling;
 
             if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
@@ -209,7 +226,7 @@ var collectSiblings = function(nodes, selector, getSiblings, until) {
             }
 
             if ( ! selector || matchesNodes(selector, nodeArray) ) {
-                siblings.push(sibling);
+                ( sibling.getNodeType() === 1 ) && siblings.push( sibling );
             }
             
             sibling = recurse ? sibling[ getSiblings ]() : null;
@@ -227,9 +244,9 @@ var collectParents = function(nodes, selector, until) {
     var rootElement = document.getRootElement();
 
     for ( var i = 0; i < len; i++ ) {
-        var node = nodes[i].getParentNode();
-        while ( node ) {
-            nodeArray[0] = node;
+        var parent = nodes[i].getParentNode();
+        while ( parent ) {
+            nodeArray[0] = parent;
 
             if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
                 break;
@@ -237,31 +254,20 @@ var collectParents = function(nodes, selector, until) {
 
             if ( selector ) {
                 // do not add the root element - might get confusing :
-                if ( sameNode(rootElement, node) ) break;
+                if ( sameNode(rootElement, parent) ) break;
 
-                if ( matchesNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
-                    parents.push(node);
+                if ( matchesNodes(selector, nodeArray) ) {
+                    ( parent.getNodeType() === 1 ) && parents.push( parent );
                 }
             }
             else { 
                 // @todo currently we're adding root here - seems to make sense ?!
-                parents.push(node);
+                ( parent.getNodeType() === 1 ) && parents.push(parent);
             }
-            node = recurse ? node.getParentNode() : null;
+            parent = recurse ? parent.getParentNode() : null;
         }
     }
     return FBjqRY.unique(parents);
-}
-
-var collectChildren = function(nodes, selector) {
-    var children = [];
-    for ( var i = 0, len = nodes.length; i < len; i++ ) {
-        children = children.concat( nodes[i].getChildNodes() );
-    }
-
-    children = FBjqRY.unique(children);
-    if ( selector ) children = FBjqRY.filter( selector, children );
-    return children;
 }
 
 var selector2Function = function(selector) {
