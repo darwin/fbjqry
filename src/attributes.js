@@ -263,10 +263,10 @@ FBjqRY.extend({
 
 	attr: function( elem, name, value, pass ) {
 		// don't set attributes on text and comment nodes
-		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return undefined;
-		//}
-
+		if ( ! elem || elem.getNodeType() === 3 || elem.getNodeType() === 8 ) {
+			return undefined;
+		}
+        
 		if ( pass && FBjqRY.attrFn[name] ) {
 			return FBjqRY(elem)[name](value);
 		}

@@ -94,9 +94,9 @@ FBjqRY.extend({
 		}
 
 		// don't set styles on text and comment nodes
-		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return undefined;
-		//}
+		if ( ! elem || elem.getNodeType() === 3 || elem.getNodeType() === 8 ) {
+			return undefined;
+		}
 
 		var set = value !== undefined; //, style = elem.style || elem;
 

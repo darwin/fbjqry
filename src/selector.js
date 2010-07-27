@@ -12,8 +12,8 @@ FBjqRY.find = (function() {
         classCheck = /^\.([\w\-]+)/,
         tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*|~|\|)?=?["|']?([^\]]+?)?["|']?\]/,
-        pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
-        pseudoCheck = /^:(\w+)/;
+        pseudoCheckParen = /^:((:?\w|\-)+)\("?'?([^\)]+)'?"?\)/,
+        pseudoCheck = /^:((:?\w|\-)+)/;
 
     // Elements can be considered hidden for several reasons :
     // * They have a CSS display value of none.
@@ -34,8 +34,8 @@ FBjqRY.find = (function() {
     };
     var _isInputType = function(node, type) {
         if ( node.getTagName().toLowerCase() !== 'input' ) return false;
-        var nodeType = node.getType();
-        return nodeType && nodeType.toLowerCase() === type;
+        var theType = node.getType();
+        return theType && theType.toLowerCase() === type;
     };
 
     function filterNodes(nodes, fn, recurse) {
@@ -140,6 +140,7 @@ FBjqRY.find = (function() {
     function selectByPseudo(nodes, pseudo, innerVal, sel, recurse) {
         //if ( nodes.length === 0 ) {
         if ( nodes == null ) {
+            if ( pseudo === 'root' ) return [ document.getRootElement() ];
             nodes = document.getRootElement().getElementsByTagName('*');
         }
 
@@ -187,25 +188,39 @@ FBjqRY.find = (function() {
                 break;
             case "nth-child":
                 retNodes = [];
-                FBjqRY.each(nodes, function(node) {
-                    var childs = node.getChildNodes();
-                    if ( childs && childs[innerValInt] ) retNodes.push( childs[innerValInt] );
+                FBjqRY.each(nodes, function() {
+                    //var childs = this.getChildNodes(), child;
+                    //if ( childs && (child = childs[innerValInt]) ) retNodes.push( child );
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var childs = parent.getChildNodes(), child;
+                        if ( childs && (child = childs[innerValInt]) ) retNodes.push( child );
+                    }
                 });
                 break;
             case "first-child":
                 retNodes = [];
-                FBjqRY.each(nodes, function(node) {
-                    var childs = node.getChildNodes();
-                    if ( childs && childs[0] ) retNodes.push( childs[0] );
+                FBjqRY.each(nodes, function() {
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var child = parent.getFirstChild();
+                        if ( child ) retNodes.push( child );
+                    }
                 });
                 break;
             case "last-child":
                 retNodes = [];
-                FBjqRY.each(nodes, function(node) {
-                    var childs = node.getChildNodes();
-                    var length = childs && childs.length;
-                    if ( length ) retNodes.push( childs[length - 1] );
+                //console.log(' nodes:', nodes);
+                FBjqRY.each(nodes, function() {
+                    //var child = this.getLastChild();
+                    //if ( child ) retNodes.push( child );
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var child = parent.getLastChild();
+                        if ( child ) retNodes.push( child );
+                    }
                 });
+                //console.log(' retNodes:', retNodes);
                 break;
             case "only-child":
                 retNodes = FBjqRY.grep(nodes, function(node) {
@@ -287,6 +302,11 @@ FBjqRY.find = (function() {
                     return tagName.length === 2 && tagName.charAt(0) === 'h';
                 });
                 break;
+            case "root": // returns the root element
+                var rootNode = document.getRootElement();
+                var sameNode = FBjqRY.fbjs.sameNode;
+                retNodes = FBjqRY.grep(nodes, function(node) { return sameNode(rootNode, node); });
+                break;
         }
         return retNodes;
     }
@@ -337,7 +357,8 @@ FBjqRY.find = (function() {
             recurse = ! filter; //true;
             while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
-                    recurse = (sel.charAt(0) === ' ');
+                    var char0 = sel.charAt(0);
+                    recurse = (char0 === ' ' || char0 === '>' || char0 === '~' || char0 === '+');
                     if ( recurse ) {
                         sel = trim( sel );
                         var nextNodes = [], j, sibling;
