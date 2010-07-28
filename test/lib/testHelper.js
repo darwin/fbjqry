@@ -77,23 +77,19 @@ var removeAllElements = function() {
         if (consoleLog) consoleLog( arguments[0] );
     };
 
-    var suiteResults = {}, currentSuite = null;
+    var suiteResults = {}, currentResults = null;
     
     jsUnity.startSuite = function(name) {
-        currentSuite = suiteResults[name] = [];
+        currentResults = suiteResults[name] = [];
     };
     jsUnity.doneSuite = function(name) {
-        currentSuite = null;
+        currentResults = null;
     };
 
-    // extension used by qUnit test emulation :
-    jsUnity.currentSuite = function() {
-        return currentSuite;
-    };
-    var incrementAssertionCount = function() {
-       var count = currentSuite.assertionCount || 0;
-       currentSuite.assertionCount = ++count;
-    };
+    //var incrementAssertionCount = function() {
+    //   var count = currentSuite.assertionCount || 0;
+    //   currentSuite.assertionCount = ++count;
+    //};
 
     jsUnity.done = function () {
         var content = '<div class="testResults">';
@@ -131,7 +127,7 @@ var removeAllElements = function() {
         result.call(this, passed, name, e);
         if ( e ) console.log(name, e);
         // keep the test result for the "green - red" test bar :
-        currentSuite.push({name: name, passed: passed, e: e});
+        currentResults.push({name: name, passed: passed, e: e});
         // count the assetrions in a given suite :
         //incrementAssertionCount();
     };
@@ -154,10 +150,37 @@ function test(name, fn, suite) {
     suite['testQUnit_' + name + ''] = fn;
 }
 function expect(count) { // @todo not used !
-    jsUnity.currentSuite().count = count;
+    currentSuite.count = count;
 }
+
+var currentSuite = null;
+(function() {
+
+    function findSuiteByName(name) {
+        var suites = allTestSuites();
+        for ( var i = 0; i < suites.length; i++ ) {
+            if ( suites[i].suiteName === name ) return suites[i];
+        }
+        return null;
+    }
+
+    var startSuite = jsUnity.startSuite;
+    jsUnity.startSuite = function(name) {
+        if ( startSuite ) startSuite(name);
+        
+        currentSuite = findSuiteByName(name);
+    };
+
+    var doneSuite = jsUnity.doneSuite;
+    jsUnity.doneSuite = function(name) {
+        if ( doneSuite ) doneSuite(name);
+
+        currentSuite = null;
+    };
+
+})();
+
 function reset() {
-    var currentSuite = jsUnity.currentSuite();
     if (currentSuite.tearDown) currentSuite.tearDown();
     if (currentSuite.setUp) currentSuite.setUp();
 }

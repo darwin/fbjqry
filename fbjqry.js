@@ -30,7 +30,7 @@ var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
 var trimLeft = /^\s+/;
 var trimRight = /\s+$/;
 // Match a standalone tag
-//var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
+var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
 // Keep a UserAgent string for use with jQuery.browser
 //userAgent = navigator.userAgent,
 // For matching the engine and version of the browser
@@ -66,8 +66,9 @@ FBjqRY.fn = FBjqRY.prototype = {
         //Are we dealing with an FBjqRY object?
         else if ( selector.jquery ) {
             var nodes = selector.get();
-            this.nodes = nodes.length ? nodes : [ nodes ];
-            this.length = nodes.length;
+            var length = nodes.length;
+            this.nodes = typeof(length) === 'number' ? nodes : [ nodes ];
+            this.length = length;
             this.selector = selector.selector;
             this.context = selector.context;
             return this;
@@ -81,9 +82,22 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
         else if ( typeof(selector) !== 'undefined' ) {
             var match = quickExpr.exec(selector);
-            if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
+            if ( match && ( match[1] || ! context ) ) { // verify a match, and that no context was specified for #id
                 if ( match[1] ) { // HANDLE: $(html) -> $(array)
-                    this.nodes = nodesFromXHTML( match[1] ); // helper from manipulation.js
+                    var html = match[1];
+                    // If a single string is passed in and it's a single tag
+                    // just do a createElement and skip the rest
+                    if ( ( match = rsingleTag.exec( html ) ) ) {
+                        // FBJS fails on some elements but does not throw an error
+                        // e.g. for 'button' : "button is not an allowed DOM element"
+                        // and returns undefined !
+                        var el = document.createElement( match[1] );
+                        if ( !el ) return FBjqRY.error("init() failed to createElement('" + match[1] + "')");
+                        this.nodes = [ el ];
+                    }
+                    else {
+                        this.nodes = FBjqRY.clean( [ html ] );
+                    }
                 }
                 else { // HANDLE: $("#id")
                     this.nodes = [];
@@ -92,6 +106,7 @@ FBjqRY.fn = FBjqRY.prototype = {
                 }
             }
             else {
+                // handle $(document).ready :
                 //context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
                 // HANDLE: $(expr, [context]) -- which is just equivalent to: $(context).find(expr)
                 this.nodes = FBjqRY.find( selector, context, null ); // find setup in selector.js
@@ -108,7 +123,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "0.4.0", //"@VERSION",
+	jquery: "0.5.0", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
@@ -143,7 +158,8 @@ FBjqRY.fn = FBjqRY.prototype = {
         ret.context = this.context;
 
         if ( name === "find" ) {
-            ret.selector = this.selector + (this.selector ? " " : "") + selector;
+            var thisSelector = this.selector;
+            ret.selector = thisSelector + (thisSelector ? " " : "") + selector;
         }
         else if ( name ) {
             ret.selector = this.selector + "." + name + "(" + selector + ")";
@@ -188,11 +204,15 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     end: function() { // @todo || jQuery(null); ?
         return this.prevObject || FBjqRY( [] );
-    }
+    },
 
 	// For internal use only.
 	// Behaves like an Array's method, not like a jQuery method.
-	//push: push,
+	push: function() {
+        var nodes = this.nodes;
+        nodes.push.apply(nodes, arguments);
+        this.length = nodes.length;
+    }
 	//sort: [].sort,
 	//splice: [].splice
 };
@@ -228,7 +248,7 @@ FBjqRY.fbjs = { // NOTE: needs to be defined before extend is first used !
         var getNodeId = FBjqRY.fbjs.getNodeId;
         // __instance is a unique identifier for FBDOM nodes
         //return node1.__instance == node2.__instance;
-        return getNodeId(node1) === getNodeId(node2);
+        return getNodeId(node1) === getNodeId(node2, true);
     }
 };
 
@@ -509,12 +529,13 @@ FBjqRY.extend({
 	makeArray: function( array, results ) {
 		var ret = results || [];
 
-		if( array != null ) {
+		if ( array != null ) {
 			var i = array.length;
 			// The window, strings (and functions) also have 'length'
-			if( i == null || FBjqRY.isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
+			if ( i == null || FBjqRY.isString(array) || FBjqRY.isFunction(array) || array.setInterval ) {
 				ret[0] = array;
-            } else {
+            }
+            else {
                 if ( array.jquery ) array = array.nodes;
                 FBjqRY.merge( ret, array ); // while ( i ) ret[--i] = array[i];
             }
@@ -534,8 +555,10 @@ FBjqRY.extend({
             else cmpFn = function(v) { return (elem === v); };
         }
 
+        array = array.jquery ? array.nodes : array;
+        
         for (var i = 0, len = array.length; i < len; i++) {
-            if ( cmpFn(array[i]) ) return i;
+            if ( cmpFn( array[i] ) ) return i;
         }
         return -1;
     },
@@ -772,7 +795,7 @@ FBjqRY.log = FBjqRY.noop; // a tracing helper
 
 	FBjqRY.support = {
 		// IE strips leading whitespace when .innerHTML is used
-		leadingWhitespace: false, //div.getFirstChild().nodeType === 3,
+		leadingWhitespace: div.getFirstChild().getNodeType() === 3,
 
 		// Make sure that tbody elements aren't automatically inserted
 		// IE will insert them into empty tables
@@ -1051,12 +1074,7 @@ FBjqRY.extend({
 
 	// The following elements throw uncatchable exceptions if you
 	// attempt to add expando properties to them.
-    /*
-	noData: {
-		"embed": true,
-		"object": true,
-		"applet": true
-	}, */
+	noData: { "embed": true, "object": true, "applet": true },
 
     data: function( elem, name, data ) {
 //        var id = getFBNodeId(elem, true), cache = FBjqRY.cache, thisCache;
@@ -1388,9 +1406,8 @@ FBjqRY.fn.extend({
             }
             return this;
         }
-
-        node = this.nodes[0];
-        if ( node ) {
+        
+        if ( ( node = this.nodes[0] ) ) {
             var nodeName = node.getTagName().toUpperCase();
             // NOTE: can't read text from FB nodes !
             //if ( nodeName === 'OPTION' ) {
@@ -1405,18 +1422,17 @@ FBjqRY.fn.extend({
                 // Nothing was selected
                 if ( index < 0 ) return null;
 
-                values = [];
                 // Loop through all the selected options
                 for ( i = one ? index : 0, max = one ? index + 1 : options.length; i < max; i++ ) {
                     var option = options[ i ];
+                    //console.log('val() select i', option, option.getSelected());
                     if ( option.getSelected() ) {
                         // We don't need an array for one selects
-                        if ( one ) {
-                            value = option.getValue();
-                            break;
-                        }
+                        value = option.getValue();
+                        if ( one ) break;
                         // Multi-Selects return an array
-                        values.push( option.getValue() );
+                        if ( ! values ) values = [];
+                        values.push( value );
                     }
                 }
                 if ( ! one ) return values;
@@ -1492,10 +1508,10 @@ FBjqRY.extend({
 
 	attr: function( elem, name, value, pass ) {
 		// don't set attributes on text and comment nodes
-		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return undefined;
-		//}
-
+		if ( ! elem || elem.getNodeType() === 3 || elem.getNodeType() === 8 ) {
+			return undefined;
+		}
+        
 		if ( pass && FBjqRY.attrFn[name] ) {
 			return FBjqRY(elem)[name](value);
 		}
@@ -1696,9 +1712,9 @@ FBjqRY.extend({
 		}
 
 		// don't set styles on text and comment nodes
-		//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return undefined;
-		//}
+		if ( ! elem || elem.getNodeType() === 3 || elem.getNodeType() === 8 ) {
+			return undefined;
+		}
 
 		var set = value !== undefined; //, style = elem.style || elem;
 
@@ -1883,8 +1899,8 @@ FBjqRY.find = (function() {
         classCheck = /^\.([\w\-]+)/,
         tagCheck = /^([A-Za-z_\*]{1}\w*)/,
         attributeCheck = /^\[(\w+)(!|\^|\$|\*|~|\|)?=?["|']?([^\]]+?)?["|']?\]/,
-        pseudoCheckParen = /^:(\w+)\("?'?([^\)]+)'?"?\)/,
-        pseudoCheck = /^:(\w+)/;
+        pseudoCheckParen = /^:([\w\-]+)\("?'?([^\)]+)'?"?\)/,
+        pseudoCheck = /^:([\w\-]+)/;
 
     // Elements can be considered hidden for several reasons :
     // * They have a CSS display value of none.
@@ -1905,8 +1921,8 @@ FBjqRY.find = (function() {
     };
     var _isInputType = function(node, type) {
         if ( node.getTagName().toLowerCase() !== 'input' ) return false;
-        var nodeType = node.getType();
-        return nodeType && nodeType.toLowerCase() === type;
+        var theType = node.getType();
+        return theType && theType.toLowerCase() === type;
     };
 
     function filterNodes(nodes, fn, recurse) {
@@ -1942,43 +1958,45 @@ FBjqRY.find = (function() {
 
     function selectByClass(nodes, cssClass, sel, recurse) {
         //if ( nodes.length === 0 ) {
-        if ( nodes == null ) {
-            nodes = [ document.getRootElement() ];
-        }
+        if ( nodes == null ) nodes = [ document.getRootElement() ];
+        
         return filterNodes( nodes,
             function() { return this.hasClassName(cssClass); },
             recurse
         );
     }
 
-    function selectByTag(nodes, tag, sel, recurse) {
+    function selectByTag(nodes, tagName, sel, recurse) {
         //if ( nodes.length === 0 ) {
         if ( nodes == null ) {
-            nodes = document.getRootElement().getElementsByTagName(tag);
+            return document.getRootElement().getElementsByTagName(tagName);
         }
-        else { // @todo optimize !
-//            if ( hierarchy === true ) { // optimization for the "most" case :
-//                var tagNodes = [];
-//                //console.log('selectByTag() nodes: ', nodes);
-//                for (var i = 0, len = nodes.length; i < len; i++) {
-//                    tagNodes = tagNodes.concat( nodes[i].getElementsByTagName(tag) );
-//                }
-//                //console.log('selectByTag() len: ', tagNodes.length);
-//                nodes = tagNodes;
-//            }
-//            else {
-                tag = tag.toUpperCase();
-                nodes = filterNodes( nodes,
-                    function() { return tag === '*' || this.getTagName() == tag; },
+        else { // @todo optimize :
+            tagName = tagName.toUpperCase();
+            /*
+            if ( recurse ) { // optimization for a "common" case :
+                var tagNodes1 = [], tagNodes2 = [];
+                for ( var i = 0, len = nodes.length; i < len; i++ ) {
+                    var node = nodes[i];
+                    if ( node.getTagName() === tagName || tagName === '*' ) {
+                        tagNodes1.push( node );
+                    }
+                    tagNodes2 = tagNodes2.concat( node.getElementsByTagName(tagName) );
+                }
+                nodes = tagNodes1.concat( tagNodes2 );
+            } */
+            //else {
+                //if ( tagName === '*' ) return nodes; // ok cause recurse == false
+                var allTags = tagName === '*';
+                return filterNodes( nodes,
+                    function() { return tagName === this.getTagName() || allTags; },
                     recurse
                 );
-//            }
+            //}
         }
-        return nodes;
     }
 
     function selectByAttribute(nodes, name, type, value, sel, recurse) {
-        //console.log('selectByAttribute() name, type, value, recurse: ', name, type, value, recurse);
         if ( nodes == null ) {
             nodes = [ document.getRootElement() ];
         }
@@ -2004,6 +2022,176 @@ FBjqRY.find = (function() {
             },
             recurse
         );
+    }
+
+    function selectByPseudo(nodes, pseudo, innerVal, sel, recurse) {
+        //if ( nodes.length === 0 ) {
+        if ( nodes == null ) {
+            if ( pseudo === 'root' ) return [ document.getRootElement() ];
+            nodes = document.getRootElement().getElementsByTagName('*');
+        }
+
+        var innerValInt = innerVal ? parseInt(innerVal, 10) : null;
+        var retNodes;
+        
+        switch ( pseudo ) {
+            case "first":
+                retNodes = [ nodes[0] ]; break;
+            case "last":
+                retNodes = [ nodes[nodes.length - 1] ]; break;
+            case "eq":
+                retNodes = [ nodes[innerValInt] ]; break;
+            case "lt":
+                retNodes = nodes.splice(0, innerValInt); break;
+            case "gt":
+                retNodes = nodes.splice(innerValInt + 1, (nodes.length - innerValInt)); break;
+            case "even":
+                retNodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
+            case "odd":
+                retNodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
+            case "contains":
+                retNodes = null;
+                return FBjqRY.error("find() :contains pseudo selector not supported");
+                break;
+            case "hidden":
+                retNodes = FBjqRY.grep(nodes, _isHidden); break;
+            case "visible":
+                retNodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
+            case "has":
+                //console.log('has', innerVal, nodes);
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var matches = FBjqRY.find(innerVal, node);
+                    return matches.length > 0;
+                });
+                break;
+            case "not":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var notMatches = FBjqRY.find(innerVal, false, [ node ]);
+                    // if smt is matched return false :
+                    return notMatches.length === 0;
+                });
+                break;
+            case "nth-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function() {
+                    //var childs = this.getChildNodes(), child;
+                    //if ( childs && (child = childs[innerValInt]) ) retNodes.push( child );
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var childs = parent.getChildNodes(), child;
+                        if ( childs && (child = childs[innerValInt]) ) retNodes.push( child );
+                    }
+                });
+                break;
+            case "first-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function() {
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var child = parent.getFirstChild();
+                        if ( child ) retNodes.push( child );
+                    }
+                });
+                break;
+            case "last-child":
+                retNodes = [];
+                FBjqRY.each(nodes, function() {
+                    //var child = this.getLastChild();
+                    //if ( child ) retNodes.push( child );
+                    var parent = this.getParentNode();
+                    if ( parent ) {
+                        var child = parent.getLastChild();
+                        if ( child ) retNodes.push( child );
+                    }
+                });
+                break;
+            case "only-child":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var parentChilds = node.getParentNode().getChildNodes();
+                    return parentChilds.length === 1;
+                });
+                break;
+            case "parent": // all elements that are the parent of another element :
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var childNodes = node.getChildNodes();
+                    return childNodes && childNodes.length > 0;
+                });
+                break;
+            case "empty": // all elements that have no children :
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var childNodes = node.getChildNodes();
+                    return ! childNodes || childNodes.length === 0;
+                });
+                break;
+            case "disabled":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var disabled = node.getDisabled();
+                    return !! disabled; // @todo disabled === 'disabled'
+                });
+                break;
+            case "enabled":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var disabled = node.getDisabled();
+                    return ! disabled;
+                });
+                break;
+            case "selected":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var selected = node.getSelected();
+                    return !! selected; // @todo selected === 'selected'
+                });
+                break;
+            case "checked":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var checked = node.getChecked();
+                    return !! checked; // @todo checked === 'checked'
+                });
+                break;
+            case "input": // all input, textarea, select and button elements
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var tagName = node.getTagName().toLowerCase();
+                    return tagName === 'input' || tagName === 'textarea'
+                        || tagName === 'select' || tagName === 'button';
+                });
+                break;
+            case "text":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
+                break;
+            case "password":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
+                break;
+            case "radio":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
+                break;
+            case "file":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
+                break;
+            case "image": // all image inputs
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
+                break;
+            case "reset":
+                retNodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
+                break;
+            case "submit":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var type = node.getType(), tagName = node.getTagName().toLowerCase();
+                    return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
+                           (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
+                });
+                break;
+            case "header":
+                retNodes = FBjqRY.grep(nodes, function(node) {
+                    var tagName = node.getTagName().toLowerCase();
+                    return tagName.length === 2 && tagName.charAt(0) === 'h';
+                });
+                break;
+            case "root": // returns the root element
+                var rootNode = document.getRootElement();
+                var sameNode = FBjqRY.fbjs.sameNode;
+                retNodes = FBjqRY.grep(nodes, function(node) { return sameNode(rootNode, node); });
+                break;
+        }
+        return retNodes;
     }
 
     return function(sel, context, nodes) { // the find function
@@ -2033,32 +2221,40 @@ FBjqRY.find = (function() {
                 return FBjqRY.error("find() invalid context: " + context);
             }
         }
+        else {
+            var filter = context === false; // special case to handle filter-ing
+        }
 
-        var recurse, match,
-            prevSel, selectors = sel.split(","),
+        var recurse, match, prevSel,
+            selectors = sel.split( /([^,]*\(.*?\))|,/ ),
+            //selectors = sel.split(","),
             allNodes = [], origNodes = nodes;
 
         var trim = FBjqRY.trim;
         for ( i = 0, len = selectors.length; i < len; i++ ) {
-            sel = trim(selectors[i]);
+            
+            if ( ! selectors[i] ) continue;
+
+            sel = trim( selectors[i] );
             prevSel = "";
-            recurse = true;
+            recurse = ! filter; //true;
             while ( sel && sel !== prevSel ) {
                 if ( prevSel ) {
-                    recurse = (sel.charAt(0) === ' ');
+                    var char0 = sel.charAt(0);
+                    recurse = (char0 === ' ' || char0 === '>' || char0 === '~' || char0 === '+');
                     if ( recurse ) {
-                        sel = trim(sel);
+                        sel = trim( sel );
                         var nextNodes = [], j, sibling;
                         switch ( sel.charAt(0) ) { // handling selector "hierarchy" :
                             case '>':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     nextNodes = nextNodes.concat( nodes[j].getChildNodes() );
                                 }
                                 recurse = false; // only 1st level childs
                                 break;
                             case '~':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     while ( sibling ) {
@@ -2069,7 +2265,7 @@ FBjqRY.find = (function() {
                                 recurse = false;
                                 break;
                             case '+':
-                                sel = trim(sel.substr(1)); // ltrim
+                                sel = trim( sel.substr(1) ); // ltrim
                                 for ( j = 0; j < nodes.length; j++ ) {
                                     sibling = nodes[j].getNextSibling();
                                     if ( sibling ) {
@@ -2090,30 +2286,26 @@ FBjqRY.find = (function() {
                 prevSel = sel;
 
                 //We should start with one of these first 3 cases (id, tag, class)
-                match = idCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = idCheck.exec(sel) ) ) {
                     nodes = selectById(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
-                match = classCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = classCheck.exec(sel) ) ) {
                     nodes = selectByClass(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
-                match = tagCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = tagCheck.exec(sel) ) ) {
                     nodes = selectByTag(nodes, match[1], sel, recurse);
                     sel = sel.substr( sel.indexOf(match[1]) + match[1].length );
                     continue;
                 }
 
                 //The remaining is subfiltering on nodes
-                match = attributeCheck.exec(sel);
-                if ( match ) {
+                if ( ( match = attributeCheck.exec(sel) ) ) {
                     match[3] = match[3] || true; //if m[3] does not exist we are just checking if attribute exists
                     nodes = selectByAttribute(nodes, match[1], match[2], match[3], sel, recurse);
                     sel = sel.substr( sel.indexOf("]") + 1 );
@@ -2125,144 +2317,9 @@ FBjqRY.find = (function() {
                 if ( match ) {
                     var matchStr = match[0];
                     var pseudo = match[1];
-                    var value = match.length > 2 ? match[2] : null; //the value in the parenthesis
-                    var intValue = value ? parseInt(value, 10) : null;
+                    var innerVal = match.length > 2 ? match[2] : null; // the value in the parenthesis
 
-                    var _nodes = nodes;
-
-                    switch ( pseudo ) {
-                        case "first":
-                            nodes = [ nodes[0] ]; break;
-                        case "last":
-                            nodes = [ nodes[nodes.length - 1] ]; break;
-                        case "eq":
-                            nodes = [ nodes[intValue] ]; break;
-                        case "lt":
-                            nodes = nodes.splice(0, intValue); break;
-                        case "gt":
-                            nodes = nodes.splice(intValue + 1, (nodes.length - intValue)); break;
-                        case "even":
-                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 0); } ); break;
-                        case "odd":
-                            nodes = FBjqRY.grep(nodes, function(node, i) { return (i % 2 === 1); } ); break;
-                        case "contains":
-                            nodes = null;
-                            return FBjqRY.error("find() :contains pseudo selector not supported");
-                            //break;
-                        case "hidden":
-                            nodes = FBjqRY.grep(nodes, _isHidden); break;
-                        case "visible":
-                            nodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
-                        case "has":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var matches = FBjqRY.find(value, null, [ node ]);
-                                return matches.length > 0;
-                            });
-                            break;
-                        case "not":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var notMatches = FBjqRY.find(value, null, [ node ]);
-                                // if smt is matched return false :
-                                return notMatches.length == 0;
-                            });
-                            break;
-                        case "nth-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[intValue] ) nodes.push( childs[intValue] );
-                            });
-                            break;
-                        case "first-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                if ( childs && childs[0] ) nodes.push( childs[0] );
-                            });
-                            break;
-                        case "last-child":
-                            nodes = [];
-                            FBjqRY.each(_nodes, function(node) {
-                                var childs = node.getChildNodes();
-                                var length = childs && childs.length;
-                                if ( length ) nodes.push( childs[length - 1] );
-                            });
-                            break;
-                        case "only-child":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var parentChilds = node.getParentNode().getChildNodes();
-                                return parentChilds.length === 1;
-                            });
-                            break;
-                        case "parent": // all elements that are the parent of another element :
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return childNodes && childNodes.length > 0;
-                            });
-                            break;
-                        case "empty": // all elements that have no children :
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var childNodes = node.getChildNodes();
-                                return ! childNodes || childNodes.length === 0;
-                            });
-                            break;
-                        case "disabled":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return !! disabled; // @todo disabled === 'disabled'
-                            });
-                            break;
-                        case "enabled":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var disabled = node.getDisabled();
-                                return ! disabled;
-                            });
-                            break;
-                        case "selected":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var selected = node.getSelected();
-                                return !! selected; // @todo selected === 'selected'
-                            });
-                            break;
-                        case "input": // all input, textarea, select and button elements
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName === 'input' || tagName === 'textarea'
-                                    || tagName === 'select' || tagName === 'button';
-                            });
-                            break;
-                        case "text":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'text') });
-                            break;
-                        case "password":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'password') });
-                            break;
-                        case "radio":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'radio') });
-                            break;
-                        case "file":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'file') });
-                            break;
-                        case "image": // all image inputs
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'image') });
-                            break;
-                        case "reset":
-                            nodes = FBjqRY.grep(nodes, function(node) { return _isInputType(node, 'reset') });
-                            break;
-                        case "submit":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var type = node.getType(), tagName = node.getTagName().toLowerCase();
-                                return (tagName === 'input' && type && type.toLowerCase() === 'submit') ||
-                                       (tagName === 'button' && ! type && type.toLowerCase() === 'submit');
-                            });
-                            break;
-                        case "header":
-                            nodes = FBjqRY.grep(nodes, function(node) {
-                                var tagName = node.getTagName().toLowerCase();
-                                return tagName.length === 2 && tagName.charAt(0) === 'h';
-                            });
-                            break;
-                    }
+                    nodes = selectByPseudo(nodes, pseudo, innerVal, sel, recurse);
 
                     sel = sel.substr(matchStr.length);
                     continue;
@@ -2293,60 +2350,60 @@ FBjqRY.fn.extend({
         return this.pushStack( FBjqRY.find(selector, this.nodes), "find", selector );
     },
 
-    /*
-	has: function( target ) {
-		var targets = jQuery( target );
-		return this.filter(function() {
-			for ( var i = 0, l = targets.length; i < l; i++ ) {
-				if ( jQuery.contains( this, targets[i] ) ) {
-					return true;
-				}
-			}
-		});
-	}, */
-
-    not: function( selector ) { // @todo TEST
-        //filter out specified nodes
-        var notNodes;
-        if ( selector.jquery ) notNodes = selector.nodes;
-        else if ( FBjqRY.isArray(selector) ) notNodes = selector;
-
-        if ( notNodes ) {
-            var nodes = this.get(); // is a copy already
-            for ( var i = 0, len = notNodes.length; i < len; i++ ) {
-                var idx = FBjqRY.inArray( notNodes[i], nodes ); // indexOf
-                if ( idx != -1 ) nodes.splice(idx, 1); // remove element
+    not: function(selector) {
+        
+        var nodes;
+        if ( typeof(selector) === "string" ) {
+            nodes = FBjqRY.filter( selector, this.nodes, true ); // not - true
+        }
+        else {
+            selector = selector2Function(selector);
+            
+            nodes = [];
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = this.nodes[i];
+                if ( ! selector.call( node, i, node ) ) nodes.push( node );
             }
         }
-        else { // expr assumed to be a selector :
-            notNodes = FBjqRY.find(selector, this.nodes);
-        }
-
+        
         return this.pushStack( nodes, "not", selector );
+
     },
 
 	is: function( selector ) {
 		return !! selector && FBjqRY.filter( selector, this.nodes ).length > 0;
 	},
 
-    filter: function(selector) {
-        var fn = selector;
-        if ( typeof(fn) === "string" ) {
-            fn = function() { 
-                return FBjqRY.find( selector, this ).length > 0;
-            };
-        }
-        // else it should already be a function
-        var nodes = [];
-        for ( var i = 0, len = this.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            if ( fn.call( node, i ) ) nodes.push( node );
-        }
+	has: function( selector ) {
+		var matches = FBjqRY( selector ).nodes;
+		return this.filter( function() {
+            var self = this;
+			for ( var i = 0, len = matches.length; i < len; i++ ) {
+				if ( FBjqRY.contains( self, matches[i] ) ) return true;
+			}
+            return false;
+		});
+	},
 
+    filter: function(selector) {
+        var nodes;
+        if ( typeof(selector) === "string" ) {
+            nodes = FBjqRY.filter( selector, this.nodes );
+        }
+        else {
+            selector = selector2Function(selector);
+            
+            nodes = [];
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = this.nodes[i];
+                if ( selector.call( node, i, node ) ) nodes.push( node );
+            }
+        }
+        
         return this.pushStack( nodes, "filter", selector );
     },
 
-    /*
+    /* @todo not implemented !
 	closest: function( selectors, context ) {
 		if ( jQuery.isArray( selectors ) ) {
 			var ret = [], cur = this[0], match, matches = {}, selector, level = 1;
@@ -2395,25 +2452,26 @@ FBjqRY.fn.extend({
 	// Determine the position of an element within
 	// the matched set of elements
     index: function(elem) {
-        // If it receives a jQuery object, the first element is used
-        if ( typeof(elem.selector) !== 'undefined' ) elem = elem.get(0);
-        var sameNode = FBjqRY.fbjs.sameNode;
-        for ( var i = this.length - 1; i >= 0; i-- ) {
-            if ( sameNode(elem, this.nodes[i]) ) break;
-        }
-        return i; // not found == -1
+        var elemUndefined = typeof(elem) === 'undefined';
+		if ( elemUndefined || typeof(elem) === "string" ) {
+			return FBjqRY.inArray( this.nodes[0],
+				// If it receives a string, the selector is used
+				// If it receives nothing, the siblings are used
+				elemUndefined ? this.parent().children() : FBjqRY( elem ).nodes );
+		}
+		// Locate the position of the desired element
+		return FBjqRY.inArray(
+			// If it receives a jQuery object, the first element is used
+			elem.jquery ? elem.nodes[0] : elem, this.nodes );
     },
 
 	add: function( selector ) {
-        var selNodes = FBjqRY.isString(selector) ?
-            //find( null, selector ) :
-            FBjqRY( selector ).nodes : // selector might be a html string !
-                FBjqRY.makeArray( selector );
+        var selNodes = FBjqRY.isString( selector ) ?
+                            FBjqRY( selector ).nodes : // selector might be a html string !
+                                FBjqRY.makeArray( selector );
 
-		return this.pushStack( FBjqRY.unique( FBjqRY.merge(
-			this.get(), // it's a clone
-			selNodes
-		)));
+        selNodes = FBjqRY.merge( this.get(), selNodes );
+		return this.pushStack( FBjqRY.unique( selNodes ) );
 	},
 
 	andSelf: function() {
@@ -2422,156 +2480,201 @@ FBjqRY.fn.extend({
 });
 
 FBjqRY.fn.extend({
+
     parent: function(selector) {
-        var parents = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var node = this.nodes[i].getParentNode(); nodeArray[0] = node;
-            if ( ! selector || isNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
-                parents.push(node);
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(parents));
-        return this.pushStack( FBjqRY.unique(parents), "parent", selector );
+        return this.pushStack( collectParents(this.nodes, selector, false), "parent", selector || '' );
     },
     parents: function(selector) {
-        var parents = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var node = this.nodes[i].getParentNode();
-            while ( node ) {
-                 nodeArray[0] = node;
-                if( ! selector || isNodes(selector, nodeArray) /* FBjqRY(node).is(expr) */ ) {
-                    parents.push(node);
-                }
-                node = node.getParentNode();
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(parents));
-        return this.pushStack( FBjqRY.unique(parents), "parents", selector );
+        return this.pushStack( collectParents(this.nodes, selector, true), "parents", selector || '' );
+    },
+    parentsUntil: function(until, selector) {
+        return this.pushStack( collectParents(this.nodes, selector, until), "parentsUntil", selector || '' );
     },
 
     next: function(selector) {
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "next", selector );
+        var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', false );
+        return this.pushStack( siblings, "next", selector || '' );
     },
     nextAll: function(selector) {
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getNextSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getNextSibling();
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "nextAll", selector );
+        var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', true );
+        return this.pushStack( siblings, "nextAll", selector || '' );
     },
-    
+    nextUntil: function(until, selector) {
+        var siblings = collectSiblings( this.nodes, selector, 'getNextSibling', until );
+        return this.pushStack( siblings, "nextUntil", selector || '' );
+    },
+
     prev: function(selector) {
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            nodeArray[0] = sibling;
-            if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "prev", selector );
+        var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', false );
+        return this.pushStack( siblings, "prev", selector || '' );
     },
     prevAll: function(selector) {
-        var siblings = [], len = this.length, nodeArray = [];
-        for (var i = 0; i < len; i++) {
-            var sibling = this.nodes[i].getPreviousSibling();
-            while ( sibling ) {
-                nodeArray[0] = sibling;
-                if ( ! selector || isNodes(selector, nodeArray) ) siblings.push(sibling);
-                sibling = sibling.getPreviousSibling();
-            }
-        }
-        //return FBjqRY(FBjqRY.unique(siblings));
-        return this.pushStack( FBjqRY.unique(siblings), "prevAll", selector );
+        var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', true );
+        return this.pushStack( siblings, "prevAll", selector || '' );
+    },
+    prevUntil: function(until, selector) {
+        var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', until );
+        return this.pushStack( siblings, "prevUntil", selector || '' );
     },
 
-    siblings: function(expr) {
-        return this.prevAll(expr).concat(this.nextAll(expr)); // @todo pushStack !
+    siblings: function(selector) {
+        var siblings = collectSiblings( this.nodes, selector, 'getPreviousSibling', true );
+        siblings = siblings.concat( collectSiblings( this.nodes, selector, 'getNextSibling', true ) );
+        return this.pushStack( siblings, "siblings", selector || '' );
     },
-
     children: function(selector) {
-        var children = [];
-        for ( var i = 0, len = this.length; i < len; i++ ) {
-            children = children.concat( this.nodes[i].getChildNodes() );
-        }
-        //var ret = FBjqRY(unique(children));
-        //return selector ? ret.filter(selector) : ret;
-
-        var nodes = FBjqRY.unique(children);
-        if ( selector ) nodes = filter(selector, nodes);
-        return this.pushStack( nodes, "children", selector );
-
-        /*
-        if (expr) {
-            children = FBjqRY(this.nodes).find(expr).get();
-        }
-        else {
-            children = [];
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-                children = children.concat( this.nodes[i].getChildNodes() );
+        var children = [], len = this.length;
+        for ( var i = 0, nodes = this.nodes; i < len; i++ ) {
+            var child = nodes[i].getFirstChild();
+            while ( child ) {
+                ( child.getNodeType() === 1 ) && children.push( child );
+                child = child.getNextSibling();
             }
         }
-        return FBjqRY(unique(children));
-        */
+
+        if ( selector ) children = FBjqRY.filter( selector, children );
+
+        children = len === 1 ? children : FBjqRY.unique(children);
+        return this.pushStack( children, "children", selector || '' );
     },
-    
-    contents: function() { // @todo: This doesn't feel right... TEST
-        function grabNodes(node) {
-            var nodes = node.getChildNodes();
-            for (var i = 0, len = nodes.length; i < len; i++) {
-                nodes = nodes.concat(grabNodes(nodes[i]));
-            }
-            return nodes;
+    contents: function() { // same as children()
+        var children = [], len = this.length;
+        for ( var i = 0, nodes = this.nodes; i < len; i++ ) {
+            children = children.concat( nodes[i].getChildNodes() );
         }
-
-        var nodes = this.nodes;
-        for (var i = 0; i < nodes.length; i++) {
-            nodes = nodes.concat(grabNodes(nodes[i]));
-        }
-        return FBjqRY(FBjqRY.unique(nodes)); // @todo pushStack
+        
+        children = len === 1 ? children : FBjqRY.unique(children);
+        return this.pushStack( children, "contents", '' );
     }
 
 });
 
-var isNodes = function(selector, nodes) {
+var collectSiblings = function(nodes, selector, getSiblings, until) {
+    var siblings = [], len = nodes.length, nodeArray = [];
+    var doUntil = ( typeof(until) !== 'boolean' );
+    var recurse = doUntil || until; /// until if not used means recurse (true/false)
+
+    for ( var i = 0; i < len; i++ ) {
+        var sibling = nodes[i][ getSiblings ](); // nodes[0].getNextSibling()
+        
+        while ( sibling ) {
+
+            nodeArray[0] = sibling;
+
+            if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
+                break;
+            }
+
+            if ( ! selector || matchesNodes(selector, nodeArray) ) {
+                ( sibling.getNodeType() === 1 ) && siblings.push( sibling );
+            }
+            
+            sibling = recurse ? sibling[ getSiblings ]() : null;
+        }
+    }
+    return FBjqRY.unique(siblings);
+}
+
+var collectParents = function(nodes, selector, until) {
+    var parents = [], len = nodes.length, nodeArray = [];
+    var sameNode = FBjqRY.fbjs.sameNode;
+    var doUntil = ( typeof(until) !== 'boolean' );
+    var recurse = doUntil || until; /// until if not used means recurse (true/false)
+
+    var rootElement = document.getRootElement();
+
+    for ( var i = 0; i < len; i++ ) {
+        var parent = nodes[i].getParentNode();
+        while ( parent ) {
+            nodeArray[0] = parent;
+
+            if ( doUntil && ( until && matchesNodes(until, nodeArray) ) ) {
+                break;
+            }
+
+            if ( selector ) {
+                // do not add the root element - might get confusing :
+                if ( sameNode(rootElement, parent) ) break;
+
+                if ( matchesNodes(selector, nodeArray) ) {
+                    ( parent.getNodeType() === 1 ) && parents.push( parent );
+                }
+            }
+            else { 
+                // @todo currently we're adding root here - seems to make sense ?!
+                ( parent.getNodeType() === 1 ) && parents.push(parent);
+            }
+            parent = recurse ? parent.getParentNode() : null;
+        }
+    }
+    return FBjqRY.unique(parents);
+}
+
+var selector2Function = function(selector) {
+    if ( selector.jquery ) selector = selector.nodes;
+    if ( FBjqRY.isArray(selector) ) {
+        var selNodes = selector;
+        selector = function() {
+            return FBjqRY.inArray(this, selNodes) !== -1;
+        };
+    }
+    else if ( FBjqRY.fbjs.isNode(selector) ) {
+        var selNode = selector, sameNode = FBjqRY.fbjs.sameNode;
+        selector = function() { return sameNode(this, selNode); };
+    }
+    return selector;
+};
+
+var matchesNodes = function(selector, nodes) {
     return !! selector && FBjqRY.filter( selector, nodes ).length > 0;
 };
 
 FBjqRY.filter = function( selector, nodes, not ) {
-    if ( not ) selector = ":not(" + selector + ")"; // not-used
-    var fNodes = []; //nodeArray = [];
-    //console.log('filter', selector, nodes);
+    if ( not ) selector = ":not(" + selector + ")";
+
+    var matchNodes = []; var singleNode = [];
     for ( var i = 0, len = nodes.length; i < len; i++ ) {
-        var node = nodes[i]; //nodeArray[0] = node;
-        if ( FBjqRY.find(selector, null, [ node ]).length > 0 ) {
-            fNodes.push( node );
+        var node = nodes[i]; singleNode[0] = node;
+        if ( FBjqRY.find(selector, false, singleNode).length > 0 ) {
+            matchNodes.push( node );
         }
     }
-    return fNodes;
+    
+    return matchNodes;
 };
+
+// Check to see if a DOM node is within another DOM node.
+FBjqRY.contains = (function(){
+    
+    var containsWalk = function( node, array ) {
+        if ( ! array || array.length === 0 ) return false;
+        if ( FBjqRY.inArray(node, array) !== -1 ) return true;
+        for ( var i = 0, len = array.length; i < len; i++ ) {
+            if ( containsWalk( node, array[i].getChildNodes() ) ) return true;
+        }
+        return false;
+    };
+
+    return function( container, contained ) {
+        if ( FBjqRY.fbjs.sameNode(container, contained) ) return false;
+        return containsWalk( contained, container.getChildNodes() );
+    };
+})();
 var //rinlinejQuery = / jQuery\d+="(?:\d+|null)"/g,
 	rleadingWhitespace = /^\s+/,
-	rxhtmlTag = /(<([\w:]+)[^>]*?)\/>/g,
 	rtagName = /<([\w:]+)/,
 	//rtbody = /<tbody/i,
-	//rhtml = /<|&#?\w+;/,
+	rhtml = /<|&#?\w+;/,
 	rnocache = /<script|<object|<embed|<option|<style/i,
-	//rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,  // checked="checked" or checked (html5)
+    rxhtmlTag = /(<([\w:]+)[^>]*?)\/>/g,
     rselfClosing = /^(?:area|br|col|embed|hr|img|input|link|meta|param)$/i,
 	fcloseTag = function( all, front, tag ) {
 		return rselfClosing.test( tag ) ? all : front + "></" + tag + ">";
+	},
+    // html5 style boolean attributes :
+	rhtml5Attr = /(checked|selected|disabled)(\s*=\s*['"]\w*['"])?/gi,
+	fhtml5Attr = function( str, attr, val ) {
+		return val ? str : attr + "='" + attr + "'";
 	},
 	wrapMap = {
 		option: [ 1, "<select multiple='multiple'>", "</select>" ],
@@ -2581,7 +2684,13 @@ var //rinlinejQuery = / jQuery\d+="(?:\d+|null)"/g,
 		td: [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ],
 		col: [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ],
 		area: [ 1, "<map>", "</map>" ],
-		_default: [ 0, "", "" ]
+		//_default: [ 0, "", "" ]
+        // "fixes" FBJS issue not allowing to set HTML only valid XHTML :
+        // these will wrap all content making it "more" XHTML friendly e.g.
+        //
+        // <div>1</div><div>2</div> will "become" valid XHTML due to wrappin
+        //
+        _default: [ 1, "<div>", "</div>" ]
 	};
 
 wrapMap.optgroup = wrapMap.option;
@@ -2601,124 +2710,33 @@ if ( ! FBjqRY.support.htmlSerialize ) {
  * - insertBefore: "before"
  * - insertAfter: "after"
  * - replaceAll: "replaceWith"
- * @param fn the delegate function
+ * @param manipFn the delegate function
  * @param selector the selector
  * @return FBjqRY object
  */
-var delegateManipulation = function(name, fn, selector) {
-    var ret = [], insert = FBjqRY(selector).nodes;
+var delegateManipulation = function(name, manipFn, selector) {
+    var ret = [], insert = FBjqRY(selector).nodes, self = this;
 
     for ( var i = 0, len = insert.length; i < len; i++ ) {
-        var elems = (i > 0 ? this.clone(true) : this).get();
-        fn.apply( FBjqRY( insert[i] ), elems );
+        var elems = (i > 0 ? self.clone(true) : self).nodes;
+        manipFn.call( FBjqRY( insert[i] ), elems );
         ret = ret.concat( elems );
     }
 
     return this.pushStack( ret, name, selector );
 };
 
-var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
-
-// ============================================================================
-/** A helper around setInnerXHTML (FBJS beta feature) */
-// ============================================================================
-var nodesFromXHTML = function( elems, context ) { // based on jQuery.clean 1.3.2
-    context = context || document;
-    if ( typeof context.createElement === "undefined" ) context = document;
-
-    if ( FBjqRY.isString(elems) ) { // support single string
-        elems = [ elems ];
-    }
-
-    // If a single string is passed in and it's a single tag
-    // just do a createElement and skip the rest
-    if ( elems.length === 1 && FBjqRY.isString( elems[0] ) ) {
-        var match = rsingleTag.exec( elems[0] );
-        if ( match ) return [ context.createElement( match[1] ) ];
-    }
-
-    var ret = [], div = context.createElement("div");
-    var isFBNode = FBjqRY.fbjs.isNode;
-
-    FBjqRY.each(elems, function() {
-        var elem = this;
-
-        if ( typeof elem === "number" ) elem += '';
-        if ( ! elem ) return;
-
-        // Convert html string into DOM nodes
-        if ( FBjqRY.isString(elem) ) {
-            // Fix "XHTML"-style tags in all browsers
-            //var html = elem.replace(rxhtmlTag, rselfClosing);
-            var html = elem;
-
-            // Trim whitespace, otherwise indexOf won't work as expected
-            //html = html.replace(rleadingWhitespace, '');
-
-            var tag = rtagName.exec( html );
-            tag = tag ? tag[1] : '_default';
-            var wrap = wrapMap[ tag ] || wrapMap._default;
-
-            /*
-            var tags = html.replace(rleadingWhitespace, "").substring(0, 10).toLowerCase();
-            var wrap = // @todo not sure if this is needed FBJS might handle it it's own way ...
-                // option or optgroup
-                ! tags.indexOf("<opt") &&
-                [ 1, "<select multiple='multiple'>", "</select>" ] ||
-
-                ! tags.indexOf("<leg") &&
-                [ 1, "<fieldset>", "</fieldset>" ] ||
-
-                tags.match(/^<(thead|tbody|tfoot|colg|cap)/) &&
-                [ 1, "<table>", "</table>" ] ||
-
-                ! tags.indexOf("<tr") &&
-                [ 2, "<table><tbody>", "</tbody></table>" ] ||
-
-                // <thead> matched above
-                (! tags.indexOf("<td") || !tags.indexOf("<th")) &&
-                [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ] ||
-
-                ! tags.indexOf("<col") &&
-                [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ] ||
-
-                [ 0, "", "" ]; */
-
-            // Go to html and back, then peel off extra wrappers
-            //try {
-                div.setInnerXHTML( wrap[1] + html + wrap[2] );
-            //}
-            //catch(e) { // @todo errors ?
-                //console.log('wrap', wrap, rtagName.exec( html ), e);
-                //throw e;
-            //}
-
-            // Move to the right depth
-            var unwrapCount = wrap[0];
-            while ( unwrapCount-- ) div = div.getLastChild();
-
-            elem = div.getChildNodes();
-        }
-
-        if ( isFBNode(elem) ) ret.push( elem );
-        else ret = FBjqRY.merge( ret, elem );
-
-    });
-
-    return ret;
-};
-
 FBjqRY.fn.extend({
     text: function(text) {
         if ( typeof(text) !== 'undefined' ) {
-            //if ( FBjqRY.isFunction(text) ) {
-            //    return this.each(function(i) {
-            //        var self = FBjqRY(this);
-            //        self.text( text.call(this, i, null /* self.text() */) );
-            //    });
-            //}
-            //each(this.nodes, function() {  this.setTextValue(text); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( FBjqRY.isFunction(text) ) {
+                return this.each(function(i) {
+                    var self = FBjqRY(this), old = undefined; // self.text();
+                    self.text( text.call(this, i, old) );
+                });
+            }
+            
+            for ( var i = 0, len = this.length; i < len; i++ ) {
                 this.nodes[i].setTextValue(text);
             }
             return this;
@@ -2742,36 +2760,36 @@ FBjqRY.fn.extend({
             return FBjqRY.error("html() getter not supported");
         }
 		// See if we can take a shortcut and just use innerHTML
-		else if ( FBjqRY.isString(html) && ! rnocache.test( html ) &&
-			(FBjqRY.support.leadingWhitespace || ! rleadingWhitespace.test( html )) &&
-			! wrapMap[ (rtagName.exec( html ) || ["", ""])[1].toLowerCase() ] ) {
-
-			html = html.replace(rxhtmlTag, fcloseTag);
-
-			try {
-				for ( var i = 0, l = this.length; i < l; i++ ) {
-					// Remove element nodes and prevent memory leaks
-					//if ( this[i].nodeType === 1 ) {
-                    var node = this.nodes[i];
-                    FBjqRY.cleanData( node.getElementsByTagName("*") ); // @todo cleanData ?
-                    node.setInnerXHTML( html );
-					//}
-				}
-			// If using innerHTML throws an exception, use the fallback method
-			}
-            catch(e) {
-				this.empty().append( html );
-			}
+//		else if ( FBjqRY.isString(html) && ! rnocache.test( html ) &&
+//			(FBjqRY.support.leadingWhitespace || ! rleadingWhitespace.test( html )) &&
+//			! wrapMap[ (rtagName.exec( html ) || ["", ""])[1].toLowerCase() ] ) {
+//
+//			html = html.replace(rxhtmlTag, fcloseTag);
+//
+//			try {
+//				for ( var i = 0, l = this.length; i < l; i++ ) {
+//					// Remove element nodes and prevent memory leaks
+//                    var node = this.nodes[i];
+//                    if ( node.getNodeType() === 1 ) {
+//                        FBjqRY.cleanData( node.getElementsByTagName("*") );
+//                        node.setInnerXHTML( html );
+//					}
+//				}
+//			// If using innerHTML throws an exception, use the fallback method
+//			}
+//            catch(e) {
+//				this.empty().append( html );
+//			}
+//		}
+        else if ( FBjqRY.isFunction( html ) ) {
+			this.each( function(i) {
+				var self = FBjqRY(this), old = undefined; // self.html();
+				self.empty().append(function(){
+					return html.call( this, i, old );
+				});
+			});
+        
 		}
-        //else if ( FBjqRY.isFunction( html ) ) {
-		//	this.each( function(i) {
-		//		var self = FBjqRY(this), old = self.html();
-		//		self.empty().append(function(){
-		//			return html.call( this, i, old );
-		//		});
-		//	});
-        //
-		//}
         else {
 			this.empty().append( html );
 		}
@@ -2784,8 +2802,14 @@ FBjqRY.fn.extend({
      */
     fbml: function(fbml) {
         if ( typeof(fbml) !== 'undefined' ) {
-            //each(this.nodes, function() { this.setInnerFBML(fbml); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( FBjqRY.isFunction(fbml) ) {
+                return this.each(function(i) {
+                    var self = FBjqRY(this), old = undefined; // self.fbml();
+                    self.fbml( fbml.call(this, i, old) );
+                });
+            }
+            
+            for ( var i = 0, len = this.length; i < len; i++ ) {
                 this.nodes[i].setInnerFBML(fbml);
             }
             return this;
@@ -2794,31 +2818,33 @@ FBjqRY.fn.extend({
     },
 
     wrapAll: function(html) {
+		if ( FBjqRY.isFunction( html ) ) {
+			return this.each( function(i) {
+                var self = this;
+				FBjqRY(self).wrapAll( html.call(self, i) );
+			});
+		}
+
         var node = this.nodes[0];
 		if ( node ) {
 			// The elements to wrap the target around
-			var wrap = FBjqRY( html ).clone();
+			var wrap = FBjqRY( html ).eq(0).clone(true);
 
 			if ( node.getParentNode() ) {
 				wrap.insertBefore( node );
             }
+            
 			wrap.map( function() {
-				var elem = this, child = this.getFirstChild();
-				while ( child ) {
+				var elem = this, child;
+
+				while ( ( child = elem.getFirstChild() ) && child.getNodeType() === 1 ) {
                     elem = child;
-                    child = elem.getFirstChild();
                 }
 				return elem;
 			}).append(this);
 		}
 		return this;
     },
-    
-	wrapInner: function( html ) {
-		return this.each(function() {
-			FBjqRY(this).contents().wrapAll(html);
-		});
-	},
 
 	wrap: function( html ) {
 		return this.each(function() {
@@ -2826,103 +2852,235 @@ FBjqRY.fn.extend({
 		});
 	},
 
-	unwrap: function() {
-		return this.parent().each(function() {
-			FBjqRY( this ).replaceWith( this.getChildNodes() );
-		}).end();
+	wrapInner: function( html ) {
+        if ( FBjqRY.isFunction( html ) ) {
+            return this.each( function(i) {
+                var self = this;
+                FBjqRY(self).wrapInner( html.call(self, i) );
+            });
+        }
+
+		return this.each( function(i) {
+            var self = this;
+            // can't handle correctly if there are no childs -
+            // contents() will return an empty list in FBJS !
+            if ( ! self.getFirstChild() ) {
+                
+                var wrap = FBjqRY( html ).eq(0).clone(true);
+
+                if ( self.getParentNode() ) {
+                    wrap.insertBefore( self );
+                }
+                
+                wrap.each( function() {
+                    var elem = this, child;
+                    while ( ( child = elem.getFirstChild() )
+                        && child.getNodeType() === 1 ) {
+                        elem = child;
+                    }
+
+                    self.appendChild( elem );
+                });
+
+            } // there is at least one child :
+            else {
+                FBjqRY(self).contents().wrapAll( html );
+            }
+		});
 	},
 
-    append: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [ content ];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {node.appendChild(this);});
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ ) node.appendChild( content[j] );
-        }
-        return this;
-    },
-    appendTo: function(content) {
-        return delegateManipulation.call(this, 'appendTo', this.append, content);
-    },
-    //appendTo: function(nodes) { return FBjqRY(nodes).append(this); },
+	unwrap: function() {
+        //console.log('unwrap() StRT');
+		var ret = this.parent().each(function() {
+            var self = this; var $this = FBjqRY(self);
+			//$this.replaceWith( $this.children() );
+            $this.replaceWith( self.getChildNodes() );
+		}).end();
+        //console.log('unwrap() DoNE');
+        return ret;
+	},
 
-    prepend: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [ content ];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {node.insertBefore(this);});
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ ) node.insertBefore( content[j] );
-        }
-        return this;
-    },
-    prependTo: function(content) {
-        return delegateManipulation.call(this, 'prependTo', this.prepend, content);
-    },
-    //prependTo: function(nodes) { return FBjqRY(nodes).prepend(this); },
+    append: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY(self);
+				value = value.call(self, i, undefined /* $this.html() */);
+				$this.append( value );
+			});
+		}
 
-    after: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [content];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {
-        //        node.getParentNode().insertBefore(this, node.getNextSibling());
-        //    });
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ )
-                node.getParentNode().insertBefore( content[j], node.getNextSibling() );
-        }
-        return this;
-    },
-    insertAfter: function(content) {
-        return delegateManipulation.call(this, 'insertAfter', this.after, content);
-    },
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
 
-    before: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [content];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {
-        //        node.getParentNode().insertBefore(this, node);
-        //    });
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ )
-                node.getParentNode().insertBefore( content[j], node );
-        }
-        return this;
-    },
-    insertBefore: function(content) {
-        return delegateManipulation.call(this, 'insertBefore', this.before, content);
-    },
+        //console.log('append', value);
 
-    remove: function(expr) {
-        //each(this.nodes, function() {
-        //    if ( ! expr || is(expr, [ this ]) ) {
-        //        this.getParentNode().removeChild(this);
-        //    }
-        //});
-        var nodeArray = [];
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i]; nodeArray[0] = node;
-            if ( ! expr || is(expr, nodeArray) ) {
-                node.getParentNode().removeChild(node);
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i], val;
+            if ( node.getNodeType() !== 1 ) continue;
+            for ( var j = 0; j < value.length; j++ ) {
+                if ( ( val = value[j] ) ) {
+                    if ( i > 0 ) val = val.cloneNode(true);
+                    //console.log('append i', node, value[j]);
+                    node.appendChild( val );
+                    //console.log('appended');
+                }
             }
         }
         return this;
     },
+    appendTo: function(value) {
+        return delegateManipulation.call(this, 'appendTo', this.append, value);
+    },
+
+    prepend: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY(self);
+				value = value.call(self, i, undefined /* $this.html() */);
+				$this.prepend( value );
+			});
+		}
+
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i], val;
+            if ( node.getNodeType() !== 1 ) continue;
+            for ( var j = 0; j < value.length; j++ ) {
+                if ( ( val = value[j] ) ) {
+                    if ( i > 0 ) val = val.cloneNode(true);
+                    node.insertBefore( val, node.getFirstChild() );
+                }
+            }
+        }
+        return this;
+    },
+    prependTo: function(value) {
+        return delegateManipulation.call(this, 'prependTo', this.prepend, value);
+    },
+
+    after: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY( self );
+				value = value.call( self, i );
+				$this.after( value );
+			});
+		}
+
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+
+        var nodes = this.nodes;
+		if ( nodes[0] && nodes[0].getParentNode() ) {
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = nodes[i], val;
+                var parent = node.getParentNode();
+                for ( var j = 0; j < value.length; j++ ) {
+                    if ( ( val = value[j] ) ) {
+                        if ( i > 0 ) val = val.cloneNode(true);
+                        parent.insertBefore( val, node.getNextSibling() );
+                    }
+                }
+            }
+            return this;
+		}
+        else if ( arguments.length ) {
+			var set = this.pushStack( this, "after", arguments );
+			set.push.apply( set, FBjqRY( arguments[0] ).toArray() );
+			return set;
+		}
+    },
+    insertAfter: function(value) {
+        return delegateManipulation.call(this, 'insertAfter', this.after, value);
+    },
+
+    before: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY( self );
+				value = value.call( self, i );
+				$this.before( value );
+			});
+		}
+
+        //console.log('before 1', value);
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+        //console.log('before 2', value);
+
+        /*
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i];
+            var parent = node.getParentNode();
+            for ( var j = 0; j < value.length; j++ ) {
+                // @todo if there are text nodes it starts failing
+                // with an error "TypeError: b is null { message="b is null" }"
+                //
+                // these seems to be an issue only with cloning text nodes in
+                // replaceWith where clone() is hacked instead of detach() !
+                // 
+                // cloning a text node returns null !
+                //
+                if ( value[j] ) parent.insertBefore( value[j], node );
+            }
+        }
+
+        //console.log('before 3');
+        return this; */
+        
+        var nodes = this.nodes;
+		if ( nodes[0] && nodes[0].getParentNode() ) {
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = nodes[i], val;
+                var parent = node.getParentNode();
+                for ( var j = 0; j < value.length; j++ ) {
+                    if ( ( val = value[j] ) ) {
+                        if ( i > 0 ) val = val.cloneNode(true);
+                        parent.insertBefore( val, node );
+                    }
+                }
+            }
+            return this;
+		}
+        else if ( arguments.length ) {
+			var set = FBjqRY( arguments[0] );
+			set.push.apply( set, this.toArray() );
+			return this.pushStack( set, "before", arguments );
+		}
+    },
+    insertBefore: function(value) {
+        return delegateManipulation.call(this, 'insertBefore', this.before, value);
+    },
+
+	// keepData is for internal use only--do not document
+	remove: function( selector, keepData ) {
+        
+        //console.log('remove()', this.nodes, selector);
+        var nodeArray = [];
+        for ( var i = 0, len = this.length, nodes = this.nodes; i < len; i++ ) {
+            var node = nodes[i]; nodeArray[0] = node;
+			if ( ! selector || FBjqRY.filter( selector, nodeArray ).length ) {
+				if ( ! keepData && node.getNodeType() === 1 ) {
+					FBjqRY.cleanData( node.getElementsByTagName("*") );
+                    FBjqRY.cleanData( nodeArray /* [ node ] */ );
+				}
+
+                //console.log('remove() removing', node, node.getNodeType());
+                var parent = node.getParentNode();
+				if ( parent ) parent.removeChild( node );
+                //console.log('remove() removed', node.__instance);
+			}
+		}
+
+        //console.log('remove() DoNE');
+		return this;
+	},
 
     empty: function() {
         this.children().remove();
@@ -2931,18 +3089,68 @@ FBjqRY.fn.extend({
 
     clone: function(includeEvents) {
         var cloned = [];
-        //each(this.nodes, function() {cloned.push( this.cloneNode() );});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            cloned.push( this.nodes[i].cloneNode() );
+        // @todo clone events if jQuery events are kept !?
+        for ( var i = 0, len = this.length, nodes = this.nodes; i < len; i++ ) {
+            cloned.push( nodes[i].cloneNode(true) );
         }
         return FBjqRY(cloned);
     },
 
-    replaceWith: function(content) {
-        return this.after(content).remove();
-    },
-    replaceAll: function(content) {
-        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, content);
+	replaceWith: function( value ) {
+        var node = this.nodes[0];
+		if ( node && node.getParentNode() ) {
+			if ( FBjqRY.isFunction( value ) ) {
+				return this.each(function(i) {
+                    var self = this;
+					var $this = FBjqRY(self), old = undefined /* $this.html() */;
+					$this.replaceWith( value.call( self, i, old ) );
+				});
+			}
+
+			// Make sure that the elements are removed from the DOM before they
+            // are inserted. this can help fix replacing a parent with child elements
+
+            //console.log('replaceWith() value', value);
+
+			if ( ! FBjqRY.isString(value) ) {
+                // @todo another FBJS failure - it seems to not be
+                // able to reattach detached nodes - fails with :
+                // with an error "This DOM node is no longer valid"
+                //
+				//value = FBjqRY( value ).detach();
+                value = FBjqRY( value ).clone();
+			}
+
+            //console.log('replaceWith() value 2', value);
+
+			return this.each( function() {
+                var self = this;
+                //console.log('replaceWith() self', self);
+				var next = self.getNextSibling();
+                var parent = self.getParentNode();
+
+                //console.log('replaceWith() next', next);
+				FBjqRY( self ).remove();
+                //console.log('replaceWith() next2', !! next);
+
+				if ( next ) {
+                    //console.log('replaceWith() before', next, value);
+					FBjqRY( next ).before( value );
+				}
+                else {
+                    //console.log('replaceWith() append', parent, value);
+					FBjqRY( parent ).append( value );
+				}
+
+                //console.log('replaceWith() DoNE');
+			});
+		}
+        else {
+			return this.pushStack( FBjqRY(FBjqRY.isFunction(value) ? value() : value), "replaceWith", value );
+		}
+	},
+    replaceAll: function( value ) {
+        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, value);
     },
 
 	detach: function( selector ) {
@@ -2951,12 +3159,6 @@ FBjqRY.fn.extend({
 });
 
 /*
-function root( elem, cur ) {
-	return jQuery.nodeName(elem, "table") ?
-		(elem.getElementsByTagName("tbody")[0] ||
-		elem.appendChild(elem.ownerDocument.createElement("tbody"))) :
-		elem;
-}
 
 function cloneCopyEvent(orig, ret) {
 	var i = 0;
@@ -3014,85 +3216,102 @@ function buildFragment( args, nodes, scripts ) {
 }
 
 jQuery.fragments = {};
+*/
 
-jQuery.extend({
-	clean: function( elems, context, fragment, scripts ) {
+FBjqRY.extend({
+
+	clean: function( elems, context /*, fragment, scripts */ ) {
 		context = context || document;
+        
+		if ( typeof context.createElement === "undefined" ) context = document;
 
-		// !context.createElement fails in IE with an error but returns typeof 'object'
-		if ( typeof context.createElement === "undefined" ) {
-			context = context.ownerDocument || context[0] && context[0].ownerDocument || document;
-		}
-
-		var ret = [];
+        var ret = []; //div = context.createElement("div");
+        var isFBNode = FBjqRY.fbjs.isNode, isString = FBjqRY.isString;
 
 		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
-			if ( typeof elem === "number" ) {
-				elem += "";
-			}
+			if ( typeof elem === "number" ) elem += "";
+			if ( ! elem ) continue;
 
-			if ( !elem ) {
-				continue;
-			}
+            if ( isString(elem) ) {
+                // Convert html string into DOM nodes
+                if ( ! rhtml.test( elem ) ) {
+                    //elem = context.createTextNode( elem ); continue;
+                    return FBjqRY.error("clean() cannot create text node: '" + elem + "'");
+                }
 
-			// Convert html string into DOM nodes
-			if ( typeof elem === "string" && !rhtml.test( elem ) ) {
-				elem = context.createTextNode( elem );
-
-			} else if ( typeof elem === "string" ) {
 				// Fix "XHTML"-style tags in all browsers
 				elem = elem.replace(rxhtmlTag, fcloseTag);
 
-				// Trim whitespace, otherwise indexOf won't work as expected
-				var tag = (rtagName.exec( elem ) || ["", ""])[1].toLowerCase(),
-					wrap = wrapMap[ tag ] || wrapMap._default,
-					depth = wrap[0],
-					div = context.createElement("div");
+                // setInnerXHTML does not support HTML5 style attributes
+                // e.g. <input type="radio" checked />
+                // fix: <input type="radio" checked="checked" />
+                elem = elem.replace(rhtml5Attr, fhtml5Attr);
+
+                var tag = rtagName.exec( elem );
+                tag = tag ? tag[1].toLowerCase() : '_default';
+                var wrap = wrapMap[ tag ];
+                //var xWrap = !! wrap;
+                if ( ! wrap ) wrap = wrapMap._default;
+
+				//var tag = (rtagName.exec( elem ) || ["", ""])[1].toLowerCase(),
+					//wrap = wrapMap[ tag ] || wrapMap._default;
+                var div = context.createElement("div");
 
 				// Go to html and back, then peel off extra wrappers
-				div.innerHTML = wrap[1] + elem + wrap[2];
+                var xhtml = wrap[1] + elem + wrap[2];
+				div.setInnerXHTML( xhtml );
 
 				// Move to the right depth
-				while ( depth-- ) {
-					div = div.lastChild;
-				}
+                var depth = wrap[0];
+				while ( depth-- ) div = div.getLastChild();
+
+                // The XHTML parser does not throw any errors - it only logs :
+                //
+                // XML Parsing Error: junk after document element Location:
+                // http://apps.facebook.com/fbjqry_dev/?run=manipulation
+                // Line Number 1, Column 18: <span>huuu</span><p></p>
+                //
+                // thus we'll check ourselves if the setInnnerXHTML succeeded :
+                //if ( wrap[1] ) tag = rtagName.exec( wrap[1] )[1].toLowerCase();
+                // it's XHTML thus we should always have the first child :
+                var fChild = div.getFirstChild();
+                if ( ! fChild || fChild.getTagName().toLowerCase() !== tag ) {
+                    //return FBjqRY.error('clean() setInnerXHTML with "'+ xhtml +'" failed !');
+                    return FBjqRY.error('clean() setInnerXHTML with "'+ elem +'" failed !');
+                }
 
 				// Remove IE's autoinserted <tbody> from table fragments
-				if ( !jQuery.support.tbody ) {
+				if ( ! FBjqRY.support.tbody ) {
 
 					// String was a <table>, *may* have spurious <tbody>
 					var hasBody = rtbody.test(elem),
-						tbody = tag === "table" && !hasBody ?
-							div.firstChild && div.firstChild.childNodes :
-
+						tbody = tag === "table" && ! hasBody ?
+							div.getFirstChild() && div.getFirstChild().getChildNodes() :
 							// String was a bare <thead> or <tfoot>
-							wrap[1] === "<table>" && !hasBody ?
-								div.childNodes :
-								[];
+							wrap[1] === "<table>" && ! hasBody ? div.getChildNodes() : [];
 
 					for ( var j = tbody.length - 1; j >= 0 ; --j ) {
-						if ( jQuery.nodeName( tbody[ j ], "tbody" ) && !tbody[ j ].childNodes.length ) {
-							tbody[ j ].parentNode.removeChild( tbody[ j ] );
+                        var tb = tbody[ j ];
+						if ( FBjqRY.nodeName( tb, "tbody" ) && ! tb.getChildNodes().length ) {
+							tb.getParentNode().removeChild( tb );
 						}
 					}
 
 				}
 
 				// IE completely kills leading whitespace when innerHTML is used
-				if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
-					div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
-				}
+				//if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
+				//	div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
+				//}
 
-				elem = div.childNodes;
+				elem = div.getChildNodes();
 			}
 
-			if ( elem.nodeType ) {
-				ret.push( elem );
-			} else {
-				ret = jQuery.merge( ret, elem );
-			}
+            if ( isFBNode(elem) ) ret.push( elem );
+            else ret = FBjqRY.merge( ret, elem );
 		}
 
+        /*
 		if ( fragment ) {
 			for ( i = 0; ret[i]; i++ ) {
 				if ( scripts && jQuery.nodeName( ret[i], "script" ) && (!ret[i].type || ret[i].type.toLowerCase() === "text/javascript") ) {
@@ -3106,21 +3325,26 @@ jQuery.extend({
 				}
 			}
 		}
+        */
 
 		return ret;
 	},
-	
+
 	cleanData: function( elems ) {
-		var data, id, cache = jQuery.cache,
-			special = jQuery.event.special,
-			deleteExpando = jQuery.support.deleteExpando;
-		
-		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
-			if ( elem.nodeName && jQuery.noData[elem.nodeName.toLowerCase()] ) {
+		var data, id, cache = FBjqRY.cache,
+			special = FBjqRY.event.special;
+			//deleteExpando = FBjqRY.support.deleteExpando;
+
+        var getNodeId = FBjqRY.fbjs.getNodeId;
+
+		for ( var i = 0, len = elems.length; i < len; i++ ) {
+            var elem = elems[i];
+
+			if ( elem.getTagName && FBjqRY.noData[ elem.getTagName().toLowerCase() ] ) {
 				continue;
 			}
 
-			id = elem[ jQuery.expando ];
+			id = getNodeId(elem, true); //elem[ jQuery.expando ];
 			
 			if ( id ) {
 				data = cache[ id ];
@@ -3128,20 +3352,18 @@ jQuery.extend({
 				if ( data && data.events ) {
 					for ( var type in data.events ) {
 						if ( special[ type ] ) {
-							jQuery.event.remove( elem, type );
-
+							FBjqRY.event.remove( elem, type );
 						} else {
-							removeEvent( elem, type, data.handle );
+                            elem.removeEventListener(type, data.handle);
+							//removeEvent( elem, type, data.handle );
 						}
 					}
 				}
 				
-				if ( deleteExpando ) {
-					delete elem[ jQuery.expando ];
-
-				} else if ( elem.removeAttribute ) {
-					elem.removeAttribute( jQuery.expando );
-				}
+				//if ( deleteExpando ) { delete elem[ jQuery.expando ];
+				//} else if ( elem.removeAttribute ) {
+				//	elem.removeAttribute( jQuery.expando );
+				//}
 				
 				delete cache[ id ];
 			}
@@ -3149,23 +3371,15 @@ jQuery.extend({
 	}
 });
 
-function evalScript( i, elem ) {
-	if ( elem.src ) {
-		jQuery.ajax({
-			url: elem.src,
-			async: false,
-			dataType: "script"
-		});
-	} else {
-		jQuery.globalEval( elem.text || elem.textContent || elem.innerHTML || "" );
-	}
-
-	if ( elem.parentNode ) {
-		elem.parentNode.removeChild( elem );
-	}
-}
-*/
-var rnamespaces = /\.(.*)$/,
+/*
+var rstartendtag = /<\/?([\w:]+)[^\/]*?>/g;
+var fstartendtag = function( str, tag ) {
+    return str;
+};
+var split2XHTML = function( html, tag ) {
+    //tag = tag ? tag : rtagName.exec( elem );
+    //html.split();
+}; */var rnamespaces = /\.(.*)$/,
 	fcleanup = function( nm ) {
 		return nm.replace(/[^\w\s\.\|`]/g, function( ch ) {
 			return "\\" + ch;
