@@ -13,7 +13,7 @@ var quickExpr = /^[^<]*(<(.|\s)+>)[^>]*$|^#(\w+)$/;
 var trimLeft = /^\s+/;
 var trimRight = /\s+$/;
 // Match a standalone tag
-//var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
+var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
 // Keep a UserAgent string for use with jQuery.browser
 //userAgent = navigator.userAgent,
 // For matching the engine and version of the browser
@@ -49,8 +49,9 @@ FBjqRY.fn = FBjqRY.prototype = {
         //Are we dealing with an FBjqRY object?
         else if ( selector.jquery ) {
             var nodes = selector.get();
-            this.nodes = nodes.length ? nodes : [ nodes ];
-            this.length = nodes.length;
+            var length = nodes.length;
+            this.nodes = typeof(length) === 'number' ? nodes : [ nodes ];
+            this.length = length;
             this.selector = selector.selector;
             this.context = selector.context;
             return this;
@@ -64,9 +65,22 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
         else if ( typeof(selector) !== 'undefined' ) {
             var match = quickExpr.exec(selector);
-            if ( match && ( match[1] || ! context ) ) { // Verify a match, and that no context was specified for #id
+            if ( match && ( match[1] || ! context ) ) { // verify a match, and that no context was specified for #id
                 if ( match[1] ) { // HANDLE: $(html) -> $(array)
-                    this.nodes = nodesFromXHTML( match[1] ); // helper from manipulation.js
+                    var html = match[1];
+                    // If a single string is passed in and it's a single tag
+                    // just do a createElement and skip the rest
+                    if ( ( match = rsingleTag.exec( html ) ) ) {
+                        // FBJS fails on some elements but does not throw an error
+                        // e.g. for 'button' : "button is not an allowed DOM element"
+                        // and returns undefined !
+                        var el = document.createElement( match[1] );
+                        if ( !el ) return FBjqRY.error("init() failed to createElement('" + match[1] + "')");
+                        this.nodes = [ el ];
+                    }
+                    else {
+                        this.nodes = FBjqRY.clean( [ html ] );
+                    }
                 }
                 else { // HANDLE: $("#id")
                     this.nodes = [];
@@ -75,6 +89,7 @@ FBjqRY.fn = FBjqRY.prototype = {
                 }
             }
             else {
+                // handle $(document).ready :
                 //context = context || document.getRootElement(); // @todo should be ok document itself makes no sense ?!
                 // HANDLE: $(expr, [context]) -- which is just equivalent to: $(context).find(expr)
                 this.nodes = FBjqRY.find( selector, context, null ); // find setup in selector.js
@@ -126,7 +141,8 @@ FBjqRY.fn = FBjqRY.prototype = {
         ret.context = this.context;
 
         if ( name === "find" ) {
-            ret.selector = this.selector + (this.selector ? " " : "") + selector;
+            var thisSelector = this.selector;
+            ret.selector = thisSelector + (thisSelector ? " " : "") + selector;
         }
         else if ( name ) {
             ret.selector = this.selector + "." + name + "(" + selector + ")";
@@ -171,11 +187,15 @@ FBjqRY.fn = FBjqRY.prototype = {
 
     end: function() { // @todo || jQuery(null); ?
         return this.prevObject || FBjqRY( [] );
-    }
+    },
 
 	// For internal use only.
 	// Behaves like an Array's method, not like a jQuery method.
-	//push: push,
+	push: function() {
+        var nodes = this.nodes;
+        nodes.push.apply(nodes, arguments);
+        this.length = nodes.length;
+    }
 	//sort: [].sort,
 	//splice: [].splice
 };
@@ -211,7 +231,7 @@ FBjqRY.fbjs = { // NOTE: needs to be defined before extend is first used !
         var getNodeId = FBjqRY.fbjs.getNodeId;
         // __instance is a unique identifier for FBDOM nodes
         //return node1.__instance == node2.__instance;
-        return getNodeId(node1) === getNodeId(node2);
+        return getNodeId(node1) === getNodeId(node2, true);
     }
 };
 

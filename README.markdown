@@ -19,7 +19,13 @@ Code is based on jQuery 1.3.2 with some 1.4.2 goodies.
 Extensions
 ----------
 
-TODO
+The `FBjqRY.fbjs` module contains function for dealing with FBJS "DOM" nodes.
+
+There's an `FBjqRY.isString` for determining whether the argument is a String,
+that works with "pre-rendered" FBML blocks besides regular Javascript strings.
+
+There is a `FBjqRY.fn.fbml` function similar to `FBjqRY.fn.html` for setting
+FBML markup content into Facebook DOM nodes (based on `setInnerFBML`).
 
 
 LIMITATIONS
@@ -50,24 +56,25 @@ LIMITATIONS
     <a href="http://www.example.com/"></a>
     <a href="[YOUR_CANVAS_HOME_URL]/"></a>
 
-   array style access for FBjqRY ("jQuery") objects does not work, use get :
+   array style access for FBjqRY ("jQuery") objects does not work, use `get` :
 
-    var $div = $('div')[0]; // BAD - won't work cause of FBJS !
+    var $div = $('div')[0]; // BAD - will be undefined cause of FBJS !
     var $div = $('div').get(0); // OK
 
-   calling the FBjqRY function with arbitrary HTML won't work, it's based on
-   the `setInnerXHTML()` FBJS feature thus only accepts valid XHTML strings :
+   calling the FBjqRY function with arbitrary HTML won't work, some HTML types
+   are not supported by the parser e.g. `<object>` or `<button>` :
 
-    var $el = $('<div/><hr/><b/>'); // BAD - not valid XHTML !
-    var $el = $('<div><hr/><b/></div>'); // OK - valid XHTML
+    var $el = $('<button/>'); // FAILS
 
-    var $el = $('<div id="main"><div/>'); // BAD - double quotes !
-    var $el = $("<div id='main'><div/>"); // OK - single quotes
+   XHTMLize tags in Your HTML markup to be accepted by the XHTML parser :
+
+    var $el = $('<div/><hr/><br>'); // BAD - <br> is not valid XHTML !
+    var $el = $('<div/><hr/><br/>'); // OK - <br/> is valid XHTML
 
    the XHTML parser does not allow inline style with opacity (set manually) :
 
-    var $el = $("<div id='main' style='opacity: 0.55;'><div/>"); // BAD - fails
-    var $el = $("<div id='main'><div/>").css('opacity', '0.55'); // OK - works
+    var $el = $("<div id='main' style='opacity: 0.55;'/>"); // BAD - fails
+    var $el = $("<div id='main'/>").css('opacity', '0.55'); // OK - works
 
    the `FBjqRY.data()` method does not trigger any handlers as jQuery does
 
@@ -75,10 +82,15 @@ Issues
 ------
 
 
+
 Setup
 =====
 
-TODO
+For building/developing FBjqRY You'll need [http://ringojs.org](RingoJS).
+
+For building the project see the `build.js` file.
+
+Instructions for development setup might be found under test/README !
 
 Logging
 -------

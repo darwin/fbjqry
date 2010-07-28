@@ -75,12 +75,19 @@
         var div = jQuery("<div><hr/><code/><b/></div>");
         Asserts.assertEqual(1, div.length, 'one div (parent) node exist');
         Asserts.assertTrue(div.get(0).getTagName);
-        Asserts.assertEqual('DIV', div.get(0).getTagName());
+        Asserts.assertEqual('DIV', div.get(0).getTagName().toUpperCase());
         var divChilds = div.get(0).getChildNodes();
         Asserts.assertEqual(3, divChilds.length, 'div has 3 child nodes');
-        Asserts.assertEqual('HR', divChilds[0].getTagName());
-        Asserts.assertEqual('CODE', divChilds[1].getTagName());
-        Asserts.assertEqual('B', divChilds[2].getTagName());
+        Asserts.assertEqual('HR', divChilds[0].getTagName().toUpperCase());
+        Asserts.assertEqual('CODE', divChilds[1].getTagName().toUpperCase());
+        Asserts.assertEqual('B', divChilds[2].getTagName().toUpperCase());
+
+        var els = jQuery("<hr/><code/><b>b</b><br/>");
+        Asserts.assertEqual(4, els.length, 'has 4 nodes');
+        Asserts.assertEqual('HR', els.get(0).getTagName().toUpperCase());
+        Asserts.assertEqual('CODE', els.get(1).getTagName().toUpperCase());
+        Asserts.assertEqual('B', els.get(2).getTagName().toUpperCase());
+        Asserts.assertEqual('BR', els.get(3).getTagName().toUpperCase());
     };
     coreSuite.testFBjqRY3 = function () {
         Asserts.assertEqual(1, FBjqRY( document ).length);

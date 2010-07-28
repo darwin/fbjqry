@@ -10,12 +10,7 @@ FBjqRY.extend({
 
 	// The following elements throw uncatchable exceptions if you
 	// attempt to add expando properties to them.
-    /*
-	noData: {
-		"embed": true,
-		"object": true,
-		"applet": true
-	}, */
+	noData: { "embed": true, "object": true, "applet": true },
 
     data: function( elem, name, data ) {
 //        var id = getFBNodeId(elem, true), cache = FBjqRY.cache, thisCache;

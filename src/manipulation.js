@@ -1,14 +1,18 @@
 var //rinlinejQuery = / jQuery\d+="(?:\d+|null)"/g,
 	rleadingWhitespace = /^\s+/,
-	rxhtmlTag = /(<([\w:]+)[^>]*?)\/>/g,
 	rtagName = /<([\w:]+)/,
 	//rtbody = /<tbody/i,
-	//rhtml = /<|&#?\w+;/,
+	rhtml = /<|&#?\w+;/,
 	rnocache = /<script|<object|<embed|<option|<style/i,
-	//rchecked = /checked\s*(?:[^=]|=\s*.checked.)/i,  // checked="checked" or checked (html5)
+    rxhtmlTag = /(<([\w:]+)[^>]*?)\/>/g,
     rselfClosing = /^(?:area|br|col|embed|hr|img|input|link|meta|param)$/i,
 	fcloseTag = function( all, front, tag ) {
 		return rselfClosing.test( tag ) ? all : front + "></" + tag + ">";
+	},
+    // html5 style boolean attributes :
+	rhtml5Attr = /(checked|selected|disabled)(\s*=\s*['"]\w*['"])?/gi,
+	fhtml5Attr = function( str, attr, val ) {
+		return val ? str : attr + "='" + attr + "'";
 	},
 	wrapMap = {
 		option: [ 1, "<select multiple='multiple'>", "</select>" ],
@@ -18,7 +22,13 @@ var //rinlinejQuery = / jQuery\d+="(?:\d+|null)"/g,
 		td: [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ],
 		col: [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ],
 		area: [ 1, "<map>", "</map>" ],
-		_default: [ 0, "", "" ]
+		//_default: [ 0, "", "" ]
+        // "fixes" FBJS issue not allowing to set HTML only valid XHTML :
+        // these will wrap all content making it "more" XHTML friendly e.g.
+        //
+        // <div>1</div><div>2</div> will "become" valid XHTML due to wrappin
+        //
+        _default: [ 1, "<div>", "</div>" ]
 	};
 
 wrapMap.optgroup = wrapMap.option;
@@ -38,124 +48,33 @@ if ( ! FBjqRY.support.htmlSerialize ) {
  * - insertBefore: "before"
  * - insertAfter: "after"
  * - replaceAll: "replaceWith"
- * @param fn the delegate function
+ * @param manipFn the delegate function
  * @param selector the selector
  * @return FBjqRY object
  */
-var delegateManipulation = function(name, fn, selector) {
-    var ret = [], insert = FBjqRY(selector).nodes;
+var delegateManipulation = function(name, manipFn, selector) {
+    var ret = [], insert = FBjqRY(selector).nodes, self = this;
 
     for ( var i = 0, len = insert.length; i < len; i++ ) {
-        var elems = (i > 0 ? this.clone(true) : this).get();
-        fn.apply( FBjqRY( insert[i] ), elems );
+        var elems = (i > 0 ? self.clone(true) : self).nodes;
+        manipFn.call( FBjqRY( insert[i] ), elems );
         ret = ret.concat( elems );
     }
 
     return this.pushStack( ret, name, selector );
 };
 
-var rsingleTag = /^<(\w+)\s*\/?>(?:<\/\1>)?$/;
-
-// ============================================================================
-/** A helper around setInnerXHTML (FBJS beta feature) */
-// ============================================================================
-var nodesFromXHTML = function( elems, context ) { // based on jQuery.clean 1.3.2
-    context = context || document;
-    if ( typeof context.createElement === "undefined" ) context = document;
-
-    if ( FBjqRY.isString(elems) ) { // support single string
-        elems = [ elems ];
-    }
-
-    // If a single string is passed in and it's a single tag
-    // just do a createElement and skip the rest
-    if ( elems.length === 1 && FBjqRY.isString( elems[0] ) ) {
-        var match = rsingleTag.exec( elems[0] );
-        if ( match ) return [ context.createElement( match[1] ) ];
-    }
-
-    var ret = [], div = context.createElement("div");
-    var isFBNode = FBjqRY.fbjs.isNode;
-
-    FBjqRY.each(elems, function() {
-        var elem = this;
-
-        if ( typeof elem === "number" ) elem += '';
-        if ( ! elem ) return;
-
-        // Convert html string into DOM nodes
-        if ( FBjqRY.isString(elem) ) {
-            // Fix "XHTML"-style tags in all browsers
-            //var html = elem.replace(rxhtmlTag, rselfClosing);
-            var html = elem;
-
-            // Trim whitespace, otherwise indexOf won't work as expected
-            //html = html.replace(rleadingWhitespace, '');
-
-            var tag = rtagName.exec( html );
-            tag = tag ? tag[1] : '_default';
-            var wrap = wrapMap[ tag ] || wrapMap._default;
-
-            /*
-            var tags = html.replace(rleadingWhitespace, "").substring(0, 10).toLowerCase();
-            var wrap = // @todo not sure if this is needed FBJS might handle it it's own way ...
-                // option or optgroup
-                ! tags.indexOf("<opt") &&
-                [ 1, "<select multiple='multiple'>", "</select>" ] ||
-
-                ! tags.indexOf("<leg") &&
-                [ 1, "<fieldset>", "</fieldset>" ] ||
-
-                tags.match(/^<(thead|tbody|tfoot|colg|cap)/) &&
-                [ 1, "<table>", "</table>" ] ||
-
-                ! tags.indexOf("<tr") &&
-                [ 2, "<table><tbody>", "</tbody></table>" ] ||
-
-                // <thead> matched above
-                (! tags.indexOf("<td") || !tags.indexOf("<th")) &&
-                [ 3, "<table><tbody><tr>", "</tr></tbody></table>" ] ||
-
-                ! tags.indexOf("<col") &&
-                [ 2, "<table><tbody></tbody><colgroup>", "</colgroup></table>" ] ||
-
-                [ 0, "", "" ]; */
-
-            // Go to html and back, then peel off extra wrappers
-            //try {
-                div.setInnerXHTML( wrap[1] + html + wrap[2] );
-            //}
-            //catch(e) { // @todo errors ?
-                //console.log('wrap', wrap, rtagName.exec( html ), e);
-                //throw e;
-            //}
-
-            // Move to the right depth
-            var unwrapCount = wrap[0];
-            while ( unwrapCount-- ) div = div.getLastChild();
-
-            elem = div.getChildNodes();
-        }
-
-        if ( isFBNode(elem) ) ret.push( elem );
-        else ret = FBjqRY.merge( ret, elem );
-
-    });
-
-    return ret;
-};
-
 FBjqRY.fn.extend({
     text: function(text) {
         if ( typeof(text) !== 'undefined' ) {
-            //if ( FBjqRY.isFunction(text) ) {
-            //    return this.each(function(i) {
-            //        var self = FBjqRY(this);
-            //        self.text( text.call(this, i, null /* self.text() */) );
-            //    });
-            //}
-            //each(this.nodes, function() {  this.setTextValue(text); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( FBjqRY.isFunction(text) ) {
+                return this.each(function(i) {
+                    var self = FBjqRY(this), old = undefined; // self.text();
+                    self.text( text.call(this, i, old) );
+                });
+            }
+            
+            for ( var i = 0, len = this.length; i < len; i++ ) {
                 this.nodes[i].setTextValue(text);
             }
             return this;
@@ -179,36 +98,36 @@ FBjqRY.fn.extend({
             return FBjqRY.error("html() getter not supported");
         }
 		// See if we can take a shortcut and just use innerHTML
-		else if ( FBjqRY.isString(html) && ! rnocache.test( html ) &&
-			(FBjqRY.support.leadingWhitespace || ! rleadingWhitespace.test( html )) &&
-			! wrapMap[ (rtagName.exec( html ) || ["", ""])[1].toLowerCase() ] ) {
-
-			html = html.replace(rxhtmlTag, fcloseTag);
-
-			try {
-				for ( var i = 0, l = this.length; i < l; i++ ) {
-					// Remove element nodes and prevent memory leaks
-					//if ( this[i].nodeType === 1 ) {
-                    var node = this.nodes[i];
-                    FBjqRY.cleanData( node.getElementsByTagName("*") ); // @todo cleanData ?
-                    node.setInnerXHTML( html );
-					//}
-				}
-			// If using innerHTML throws an exception, use the fallback method
-			}
-            catch(e) {
-				this.empty().append( html );
-			}
+//		else if ( FBjqRY.isString(html) && ! rnocache.test( html ) &&
+//			(FBjqRY.support.leadingWhitespace || ! rleadingWhitespace.test( html )) &&
+//			! wrapMap[ (rtagName.exec( html ) || ["", ""])[1].toLowerCase() ] ) {
+//
+//			html = html.replace(rxhtmlTag, fcloseTag);
+//
+//			try {
+//				for ( var i = 0, l = this.length; i < l; i++ ) {
+//					// Remove element nodes and prevent memory leaks
+//                    var node = this.nodes[i];
+//                    if ( node.getNodeType() === 1 ) {
+//                        FBjqRY.cleanData( node.getElementsByTagName("*") );
+//                        node.setInnerXHTML( html );
+//					}
+//				}
+//			// If using innerHTML throws an exception, use the fallback method
+//			}
+//            catch(e) {
+//				this.empty().append( html );
+//			}
+//		}
+        else if ( FBjqRY.isFunction( html ) ) {
+			this.each( function(i) {
+				var self = FBjqRY(this), old = undefined; // self.html();
+				self.empty().append(function(){
+					return html.call( this, i, old );
+				});
+			});
+        
 		}
-        //else if ( FBjqRY.isFunction( html ) ) {
-		//	this.each( function(i) {
-		//		var self = FBjqRY(this), old = self.html();
-		//		self.empty().append(function(){
-		//			return html.call( this, i, old );
-		//		});
-		//	});
-        //
-		//}
         else {
 			this.empty().append( html );
 		}
@@ -221,8 +140,14 @@ FBjqRY.fn.extend({
      */
     fbml: function(fbml) {
         if ( typeof(fbml) !== 'undefined' ) {
-            //each(this.nodes, function() { this.setInnerFBML(fbml); });
-            for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
+            if ( FBjqRY.isFunction(fbml) ) {
+                return this.each(function(i) {
+                    var self = FBjqRY(this), old = undefined; // self.fbml();
+                    self.fbml( fbml.call(this, i, old) );
+                });
+            }
+            
+            for ( var i = 0, len = this.length; i < len; i++ ) {
                 this.nodes[i].setInnerFBML(fbml);
             }
             return this;
@@ -231,31 +156,33 @@ FBjqRY.fn.extend({
     },
 
     wrapAll: function(html) {
+		if ( FBjqRY.isFunction( html ) ) {
+			return this.each( function(i) {
+                var self = this;
+				FBjqRY(self).wrapAll( html.call(self, i) );
+			});
+		}
+
         var node = this.nodes[0];
 		if ( node ) {
 			// The elements to wrap the target around
-			var wrap = FBjqRY( html ).clone();
+			var wrap = FBjqRY( html ).eq(0).clone(true);
 
 			if ( node.getParentNode() ) {
 				wrap.insertBefore( node );
             }
+            
 			wrap.map( function() {
-				var elem = this, child = this.getFirstChild();
-				while ( child ) {
+				var elem = this, child;
+
+				while ( ( child = elem.getFirstChild() ) && child.getNodeType() === 1 ) {
                     elem = child;
-                    child = elem.getFirstChild();
                 }
 				return elem;
 			}).append(this);
 		}
 		return this;
     },
-    
-	wrapInner: function( html ) {
-		return this.each(function() {
-			FBjqRY(this).contents().wrapAll(html);
-		});
-	},
 
 	wrap: function( html ) {
 		return this.each(function() {
@@ -263,103 +190,235 @@ FBjqRY.fn.extend({
 		});
 	},
 
-	unwrap: function() {
-		return this.parent().each(function() {
-			FBjqRY( this ).replaceWith( this.getChildNodes() );
-		}).end();
+	wrapInner: function( html ) {
+        if ( FBjqRY.isFunction( html ) ) {
+            return this.each( function(i) {
+                var self = this;
+                FBjqRY(self).wrapInner( html.call(self, i) );
+            });
+        }
+
+		return this.each( function(i) {
+            var self = this;
+            // can't handle correctly if there are no childs -
+            // contents() will return an empty list in FBJS !
+            if ( ! self.getFirstChild() ) {
+                
+                var wrap = FBjqRY( html ).eq(0).clone(true);
+
+                if ( self.getParentNode() ) {
+                    wrap.insertBefore( self );
+                }
+                
+                wrap.each( function() {
+                    var elem = this, child;
+                    while ( ( child = elem.getFirstChild() )
+                        && child.getNodeType() === 1 ) {
+                        elem = child;
+                    }
+
+                    self.appendChild( elem );
+                });
+
+            } // there is at least one child :
+            else {
+                FBjqRY(self).contents().wrapAll( html );
+            }
+		});
 	},
 
-    append: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [ content ];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {node.appendChild(this);});
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ ) node.appendChild( content[j] );
-        }
-        return this;
-    },
-    appendTo: function(content) {
-        return delegateManipulation.call(this, 'appendTo', this.append, content);
-    },
-    //appendTo: function(nodes) { return FBjqRY(nodes).append(this); },
+	unwrap: function() {
+        //console.log('unwrap() StRT');
+		var ret = this.parent().each(function() {
+            var self = this; var $this = FBjqRY(self);
+			//$this.replaceWith( $this.children() );
+            $this.replaceWith( self.getChildNodes() );
+		}).end();
+        //console.log('unwrap() DoNE');
+        return ret;
+	},
 
-    prepend: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [ content ];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {node.insertBefore(this);});
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ ) node.insertBefore( content[j] );
-        }
-        return this;
-    },
-    prependTo: function(content) {
-        return delegateManipulation.call(this, 'prependTo', this.prepend, content);
-    },
-    //prependTo: function(nodes) { return FBjqRY(nodes).prepend(this); },
+    append: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY(self);
+				value = value.call(self, i, undefined /* $this.html() */);
+				$this.append( value );
+			});
+		}
 
-    after: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [content];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {
-        //        node.getParentNode().insertBefore(this, node.getNextSibling());
-        //    });
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ )
-                node.getParentNode().insertBefore( content[j], node.getNextSibling() );
-        }
-        return this;
-    },
-    insertAfter: function(content) {
-        return delegateManipulation.call(this, 'insertAfter', this.after, content);
-    },
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
 
-    before: function(content) {
-        content = FBjqRY(content).get();
-        content = content.length ? content : [content];
-        //each(this.nodes, function() {
-        //    var node = this;
-        //    each(content, function() {
-        //        node.getParentNode().insertBefore(this, node);
-        //    });
-        //});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i];
-            for ( var j = 0; j < content.length; j++ )
-                node.getParentNode().insertBefore( content[j], node );
-        }
-        return this;
-    },
-    insertBefore: function(content) {
-        return delegateManipulation.call(this, 'insertBefore', this.before, content);
-    },
+        //console.log('append', value);
 
-    remove: function(expr) {
-        //each(this.nodes, function() {
-        //    if ( ! expr || is(expr, [ this ]) ) {
-        //        this.getParentNode().removeChild(this);
-        //    }
-        //});
-        var nodeArray = [];
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            var node = this.nodes[i]; nodeArray[0] = node;
-            if ( ! expr || is(expr, nodeArray) ) {
-                node.getParentNode().removeChild(node);
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i], val;
+            if ( node.getNodeType() !== 1 ) continue;
+            for ( var j = 0; j < value.length; j++ ) {
+                if ( ( val = value[j] ) ) {
+                    if ( i > 0 ) val = val.cloneNode(true);
+                    //console.log('append i', node, value[j]);
+                    node.appendChild( val );
+                    //console.log('appended');
+                }
             }
         }
         return this;
     },
+    appendTo: function(value) {
+        return delegateManipulation.call(this, 'appendTo', this.append, value);
+    },
+
+    prepend: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY(self);
+				value = value.call(self, i, undefined /* $this.html() */);
+				$this.prepend( value );
+			});
+		}
+
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i], val;
+            if ( node.getNodeType() !== 1 ) continue;
+            for ( var j = 0; j < value.length; j++ ) {
+                if ( ( val = value[j] ) ) {
+                    if ( i > 0 ) val = val.cloneNode(true);
+                    node.insertBefore( val, node.getFirstChild() );
+                }
+            }
+        }
+        return this;
+    },
+    prependTo: function(value) {
+        return delegateManipulation.call(this, 'prependTo', this.prepend, value);
+    },
+
+    after: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY( self );
+				value = value.call( self, i );
+				$this.after( value );
+			});
+		}
+
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+
+        var nodes = this.nodes;
+		if ( nodes[0] && nodes[0].getParentNode() ) {
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = nodes[i], val;
+                var parent = node.getParentNode();
+                for ( var j = 0; j < value.length; j++ ) {
+                    if ( ( val = value[j] ) ) {
+                        if ( i > 0 ) val = val.cloneNode(true);
+                        parent.insertBefore( val, node.getNextSibling() );
+                    }
+                }
+            }
+            return this;
+		}
+        else if ( arguments.length ) {
+			var set = this.pushStack( this, "after", arguments );
+			set.push.apply( set, FBjqRY( arguments[0] ).toArray() );
+			return set;
+		}
+    },
+    insertAfter: function(value) {
+        return delegateManipulation.call(this, 'insertAfter', this.after, value);
+    },
+
+    before: function(value) {
+		if ( FBjqRY.isFunction(value) ) {
+			return this.each( function(i) {
+                var self = this;
+				var $this = FBjqRY( self );
+				value = value.call( self, i );
+				$this.before( value );
+			});
+		}
+
+        //console.log('before 1', value);
+        value = FBjqRY(value).nodes;
+        //value = typeof(value.length) === 'number' ? value : [ value ];
+        //console.log('before 2', value);
+
+        /*
+        for ( var i = 0, nodes = this.nodes, len = this.length; i < len; i++ ) {
+            var node = nodes[i];
+            var parent = node.getParentNode();
+            for ( var j = 0; j < value.length; j++ ) {
+                // @todo if there are text nodes it starts failing
+                // with an error "TypeError: b is null { message="b is null" }"
+                //
+                // these seems to be an issue only with cloning text nodes in
+                // replaceWith where clone() is hacked instead of detach() !
+                // 
+                // cloning a text node returns null !
+                //
+                if ( value[j] ) parent.insertBefore( value[j], node );
+            }
+        }
+
+        //console.log('before 3');
+        return this; */
+        
+        var nodes = this.nodes;
+		if ( nodes[0] && nodes[0].getParentNode() ) {
+            for ( var i = 0, len = this.length; i < len; i++ ) {
+                var node = nodes[i], val;
+                var parent = node.getParentNode();
+                for ( var j = 0; j < value.length; j++ ) {
+                    if ( ( val = value[j] ) ) {
+                        if ( i > 0 ) val = val.cloneNode(true);
+                        parent.insertBefore( val, node );
+                    }
+                }
+            }
+            return this;
+		}
+        else if ( arguments.length ) {
+			var set = FBjqRY( arguments[0] );
+			set.push.apply( set, this.toArray() );
+			return this.pushStack( set, "before", arguments );
+		}
+    },
+    insertBefore: function(value) {
+        return delegateManipulation.call(this, 'insertBefore', this.before, value);
+    },
+
+	// keepData is for internal use only--do not document
+	remove: function( selector, keepData ) {
+        
+        //console.log('remove()', this.nodes, selector);
+        var nodeArray = [];
+        for ( var i = 0, len = this.length, nodes = this.nodes; i < len; i++ ) {
+            var node = nodes[i]; nodeArray[0] = node;
+			if ( ! selector || FBjqRY.filter( selector, nodeArray ).length ) {
+				if ( ! keepData && node.getNodeType() === 1 ) {
+					FBjqRY.cleanData( node.getElementsByTagName("*") );
+                    FBjqRY.cleanData( nodeArray /* [ node ] */ );
+				}
+
+                //console.log('remove() removing', node, node.getNodeType());
+                var parent = node.getParentNode();
+				if ( parent ) parent.removeChild( node );
+                //console.log('remove() removed', node.__instance);
+			}
+		}
+
+        //console.log('remove() DoNE');
+		return this;
+	},
 
     empty: function() {
         this.children().remove();
@@ -368,18 +427,68 @@ FBjqRY.fn.extend({
 
     clone: function(includeEvents) {
         var cloned = [];
-        //each(this.nodes, function() {cloned.push( this.cloneNode() );});
-        for ( var i = 0, len = this.nodes.length; i < len; i++ ) {
-            cloned.push( this.nodes[i].cloneNode() );
+        // @todo clone events if jQuery events are kept !?
+        for ( var i = 0, len = this.length, nodes = this.nodes; i < len; i++ ) {
+            cloned.push( nodes[i].cloneNode(true) );
         }
         return FBjqRY(cloned);
     },
 
-    replaceWith: function(content) {
-        return this.after(content).remove();
-    },
-    replaceAll: function(content) {
-        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, content);
+	replaceWith: function( value ) {
+        var node = this.nodes[0];
+		if ( node && node.getParentNode() ) {
+			if ( FBjqRY.isFunction( value ) ) {
+				return this.each(function(i) {
+                    var self = this;
+					var $this = FBjqRY(self), old = undefined /* $this.html() */;
+					$this.replaceWith( value.call( self, i, old ) );
+				});
+			}
+
+			// Make sure that the elements are removed from the DOM before they
+            // are inserted. this can help fix replacing a parent with child elements
+
+            //console.log('replaceWith() value', value);
+
+			if ( ! FBjqRY.isString(value) ) {
+                // @todo another FBJS failure - it seems to not be
+                // able to reattach detached nodes - fails with :
+                // with an error "This DOM node is no longer valid"
+                //
+				//value = FBjqRY( value ).detach();
+                value = FBjqRY( value ).clone();
+			}
+
+            //console.log('replaceWith() value 2', value);
+
+			return this.each( function() {
+                var self = this;
+                //console.log('replaceWith() self', self);
+				var next = self.getNextSibling();
+                var parent = self.getParentNode();
+
+                //console.log('replaceWith() next', next);
+				FBjqRY( self ).remove();
+                //console.log('replaceWith() next2', !! next);
+
+				if ( next ) {
+                    //console.log('replaceWith() before', next, value);
+					FBjqRY( next ).before( value );
+				}
+                else {
+                    //console.log('replaceWith() append', parent, value);
+					FBjqRY( parent ).append( value );
+				}
+
+                //console.log('replaceWith() DoNE');
+			});
+		}
+        else {
+			return this.pushStack( FBjqRY(FBjqRY.isFunction(value) ? value() : value), "replaceWith", value );
+		}
+	},
+    replaceAll: function( value ) {
+        return delegateManipulation.call(this, 'replaceAll', this.replaceWith, value);
     },
 
 	detach: function( selector ) {
@@ -388,12 +497,6 @@ FBjqRY.fn.extend({
 });
 
 /*
-function root( elem, cur ) {
-	return jQuery.nodeName(elem, "table") ?
-		(elem.getElementsByTagName("tbody")[0] ||
-		elem.appendChild(elem.ownerDocument.createElement("tbody"))) :
-		elem;
-}
 
 function cloneCopyEvent(orig, ret) {
 	var i = 0;
@@ -451,85 +554,102 @@ function buildFragment( args, nodes, scripts ) {
 }
 
 jQuery.fragments = {};
+*/
 
-jQuery.extend({
-	clean: function( elems, context, fragment, scripts ) {
+FBjqRY.extend({
+
+	clean: function( elems, context /*, fragment, scripts */ ) {
 		context = context || document;
+        
+		if ( typeof context.createElement === "undefined" ) context = document;
 
-		// !context.createElement fails in IE with an error but returns typeof 'object'
-		if ( typeof context.createElement === "undefined" ) {
-			context = context.ownerDocument || context[0] && context[0].ownerDocument || document;
-		}
-
-		var ret = [];
+        var ret = []; //div = context.createElement("div");
+        var isFBNode = FBjqRY.fbjs.isNode, isString = FBjqRY.isString;
 
 		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
-			if ( typeof elem === "number" ) {
-				elem += "";
-			}
+			if ( typeof elem === "number" ) elem += "";
+			if ( ! elem ) continue;
 
-			if ( !elem ) {
-				continue;
-			}
+            if ( isString(elem) ) {
+                // Convert html string into DOM nodes
+                if ( ! rhtml.test( elem ) ) {
+                    //elem = context.createTextNode( elem ); continue;
+                    return FBjqRY.error("clean() cannot create text node: '" + elem + "'");
+                }
 
-			// Convert html string into DOM nodes
-			if ( typeof elem === "string" && !rhtml.test( elem ) ) {
-				elem = context.createTextNode( elem );
-
-			} else if ( typeof elem === "string" ) {
 				// Fix "XHTML"-style tags in all browsers
 				elem = elem.replace(rxhtmlTag, fcloseTag);
 
-				// Trim whitespace, otherwise indexOf won't work as expected
-				var tag = (rtagName.exec( elem ) || ["", ""])[1].toLowerCase(),
-					wrap = wrapMap[ tag ] || wrapMap._default,
-					depth = wrap[0],
-					div = context.createElement("div");
+                // setInnerXHTML does not support HTML5 style attributes
+                // e.g. <input type="radio" checked />
+                // fix: <input type="radio" checked="checked" />
+                elem = elem.replace(rhtml5Attr, fhtml5Attr);
+
+                var tag = rtagName.exec( elem );
+                tag = tag ? tag[1].toLowerCase() : '_default';
+                var wrap = wrapMap[ tag ];
+                //var xWrap = !! wrap;
+                if ( ! wrap ) wrap = wrapMap._default;
+
+				//var tag = (rtagName.exec( elem ) || ["", ""])[1].toLowerCase(),
+					//wrap = wrapMap[ tag ] || wrapMap._default;
+                var div = context.createElement("div");
 
 				// Go to html and back, then peel off extra wrappers
-				div.innerHTML = wrap[1] + elem + wrap[2];
+                var xhtml = wrap[1] + elem + wrap[2];
+				div.setInnerXHTML( xhtml );
 
 				// Move to the right depth
-				while ( depth-- ) {
-					div = div.lastChild;
-				}
+                var depth = wrap[0];
+				while ( depth-- ) div = div.getLastChild();
+
+                // The XHTML parser does not throw any errors - it only logs :
+                //
+                // XML Parsing Error: junk after document element Location:
+                // http://apps.facebook.com/fbjqry_dev/?run=manipulation
+                // Line Number 1, Column 18: <span>huuu</span><p></p>
+                //
+                // thus we'll check ourselves if the setInnnerXHTML succeeded :
+                //if ( wrap[1] ) tag = rtagName.exec( wrap[1] )[1].toLowerCase();
+                // it's XHTML thus we should always have the first child :
+                var fChild = div.getFirstChild();
+                if ( ! fChild || fChild.getTagName().toLowerCase() !== tag ) {
+                    //return FBjqRY.error('clean() setInnerXHTML with "'+ xhtml +'" failed !');
+                    return FBjqRY.error('clean() setInnerXHTML with "'+ elem +'" failed !');
+                }
 
 				// Remove IE's autoinserted <tbody> from table fragments
-				if ( !jQuery.support.tbody ) {
+				if ( ! FBjqRY.support.tbody ) {
 
 					// String was a <table>, *may* have spurious <tbody>
 					var hasBody = rtbody.test(elem),
-						tbody = tag === "table" && !hasBody ?
-							div.firstChild && div.firstChild.childNodes :
-
+						tbody = tag === "table" && ! hasBody ?
+							div.getFirstChild() && div.getFirstChild().getChildNodes() :
 							// String was a bare <thead> or <tfoot>
-							wrap[1] === "<table>" && !hasBody ?
-								div.childNodes :
-								[];
+							wrap[1] === "<table>" && ! hasBody ? div.getChildNodes() : [];
 
 					for ( var j = tbody.length - 1; j >= 0 ; --j ) {
-						if ( jQuery.nodeName( tbody[ j ], "tbody" ) && !tbody[ j ].childNodes.length ) {
-							tbody[ j ].parentNode.removeChild( tbody[ j ] );
+                        var tb = tbody[ j ];
+						if ( FBjqRY.nodeName( tb, "tbody" ) && ! tb.getChildNodes().length ) {
+							tb.getParentNode().removeChild( tb );
 						}
 					}
 
 				}
 
 				// IE completely kills leading whitespace when innerHTML is used
-				if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
-					div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
-				}
+				//if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
+				//	div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
+				//}
 
-				elem = div.childNodes;
+				elem = div.getChildNodes();
 			}
 
-			if ( elem.nodeType ) {
-				ret.push( elem );
-			} else {
-				ret = jQuery.merge( ret, elem );
-			}
+            if ( isFBNode(elem) ) ret.push( elem );
+            else ret = FBjqRY.merge( ret, elem );
 		}
 
+        /*
 		if ( fragment ) {
 			for ( i = 0; ret[i]; i++ ) {
 				if ( scripts && jQuery.nodeName( ret[i], "script" ) && (!ret[i].type || ret[i].type.toLowerCase() === "text/javascript") ) {
@@ -543,21 +663,26 @@ jQuery.extend({
 				}
 			}
 		}
+        */
 
 		return ret;
 	},
-	
+
 	cleanData: function( elems ) {
-		var data, id, cache = jQuery.cache,
-			special = jQuery.event.special,
-			deleteExpando = jQuery.support.deleteExpando;
-		
-		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
-			if ( elem.nodeName && jQuery.noData[elem.nodeName.toLowerCase()] ) {
+		var data, id, cache = FBjqRY.cache,
+			special = FBjqRY.event.special;
+			//deleteExpando = FBjqRY.support.deleteExpando;
+
+        var getNodeId = FBjqRY.fbjs.getNodeId;
+
+		for ( var i = 0, len = elems.length; i < len; i++ ) {
+            var elem = elems[i];
+
+			if ( elem.getTagName && FBjqRY.noData[ elem.getTagName().toLowerCase() ] ) {
 				continue;
 			}
 
-			id = elem[ jQuery.expando ];
+			id = getNodeId(elem, true); //elem[ jQuery.expando ];
 			
 			if ( id ) {
 				data = cache[ id ];
@@ -565,20 +690,18 @@ jQuery.extend({
 				if ( data && data.events ) {
 					for ( var type in data.events ) {
 						if ( special[ type ] ) {
-							jQuery.event.remove( elem, type );
-
+							FBjqRY.event.remove( elem, type );
 						} else {
-							removeEvent( elem, type, data.handle );
+                            elem.removeEventListener(type, data.handle);
+							//removeEvent( elem, type, data.handle );
 						}
 					}
 				}
 				
-				if ( deleteExpando ) {
-					delete elem[ jQuery.expando ];
-
-				} else if ( elem.removeAttribute ) {
-					elem.removeAttribute( jQuery.expando );
-				}
+				//if ( deleteExpando ) { delete elem[ jQuery.expando ];
+				//} else if ( elem.removeAttribute ) {
+				//	elem.removeAttribute( jQuery.expando );
+				//}
 				
 				delete cache[ id ];
 			}
@@ -586,19 +709,12 @@ jQuery.extend({
 	}
 });
 
-function evalScript( i, elem ) {
-	if ( elem.src ) {
-		jQuery.ajax({
-			url: elem.src,
-			async: false,
-			dataType: "script"
-		});
-	} else {
-		jQuery.globalEval( elem.text || elem.textContent || elem.innerHTML || "" );
-	}
-
-	if ( elem.parentNode ) {
-		elem.parentNode.removeChild( elem );
-	}
-}
-*/
+/*
+var rstartendtag = /<\/?([\w:]+)[^\/]*?>/g;
+var fstartendtag = function( str, tag ) {
+    return str;
+};
+var split2XHTML = function( html, tag ) {
+    //tag = tag ? tag : rtagName.exec( elem );
+    //html.split();
+}; */

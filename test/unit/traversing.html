@@ -83,6 +83,7 @@
         ok( !jQuery('#radio1').is(':checked'), 'Check for pseudoclass: Expected not checked' );
         
         ok( jQuery('#foo').is(':has(p)'), 'Check for child: Expected a child "p" element' );
+        
         ok( !jQuery('#foo').is(':has(ul)'), 'Check for child: Did not expect "ul" element' );
         ok( jQuery('#foo').is(':has(p):has(span):has(div)'), 'Check for childs: Expected "p", "span" and "div" child elements' );
         ok( !jQuery('#foo').is(':has(p):has(span):has(div):has(ol)'), 'Check for childs: Expected "p", "span" and "div" child elements, but no "ol"' );
