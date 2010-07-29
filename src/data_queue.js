@@ -1,4 +1,6 @@
-//var windowData = {};
+
+var expando = "FBjqRY" + FBjqRY.now(), uuid = 0;
+
 FBjqRY.extend({
 	cache: {},
 
@@ -6,7 +8,7 @@ FBjqRY.extend({
 	//uuid: 0,
 
 	// Unique for each copy of jQuery on the page
-	expando: "FBjqRY" + FBjqRY.now(),
+	expando: expando,
 
 	// The following elements throw uncatchable exceptions if you
 	// attempt to add expando properties to them.
@@ -20,11 +22,22 @@ FBjqRY.extend({
 //        else {
 //            id = getFBNodeId(elem, false);
 //        }
-        var id = FBjqRY.fbjs.getNodeId(elem), cache = FBjqRY.cache, thisCache;
+        var id, cache = FBjqRY.cache, thisCache;
+            
+        if ( FBjqRY.fbjs.isNode(elem) ) {
+            id = FBjqRY.fbjs.getNodeId(elem);
+        }
+        else {
+            // NOTE: we should allow .data to work for bare objects not just FB nodes :
+            id = elem[ expando ];
+            if ( ! id ) id = elem[ expando ] = ++uuid;
+        }
+
+        //console.log('data() ', elem, name, data);
 
 		// Avoid generating a new cache unless none exists and we
 		// want to manipulate it.
-		if ( typeof name === "object" ) {
+		if ( typeof(name) === "object" ) {
 			cache[ id ] = FBjqRY.extend(true, {}, name);
 		}
         else if ( ! cache[ id ] ) {
@@ -32,14 +45,22 @@ FBjqRY.extend({
 		}
 		thisCache = cache[ id ];
 
+        //console.log('data() id = ', id, thisCache);
+
 		// Prevent overriding the named cache with undefined values
 		if ( typeof(data) !== 'undefined' ) thisCache[ name ] = data;
 
-		return typeof(name) === "string" ? thisCache[ name ] : thisCache;
+		return typeof(name) === 'string' ? thisCache[ name ] : thisCache;
     },
 
     removeData: function( elem, name ) {
-        var id = FBjqRY.fbjs.getNodeId(elem, true), cache = FBjqRY.cache;
+        var id, cache = FBjqRY.cache;
+        if ( FBjqRY.fbjs.isNode(elem) ) {
+            id = FBjqRY.fbjs.getNodeId(elem, true);
+        }
+        else {
+            id = elem[ expando ];
+        }
         var thisCache = id ? cache[ id ] : undefined;
 
 		// If we want to remove a specific section of the element's data
@@ -108,7 +129,7 @@ FBjqRY.fn.extend({
         if ( typeof(key) === 'undefined' && this.length ) {
             return FBjqRY.data( this.nodes[0] );
         }
-        else if ( typeof key === "object" ) {
+        else if ( ! FBjqRY.isString(key) /*typeof key === "object"*/ ) {
             return this.each(function() { 
                 FBjqRY.data( this, key );
             });
@@ -141,7 +162,7 @@ FBjqRY.fn.extend({
     // embedded queue.js :
 
 	queue: function( type, data ) {
-		if ( typeof type !== "string" ) {
+		if ( typeof(type) !== 'string' ) {
 			data = type;
 			type = "fx";
 		}

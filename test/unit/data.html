@@ -1,8 +1,9 @@
 <fb:js-string var="dataFBML">
 
-<div id="foo">
+<div id="foo123">
+    <span></span>
 </div>
-
+    
 </fb:js-string>
 
 <script type="text/javascript">
@@ -10,10 +11,11 @@
 
     dataSuite.setUp = function () {
         document.getRootElement().setInnerFBML(dataFBML);
-    };
+    };  
 
     test("jQuery.data", function() {
         expect(12);
+        
         var div = document.createElement("div");
 
         ok( jQuery.data(div, "test") === undefined, "Check for no data exists" );
@@ -39,25 +41,40 @@
         equals( jQuery.data(div, "test"), "in", "Verify setting an object in data." );
         equals( jQuery.data(div, "test2"), "in2", "Verify setting an object in data." );
 
-        var obj = {};
-        jQuery.data( obj, "prop", true );
+        var obj1 = {}, obj2 = [];
+        jQuery.data( obj1, "prop", true );
+        jQuery.data( obj2, "prop", false );
 
         //ok( obj[ jQuery.expando ], "Data is being stored on the object." );
         //ok( obj[ jQuery.expando ].prop, "Data is being stored on the object." );
 
-        equals( jQuery.data( obj, "prop" ), true, "Make sure the right value is retrieved." );
+        equals( jQuery.data( obj1, "prop" ), true, "Make sure the right value is retrieved 1" );
+        equals( jQuery.data( obj2, "prop" ), false, "Make sure the right value is retrieved 2" );
+
+        jQuery.data( obj1, "prop2", { foo: 'bar' } );
+        equals( jQuery.data( obj1, "prop2" ), { foo: 'bar' }, "Make sure the right value is retrieved" );
+
+        //jQuery.removeData( obj1 );
+        //jQuery.removeData( obj2 );
+
     }, dataSuite);
 
     test(".data()", function() {
         expect(1);
 
-        var div = jQuery("#foo");
+        var div = jQuery("#foo123");
         div.data("test", "success");
-        same( div.data(), {test: "success"}, "data() get the entire data object" )
-    }, dataSuite)
+        //console.log('DATA:', div.data());
+        equals( div.data(), {test: "success"}, "data() get the entire data object 1" );
+
+        jQuery("span").data("test", {span: [1, 2, 3]});
+        equals( jQuery("span").data(), {test: {span: [1, 2, 3]}}, "data() get the entire data object 2" );
+
+    }, dataSuite);
 
     test(".data(String) and .data(String, Object)", function() {
         expect(23);
+        
         var div = jQuery("<div/>");
 
         ok( div.data("test") === undefined, "Check for no data exists" );
@@ -105,6 +122,7 @@
         hits.test = 0;
         gets.test = 0;
 
+        // @todo
         //div
         //    .bind("getData",function(e,key){ return key + "root"; })
         //    .bind("getData.foo",function(e,key){ return key + "foo"; });
@@ -132,19 +150,23 @@
         div.data({ "test": "in", "test2": "in2" });
         equals( div.data("test"), "in", "Verify setting an object in data." );
         equals( div.data("test2"), "in2", "Verify setting an object in data." );
+        
     }, dataSuite);
 
     test("jQuery.removeData", function() {
         expect(1);
-        var div = jQuery("#foo").get(0);
+        
+        var div = jQuery("#foo123").get(0);
         jQuery.data(div, "test", "testing");
         jQuery.removeData(div, "test");
         equals( jQuery.data(div, "test"), undefined, "Check removal of data" );
+        
     }, dataSuite);
 
     test(".removeData()", function() {
         expect(6);
-        var div = jQuery("#foo");
+        
+        var div = jQuery("#foo123");
         div.data("test", "testing");
         div.removeData("test");
         equals( div.data("test"), undefined, "Check removal of data" );
@@ -161,6 +183,17 @@
 
         div.removeData("test.foo");
         equals( div.data("test.foo"), undefined, "Make sure data is intact" );
+        
+        var obj = {};
+        jQuery.data( obj, "prop", true );
+        jQuery.data( obj, "prop2", { foo: 'bar' } );
+        
+        jQuery.removeData(obj, 'prop');
+        equals( jQuery.data( obj, "prop" ), undefined, "Make sure the data is gone 1" );
+
+        jQuery.removeData(obj, 'prop2');
+        equals( jQuery.data( obj, "prop2" ), undefined, "Make sure the data is gone 2" );
+        
     }, dataSuite);
 
 </script>

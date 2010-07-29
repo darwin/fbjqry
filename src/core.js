@@ -106,7 +106,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "0.5.0-SNAPSHOT", //"@VERSION",
+	jquery: "0.6.0-SNAPSHOT", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
@@ -206,28 +206,29 @@ FBjqRY.fn.init.prototype = FBjqRY.fn;
 // ============================================================================
 /** FBJS helpers */
 // ============================================================================
+var nextId = 1;
 FBjqRY.fbjs = { // NOTE: needs to be defined before extend is first used !
-    nextId: 1,
+    //nextId: 1,
     // NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
     // having the same elements matched with a different __instance identifier !
     getNodeId: function(node, dontGenerate) {
         // __instance is a unique identifier for FBDOM nodes
         //return node && node.__instance;
-        if ( node ) {
-            if ( ! node.getId ) return undefined;
+        if ( node && node.getId ) {
             var nodeId = node.getId();
             if ( ! nodeId && ! dontGenerate ) {
-                nodeId = '_generated-' + FBjqRY.fbjs.nextId++;
+                nodeId = '_FBjqRY_generated-' + nextId++; //FBjqRY.fbjs.nextId++;
                 node.setId( nodeId );
             }
             return nodeId;
         }
-        return node;
+        return undefined; //return node;
     },
     isNode: function(node) {
         return node && (node.__instance || node.__instance === 0);
     },
     sameNode: function(node1, node2) {
+        if ( node1 === node2 ) return true;
         var getNodeId = FBjqRY.fbjs.getNodeId;
         // __instance is a unique identifier for FBDOM nodes
         //return node1.__instance == node2.__instance;
@@ -596,6 +597,7 @@ FBjqRY.extend({
 
 	// A global GUID counter for objects
 	guid: 1,
+    
 	proxy: function( fn, proxy, thisObject ) {
 		if ( arguments.length === 2 ) {
 			if ( typeof proxy === "string" ) {
@@ -603,7 +605,7 @@ FBjqRY.extend({
 				fn = thisObject[ proxy ];
 				proxy = undefined;
 			}
-            else if ( proxy && !jQuery.isFunction( proxy ) ) {
+            else if ( proxy && ! FBjqRY.isFunction( proxy ) ) {
 				thisObject = proxy;
 				proxy = undefined;
 			}
@@ -617,7 +619,7 @@ FBjqRY.extend({
 
 		// Set the guid of unique handler to the same of original handler, so it can be removed
 		if ( fn ) {
-			proxy.guid = fn.guid = fn.guid || proxy.guid || jQuery.guid++;
+			proxy.guid = fn.guid = fn.guid || proxy.guid || FBjqRY.guid++;
 		}
 
 		// So proxy can be declared as an argument

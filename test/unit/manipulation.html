@@ -1124,6 +1124,11 @@
 
     test("html(String)", function() {
         testHtml(bareObj);
+        
+        var div = jQuery("<div>&nbsp;</div>");
+        Asserts.assertEqual( 1, div.size() );
+        Asserts.assertTrue( FBjqRY.nodeName(div.get(0), 'div') );
+        
     }, manipulationSuite);
 
     test("html(Function)", function() {

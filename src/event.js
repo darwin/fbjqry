@@ -12,12 +12,13 @@ var rnamespaces = /\.(.*)$/,
  */
 FBjqRY.event = {
 
+    global: {},
+
 	// Bind an event to an element
 	// Original by Dean Edwards
 	add: function( elem, types, handler, data ) {
-		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return;
-		//}
+        var nodeType = elem.getNodeType && elem.getNodeType();
+		if ( nodeType === 3 || nodeType === 8 ) return;
 
 		// For whatever reason, IE has trouble passing the window object
 		// around, causing it to be cloned in the process
@@ -36,15 +37,15 @@ FBjqRY.event = {
 
 		// Make sure that the function being executed has a unique ID
 		if ( ! handler.guid ) {
-			handler.guid = FBjqRY.guid++; // @todo ?
+			handler.guid = FBjqRY.guid++;
 		}
 
 		// Init the element's event structure
 		var elemData = FBjqRY.data( elem );
-
+        //console.log('add', elem, elemData);
 		// If no elemData is found then we must be trying to bind to one of the
 		// banned noData elements
-		if ( !elemData ) return;
+		if ( ! elemData ) return;
 
 		var events = elemData.events = elemData.events || {},
 			eventHandle = elemData.handle;
@@ -68,7 +69,6 @@ FBjqRY.event = {
 		types = types.split(" ");
 
 		var type, i = 0, namespaces;
-
 		while ( (type = types[ i++ ]) ) {
 			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : { handler: handler, data: data };
 
@@ -77,37 +77,36 @@ FBjqRY.event = {
 				namespaces = type.split(".");
 				type = namespaces.shift();
 				handleObj.namespace = namespaces.slice(0).sort().join(".");
-
-			} else {
+			} 
+            else {
 				namespaces = [];
 				handleObj.namespace = "";
 			}
 
 			handleObj.type = type;
-			if ( !handleObj.guid ) {
-				handleObj.guid = handler.guid;
-			}
+			if ( ! handleObj.guid ) handleObj.guid = handler.guid;
 
 			// Get the current list of functions bound to this event
-			var handlers = events[ type ], special = FBjqRY.event.special[ type ] || {};
+			var handlers = events[ type ], special = FBjqRY.event.special[ type ];
 
 			// Init the event handler queue
-			if ( !handlers ) {
+			if ( ! handlers ) {
 				handlers = events[ type ] = [];
-
+                
+                var setup = special && special.setup;
 				// Check for a special event handler
 				// Only use addEventListener/attachEvent if the special
 				// events handler returns false
-				if ( ! special.setup ||
-                        special.setup.call( elem, data, namespaces, eventHandle ) === false ) {
+				if ( ! setup || setup.call( elem, data, namespaces, eventHandle ) === false ) {
 					// Bind the global event handler to the element
-					//if (elem.addEventListener) {
+					if (elem.addEventListener && supportedEvents.indexOf(type) !== -1) {
+                        // NOTE: FBJS logs errors for events it does not "support" !
 						elem.addEventListener( type, eventHandle, false );
-					//}
+					}
 				}
 			}
 			
-			if ( special.add ) { 
+			if ( special && special.add ) { 
 				special.add.call( elem, handleObj ); 
 
 				if ( !handleObj.handler.guid ) {
@@ -125,8 +124,6 @@ FBjqRY.event = {
 		// Nullify elem to prevent memory leaks in IE
 		elem = null;
 	},
-
-	global: {},
 
 	// Detach an event or set of events from an element
 	remove: function( elem, types, handler, pos ) {
@@ -219,7 +216,7 @@ FBjqRY.event = {
 			// remove generic event handler if no more handlers exist
 			if ( eventType.length === 0 || pos != null && eventType.length === 1 ) {
 				if ( !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
-                    if (elem.removeEventListener) {
+                    if (elem.removeEventListener && supportedEvents.indexOf(type) !== -1) {
                         elem.removeEventListener( type, elemData.handle, false );
                     }
 				}
@@ -250,7 +247,7 @@ FBjqRY.event = {
 		// Event object or event type
 		var type = event.type || event, bubbling = arguments[3];
 
-		if ( !bubbling ) {
+		if ( ! bubbling ) {
 			event = typeof event === "object" ?
 				// jQuery.Event object
 				event[ FBjqRY.expando ] ? event :
@@ -265,7 +262,7 @@ FBjqRY.event = {
 			}
 
 			// Handle a global trigger
-			if ( !elem ) {
+			if ( ! elem ) {
 				// Don't bubble custom events when global (to avoid too much overhead)
 				event.stopPropagation(); // supported in FBJS
 
@@ -282,9 +279,9 @@ FBjqRY.event = {
 			// Handle triggering a single element
 
 			// don't do events on text and comment nodes
-			//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-			//	return undefined;
-			//}
+			if ( !elem || ( elem.getNodeType && (elem.getNodeType() === 3 || elem.getNodeType() === 8) ) ) {
+				return undefined;
+			}
 
 			// Clean up in case it is reused
 			event.result = undefined;
@@ -301,7 +298,7 @@ FBjqRY.event = {
 		var handle = FBjqRY.data( elem, "handle" );
 		if ( handle ) handle.apply( elem, data );
 
-		var parent = elem.getParentNode(); //|| elem.ownerDocument;
+		var parent = elem.getParentNode && elem.getParentNode(); //|| elem.ownerDocument;
 
 		// Trigger an inline bound script
         /*
@@ -314,37 +311,40 @@ FBjqRY.event = {
 		// prevent IE from throwing an error for some elements with some event types, see #3533
 		} catch (inlineError) {} */
 
-		if ( !event.isPropagationStopped() && parent ) { // @todo
+		if ( ! event.isPropagationStopped() && parent ) { // @todo
 			FBjqRY.event.trigger( event, data, parent, true );
 		}
-        else if ( !event.isDefaultPrevented() ) { // @todo
+        else if ( ! event.isDefaultPrevented() ) { // @todo
+            
 			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
 				isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
 				special = FBjqRY.event.special[ targetType ] || {};
 
-			if ( (!special._default || special._default.call( elem, event ) === false) && 
-				!isClick && !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
-                /* @todo ?!
-				try {
-					if ( target[ targetType ] ) {
+			if ( ( ! special._default || special._default.call( elem, event ) === false ) && 
+				! isClick && !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+				//try {
+                    //console.log('trigger', target, targetType, event)
+                    var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
+					//if ( target[ targetType ] ) {
+                    if ( listeners && ( len = listeners.length ) ) {
 						// Make sure that we don't accidentally re-trigger the onFOO events
-						old = target[ "on" + targetType ];
-
-						if ( old ) {
-							target[ "on" + targetType ] = null;
-						}
-
+						//old = target[ "on" + targetType ];
+						//if ( old ) target[ "on" + targetType ] = null;
 						FBjqRY.event.triggered = true;
-						target[ targetType ]();
+						//target[ targetType ]();
+                        for ( var i = 0; i < len; i++ ) {
+                            var listener = listeners[i];
+                            //console.log('calling: listeners[i] = ', listener, target, data);
+                            if ( ! listener ) continue; // some seem to be undefined
+                            //var ret = listener.call(target, event); // @todo
+                            //var ret = listener(target, event); // @todo
+                            var ret = listener.apply( target, data ); // @todo
+                            //if ( ret === false || event.isPropagationStopped ) break; // @todo
+                        }
 					}
-
 				// prevent IE from throwing an error for some elements with some event types, see #3533
-				} catch (triggerError) {}
-
-				if ( old ) {
-					target[ "on" + targetType ] = old;
-				} */
-
+				//} catch (triggerError) {}
+				//if ( old ) target[ "on" + targetType ] = old;
 				FBjqRY.event.triggered = false;
 			}
 		}
@@ -471,7 +471,7 @@ FBjqRY.event = {
 	},
 
 	// Deprecated, use jQuery.guid instead
-	guid: 100000000, //1E8,
+	//guid: 100000000, //1E8,
 
 	// Deprecated, use jQuery.proxy instead
 	proxy: FBjqRY.proxy,
@@ -629,8 +629,9 @@ if ( ! FBjqRY.support.submitBubbles ) { // @todo
     
 	FBjqRY.event.special.submit = {
 		setup: function( data, namespaces ) {
-			if ( this.nodeName.toLowerCase() !== "form" ) {
-				FBjqRY.event.add(this, "click.specialSubmit", function( e ) {
+            var self = this;
+			if ( ! FBjqRY.nodeName(self, "form") ) {
+				FBjqRY.event.add(self, "click.specialSubmit", function( e ) {
 					var elem = e.target, type = elem.type;
 
 					if ( (type === "submit" || type === "image") &&
@@ -639,7 +640,7 @@ if ( ! FBjqRY.support.submitBubbles ) { // @todo
 					}
 				});
 	 
-				FBjqRY.event.add(this, "keypress.specialSubmit", function( e ) {
+				FBjqRY.event.add(self, "keypress.specialSubmit", function( e ) {
 					var elem = e.target, type = elem.type;
 
 					if ( (type === "text" || type === "password") && 
@@ -684,7 +685,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 				}).join("-") :
 				"";
 		}
-        else if ( FBjqRY.nodeName(elem) === "select" ) {
+        else if ( FBjqRY.nodeName(elem, "select") ) {
 			val = elem.getSelectedIndex();
 		}
 
@@ -723,7 +724,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 			click: function( e ) {
 				var elem = e.target, type = elem.getType();
 
-				if ( type === "radio" || type === "checkbox" || FBjqRY.nodeName(elem) === "select" ) {
+				if ( type === "radio" || type === "checkbox" || FBjqRY.nodeName(elem, "select") ) {
 					return testChange.call( this, e );
 				}
 			},
@@ -733,7 +734,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 			keydown: function( e ) {
 				var elem = e.target, type = elem.getType();
 
-				if ( (e.keyCode === 13 && FBjqRY.nodeName(elem) !== "textarea") ||
+				if ( (e.keyCode === 13 && ! FBjqRY.nodeName(elem, "textarea")) ||
 					(e.keyCode === 32 && (type === "checkbox" || type === "radio")) ||
 					type === "select-multiple" ) {
 					return testChange.call( this, e );
@@ -751,18 +752,20 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 
 		setup: function( data, namespaces ) {
 			if ( this.type === "file" ) return false;
-
+            
+            var self = this;
 			for ( var type in changeFilters ) {
-				FBjqRY.event.add( this, type + ".specialChange", changeFilters[type] );
+				FBjqRY.event.add( self, type + ".specialChange", changeFilters[type] );
 			}
 
-			return formElems.test( this.nodeName );
+			return formElems.test( self.getTagName() );
 		},
 
 		teardown: function( namespaces ) {
-			FBjqRY.event.remove( this, ".specialChange" );
+            var self = this;
+			FBjqRY.event.remove( self, ".specialChange" );
 
-			return formElems.test( this.nodeName );
+			return formElems.test( self.getTagName() );
 		}
 	};
 
@@ -775,7 +778,7 @@ function trigger( type, elem, args ) {
 }
 
 // Create "bubbling" focus and blur events
-if ( document.addEventListener ) {
+if ( document.addEventListener ) { // @todo root
 	FBjqRY.each({ focus: "focusin", blur: "focusout" }, function( orig, fix ) {
 		FBjqRY.event.special[ fix ] = {
 			setup: function() {
@@ -796,8 +799,11 @@ if ( document.addEventListener ) {
 
 FBjqRY.each(["bind", "one"], function( i, name ) {
 	FBjqRY.fn[ name ] = function( type, data, fn ) {
+        
+        //console.log(name, type, data);
+        
 		// Handle object literals
-		if ( typeof type === "object" ) {
+		if ( ! FBjqRY.isString(type) /*typeof type === "object"*/ ) {
 			for ( var key in type ) {
 				this[ name ](key, data, type[key], fn);
 			}
@@ -818,8 +824,11 @@ FBjqRY.each(["bind", "one"], function( i, name ) {
 			this.one( type, data, fn );
 		}
         else {
+            var nodes = this.nodes;
+            //console.log(name, type, nodes);
 			for ( var i = 0, l = this.length; i < l; i++ ) {
-				FBjqRY.event.add( this[i], type, handler, data );
+                //console.log(name, type, nodes[i]);
+				FBjqRY.event.add( nodes[i], type, handler, data );
 			}
 		}
 
@@ -830,14 +839,14 @@ FBjqRY.each(["bind", "one"], function( i, name ) {
 FBjqRY.fn.extend({
 	unbind: function( type, fn ) {
 		// Handle object literals
-		if ( typeof type === "object" && !type.preventDefault ) {
-			for ( var key in type ) {
-				this.unbind(key, type[key]);
-			}
-
-		} else {
+		if ( typeof type === "object" && ! FBjqRY.isString(type) /* added */ 
+            && ! type.preventDefault ) {
+			for ( var key in type ) this.unbind( key, type[key] );
+		} 
+        else {
+            var nodes = this.nodes;
 			for ( var i = 0, l = this.length; i < l; i++ ) {
-				FBjqRY.event.remove( this[i], type, fn );
+				FBjqRY.event.remove( nodes[i], type, fn );
 			}
 		}
 
@@ -1045,14 +1054,10 @@ function liveConvert( type, selector ) {
 	return (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
 }
 
-//var supportedEvents = ("blur focus focusin focusout load resize scroll unload click dblclick " +
-//	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
-//	"change select submit keydown keypress keyup error").split(" ");
 var supportedEvents = ("blur change click dblclick error focus keydown keypress keyup load "  +
                    "mousedown mousemove mouseout mouseover mouseup resize scroll select " +
                    "submit unload").split(" ");
-FBjqRY.each( supportedEvents, function( i, name ) {
-
+var addEventFn = function( i, name ) {
 	// Handle event binding
 	FBjqRY.fn[ name ] = function( data, fn ) {
 		if ( fn == null ) {
@@ -1061,9 +1066,15 @@ FBjqRY.each( supportedEvents, function( i, name ) {
 		}
 		return arguments.length > 0 ? this.bind( name, data, fn ) : this.trigger( name );
 	};
-
 	if ( FBjqRY.attrFn ) FBjqRY.attrFn[ name ] = true;
-});
+};
+FBjqRY.each(supportedEvents, addEventFn);
+// NOTE: jQuery has 4 extra events on top what FBJS supports :
+// these won't be bind to FB elements using addEventListener !
+addEventFn(0, 'focusin'); 
+addEventFn(0, 'focusout');
+addEventFn(0, 'mouseenter'); 
+addEventFn(0, 'mouseleave');
 
 // Prevent memory leaks in IE
 // Window isn't included so as not to unbind existing unload events
