@@ -293,24 +293,30 @@
         same( multipleHas.get(), q("foo"), "Only adds elements once" );
     }, traversingSuite);
 
-//    test("closest()", function() {
-//        expect(9);
-//
-//        same( jQuery("body").closest("body").get(), q("body"), "closest(body)" );
-//        same( jQuery("body").closest("html").get(), q("html"), "closest(html)" );
-//        same( jQuery("body").closest("div").get(), [], "closest(div)" );
-//        same( jQuery("#main").closest("span,#html").get(), q("html"), "closest(span,#html)" );
-//
-//        same( jQuery("div:eq(1)").closest("div:first").get(), [], "closest(div:first)" );
-//        same( jQuery("div").closest("body:first div:last").get(), q("fx-tests"), "closest(body:first div:last)" );
-//
-//        // Test .closest() limited by the context
-//        var jq = jQuery("#nothiddendivchild");
-//        var root = document.getRootElement();
-//        same( jq.closest("html", document.body).get(), [], "Context limited." );
-//        same( jq.closest("body", document.body).get(), [], "Context limited." );
-//        same( jq.closest("#nothiddendiv", document.body).get(), q("nothiddendiv"), "Context not reached." );
-//    }, traversingSuite);
+    test("closest()", function() {
+        //expect(9);
+
+        same( jQuery(":root").closest(":root").get(), q(":root"), "closest(:root)" );
+        same( jQuery("#foo").closest(":root").get(), q(":root"), "closest(:root) for #foo" );
+        same( jQuery(":root").closest("span").get(), [], "closest(div)" );
+        same( jQuery("#ltr").closest("span,:root").get(), q(":root"), "closest(span,#html)" );
+
+        //console.log("div:eq(1)", jQuery("div:eq(1)").nodes);
+        //console.log("div:first", jQuery("div:first").nodes);
+        same( jQuery("div:eq(1)").closest("div:first").get(), q('foo'), "closest(div:first)" );
+        
+        same( jQuery("span:eq(1)").closest("span:first").get(), [], "closest(span:first)" );
+        
+        same( jQuery("div").closest(":root div:last").get(), q("muu"), "closest(:root div:last)" );
+
+        // Test .closest() limited by the context
+        var jq = jQuery("#bar2");
+        var root = document.getRootElement();
+        same( jq.closest(":root", root).get(), [], "Context limited." );
+        same( jq.closest("#bar2", root).get(), q("bar2"), "Context not reached 1" );
+        same( jq.closest("div", root).get(), q("foo"), "Context not reached 2" );
+        
+    }, traversingSuite);
 
 //    test("closest(Array)", function() {
 //        expect(6);

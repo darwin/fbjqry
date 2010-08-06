@@ -368,137 +368,147 @@ FBjqRY.extend({
 
 });
 
-/* @todo except for this.elem[this.prop] it should work !!!
 FBjqRY.fx.prototype = {
 	// Simple function for setting a style value
-	update: function(){
-		if ( this.options.step ) this.options.step.call( this.elem, this.now, this );
+	update: function() {
+        var self = this;
+		if ( self.options.step ) self.options.step.call( self.elem, self.now, this );
 
-		(FBjqRY.fx.step[this.prop] || FBjqRY.fx.step._default)( this );
+        var prop = self.prop;
+		(FBjqRY.fx.step[prop] || FBjqRY.fx.step._default)( self );
 
 		// Set display property to block for height/width animations
-		if ( this.prop == "height" || this.prop == "width" ) {
-			this.elem.setStyle('display', "block");
+		if ( prop == "height" || prop == "width" ) {
+			self.elem.setStyle('display', "block");
         }
 	},
     
 	// Get the current size
 	cur: function( force ) {
-		if ( this.elem[this.prop] != null && (this.elem.getStyle(this.prop) == null) ) {
-			return this.elem[ this.prop ];
+        var self = this;
+        var elem = self.elem, prop = self.prop;
+        //var elemProp = elem[ prop ]; // @todo
+        var elemProp = FBjqRY.attr(elem, prop); // @todo
+		if ( elemProp != null && (elem.getStyle(prop) == null) ) {
+			return elemProp;
 		}
 
-		var r = parseFloat(FBjqRY.css(this.elem, this.prop, force));
-		return r && r > -10000 ? r : parseFloat(FBjqRY.curCSS(this.elem, this.prop)) || 0;
+		var r = parseFloat( FBjqRY.css(elem, prop, force) );
+		return r && r > -10000 ? r : parseFloat( FBjqRY.curCSS(elem, prop) ) || 0;
 	},
 
 	// Start an animation from one number to another
 	custom: function( from, to, unit ) {
-		this.startTime = jQuery.now();
-		this.start = from;
-		this.end = to;
-		this.unit = unit || this.unit || "px";
-		this.now = this.start;
-		this.pos = this.state = 0;
+        var self = this;
+		self.startTime = FBjqRY.now();
+		self.start = from;
+		self.end = to;
+		self.unit = unit || self.unit || "px";
+		self.now = self.start;
+		self.pos = self.state = 0;
 
-		var self = this;
 		function t( gotoEnd ) {
 			return self.step(gotoEnd);
 		}
 
-		t.elem = this.elem;
+		t.elem = self.elem;
 
 		if ( t() && FBjqRY.timers.push(t) && !timerId ) {
-			timerId = setInterval(FBjqRY.fx.tick, 13);
+			timerId = setInterval( FBjqRY.fx.tick, 13 );
 		}
 	},
 
 	// Simple 'show' function
 	show: function() {
+        var self = this;
+        var elem = self.elem, prop = self.prop;
 		// Remember where we started, so that we can go back to it later
-		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
-		this.options.show = true;
+		self.options.orig[ prop ] = FBjqRY.style( elem, prop );
+		self.options.show = true;
 
 		// Begin the animation
 		// Make sure that we start at a small width/height to avoid any
 		// flash of content
-		this.custom(this.prop === "width" || this.prop === "height" ? 1 : 0, this.cur());
+		self.custom(prop === "width" || prop === "height" ? 1 : 0, self.cur());
 
 		// Start by showing the element
-		FBjqRY( this.elem ).show();
+		FBjqRY( elem ).show();
 	},
 
 	// Simple 'hide' function
 	hide: function() {
+        var self = this;
+        var elem = self.elem, prop = self.prop;
 		// Remember where we started, so that we can go back to it later
-		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
-		this.options.hide = true;
+		self.options.orig[ prop ] = FBjqRY.style( elem, prop );
+		self.options.hide = true;
 
 		// Begin the animation
-		this.custom(this.cur(), 0);
+		self.custom( self.cur(), 0 );
 	},
 
 	// Each step of an animation
 	step: function( gotoEnd ) {
+        var self = this;
+        var options = self.options, elem = self.elem;
+        
 		var t = FBjqRY.now(), done = true;
 
-		if ( gotoEnd || t >= this.options.duration + this.startTime ) {
-			this.now = this.end;
-			this.pos = this.state = 1;
-			this.update();
+		if ( gotoEnd || t >= options.duration + self.startTime ) {
+			self.now = self.end;
+			self.pos = self.state = 1;
+			self.update();
+            
+			options.curAnim[ self.prop ] = true;
 
-			this.options.curAnim[ this.prop ] = true;
-
-			for ( var i in this.options.curAnim ) {
-				if ( this.options.curAnim[i] !== true ) {
+			for ( var i in options.curAnim ) {
+				if ( options.curAnim[i] !== true ) {
 					done = false;
 				}
 			}
 
 			if ( done ) {
-				if ( this.options.display != null ) {
+				if ( options.display != null ) {
 					// Reset the overflow
-					this.elem.setStyle('overflow', this.options.overflow);
+					elem.setStyle('overflow', options.overflow);
 
 					// Reset the display
-					var old = FBjqRY.data(this.elem, "olddisplay");
-					this.elem.setStyle('display', old ? old : this.options.display);
+					var old = FBjqRY.data(elem, "olddisplay");
+					elem.setStyle('display', old ? old : options.display);
 
-					if ( FBjqRY.css(this.elem, "display") === "none" ) {
-                        this.elem.setStyle('display', "block");
+					if ( FBjqRY.css(elem, "display") === "none" ) {
+                        elem.setStyle('display', "block");
 					}
 				}
 
 				// Hide the element if the "hide" operation was done
-				if ( this.options.hide ) {
-					FBjqRY(this.elem).hide();
-				}
+				if ( options.hide ) FBjqRY(elem).hide();
 
 				// Reset the properties, if the item has been hidden or shown
-				if ( this.options.hide || this.options.show ) {
-					for ( var p in this.options.curAnim ) {
-						FBjqRY.style(this.elem, p, this.options.orig[p]);
+				if ( options.hide || options.show ) {
+					for ( var p in options.curAnim ) {
+						FBjqRY.style( elem, p, options.orig[p] );
 					}
 				}
 
 				// Execute the complete function
-				this.options.complete.call( this.elem );
+				options.complete.call( elem );
 			}
 
 			return false;
 
 		} else {
-			var n = t - this.startTime;
-			this.state = n / this.options.duration;
+			var n = t - self.startTime;
+			self.state = n / options.duration;
 
 			// Perform the easing function, defaults to swing
-			var specialEasing = this.options.specialEasing && this.options.specialEasing[this.prop];
-			var defaultEasing = this.options.easing || (FBjqRY.easing.swing ? "swing" : "linear");
-			this.pos = FBjqRY.easing[specialEasing || defaultEasing](this.state, n, 0, 1, this.options.duration);
-			this.now = this.start + ((this.end - this.start) * this.pos);
+			var specialEasing = options.specialEasing && options.specialEasing[ self.prop ];
+			var defaultEasing = options.easing || ( FBjqRY.easing.swing ? "swing" : "linear" );
+			self.pos = FBjqRY.easing[ specialEasing || defaultEasing ](self.state, n, 0, 1, options.duration);
+			self.now = self.start + ((self.end - self.start) * self.pos);
 
 			// Perform the next step of the animation
-			this.update();
+			self.update();
 		}
 
 		return true;
@@ -510,10 +520,10 @@ FBjqRY.extend( FBjqRY.fx, {
 		var timers = FBjqRY.timers;
 
 		for ( var i = 0; i < timers.length; i++ ) {
-			if ( !timers[i]() ) timers.splice(i--, 1);
+			if ( ! timers[i]() ) timers.splice(i--, 1);
 		}
 
-		if ( !timers.length ) FBjqRY.fx.stop();
+		if ( ! timers.length ) FBjqRY.fx.stop();
 	},
 		
 	stop: function() {
@@ -534,14 +544,16 @@ FBjqRY.extend( FBjqRY.fx, {
 		},
 
 		_default: function( fx ) {
-			if ( fx.elem.getStyle && fx.elem.getStyle(fx.prop) != null ) {
-				fx.elem.setStyle( fx.prop, (fx.prop === "width" || fx.prop === "height" ? Math.max(0, fx.now) : fx.now) + fx.unit );
-			} else {
-				fx.elem[ fx.prop ] = fx.now;
+            var elem = fx.elem, prop = fx.prop;
+			if ( elem.getStyle && elem.getStyle(prop) != null ) {
+				elem.setStyle( prop, (prop === "width" || prop === "height" ? Math.max(0, fx.now) : fx.now) + fx.unit );
+			} 
+            else {
+				elem[ fx.prop ] = fx.now; // @todo ?
 			}
 		}
 	}
-}); */
+});
 
 if ( FBjqRY.expr && FBjqRY.expr.filters ) {
 	FBjqRY.expr.filters.animated = function( elem ) {

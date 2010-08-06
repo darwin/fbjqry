@@ -62,52 +62,6 @@ FBjqRY.fn.extend({
         
         return this.pushStack( nodes, "filter", selector );
     },
-
-    /* @todo not implemented !
-	closest: function( selectors, context ) {
-		if ( jQuery.isArray( selectors ) ) {
-			var ret = [], cur = this[0], match, matches = {}, selector, level = 1;
-
-			if ( cur && selectors.length ) {
-				for ( var i = 0, l = selectors.length; i < l; i++ ) {
-					selector = selectors[i];
-
-					if ( !matches[selector] ) {
-						matches[selector] = jQuery.expr.match.POS.test( selector ) ? 
-							jQuery( selector, context || this.context ) :
-							selector;
-					}
-				}
-
-				while ( cur && cur.ownerDocument && cur !== context ) {
-					for ( selector in matches ) {
-						match = matches[selector];
-
-						if ( match.jquery ? match.index(cur) > -1 : jQuery(cur).is(match) ) {
-							ret.push({ selector: selector, elem: cur, level: level });
-						}
-					}
-					cur = cur.parentNode;
-					level++;
-				}
-			}
-
-			return ret;
-		}
-
-		var pos = jQuery.expr.match.POS.test( selectors ) ? 
-			jQuery( selectors, context || this.context ) : null;
-
-		return this.map(function( i, cur ) {
-			while ( cur && cur.ownerDocument && cur !== context ) {
-				if ( pos ? pos.index(cur) > -1 : jQuery(cur).is(selectors) ) {
-					return cur;
-				}
-				cur = cur.parentNode;
-			}
-			return null;
-		});
-	}, */
 	
 	// Determine the position of an element within
 	// the matched set of elements
@@ -136,11 +90,10 @@ FBjqRY.fn.extend({
 
 	andSelf: function() {
 		return this.add( this.prevObject );
-	}
-});
-
-FBjqRY.fn.extend({
-
+	},
+    
+    /* */
+    
     parent: function(selector) {
         return this.pushStack( collectParents(this.nodes, selector, false), "parent", selector || '' );
     },
@@ -205,8 +158,90 @@ FBjqRY.fn.extend({
         
         children = len === 1 ? children : FBjqRY.unique(children);
         return this.pushStack( children, "contents", '' );
-    }
+    },
+    
+    /* @todo does not support passing an array of selectors ! */
+	closest: function( selector, context ) {
+        /*
+        var self = this;
+        context = context ? context : self.context; //|| document.getRootElement();
+        
+        var closest = [], nodes = self.nodes, len = self.length, nodeArray = [];
+        var sameNode = FBjqRY.fbjs.sameNode;
 
+        for ( var i = 0; i < len; i++ ) {
+            var current = nodes[i];
+            while ( current && ! sameNode(context, current) ) {
+                nodeArray[0] = current;
+                if ( selector && matchesNodes(selector, nodeArray) ) {
+                    ( current.getNodeType() === 1 ) && closest.push( current );
+                    break; // done - only care about the first match up the tree
+                }
+                current = current.getParentNode();
+            }
+        }
+        
+        return this.pushStack( FBjqRY.unique(closest), "closest", selector ); */
+        
+        // matches POSistional selectors (from Sizzle internals) :
+        var POS = /:(nth|eq|gt|lt|first|last|even|odd)(?:\((\d*)\))?(?=[^\-]|$)/;        
+		var pos = POS.test( selector ) ?  FBjqRY( selector, context || this.context ) : null;
+
+        var sameNode = FBjqRY.fbjs.sameNode;
+		return this.map(function( i, cur ) {
+			while ( cur && ( context == null || ! sameNode(context, cur) ) ) {
+				if ( pos ? pos.index(cur) > -1 : FBjqRY(cur).is(selector) ) {
+					return cur;
+				}
+				cur = cur.getParentNode();
+			}
+			return null;
+		});
+        
+        /*
+		if ( jQuery.isArray( selectors ) ) {
+			var ret = [], cur = this[0], match, matches = {}, selector, level = 1;
+
+			if ( cur && selectors.length ) {
+				for ( var i = 0, l = selectors.length; i < l; i++ ) {
+					selector = selectors[i];
+
+					if ( !matches[selector] ) {
+						matches[selector] = jQuery.expr.match.POS.test( selector ) ? 
+							jQuery( selector, context || this.context ) :
+							selector;
+					}
+				}
+
+				while ( cur && cur.ownerDocument && cur !== context ) {
+					for ( selector in matches ) {
+						match = matches[selector];
+
+						if ( match.jquery ? match.index(cur) > -1 : jQuery(cur).is(match) ) {
+							ret.push({ selector: selector, elem: cur, level: level });
+						}
+					}
+					cur = cur.parentNode;
+					level++;
+				}
+			}
+
+			return ret;
+		}
+
+		var pos = jQuery.expr.match.POS.test( selectors ) ? 
+			jQuery( selectors, context || this.context ) : null;
+
+		return this.map(function( i, cur ) {
+			while ( cur && cur.ownerDocument && cur !== context ) {
+				if ( pos ? pos.index(cur) > -1 : jQuery(cur).is(selectors) ) {
+					return cur;
+				}
+				cur = cur.parentNode;
+			}
+			return null;
+		}); */
+	}
 });
 
 var collectSiblings = function(nodes, selector, getSiblings, until) {

@@ -119,7 +119,7 @@
 
         test = jQuery();
         equals( test.selector, "", "Empty jQuery Selector" );
-        equals( test.context, document, "Empty jQuery Context" );
+        //equals( test.context, document, "Empty jQuery Context" );
 
         test = jQuery(root);
         equals( test.selector, "", "Root Selector" );
@@ -127,11 +127,11 @@
 
         test = jQuery("#main");
         equals( test.selector, "#main", "#main Selector" );
-        equals( test.context, document, "#main Context" );
+        //equals( test.context, document, "#main Context" );
 
         test = jQuery("#notfound");
         equals( test.selector, "#notfound", "#notfound Selector" );
-        equals( test.context, document, "#notfound Context" );
+        //equals( test.context, document, "#notfound Context" );
 
         // NOTE: non-sense in FBJS as well as jQuery(document)
         //test = jQuery("#main", document);
@@ -158,27 +158,27 @@
 
         test = jQuery("#main").filter("div");
         equals( test.selector, "#main.filter(div)", "#main filter Selector" );
-        equals( test.context, document, "#main filter Context" );
+        //equals( test.context, document, "#main filter Context" );
 
         test = jQuery("#main").not("div");
         equals( test.selector, "#main.not(div)", "#main not Selector" );
-        equals( test.context, document, "#main not Context" );
+        //equals( test.context, document, "#main not Context" );
 
         test = jQuery("#main").filter("div").not("div");
         equals( test.selector, "#main.filter(div).not(div)", "#main filter, not Selector" );
-        equals( test.context, document, "#main filter, not Context" );
+        //equals( test.context, document, "#main filter, not Context" );
 
         test = jQuery("#main").filter("div").not("div").end();
         equals( test.selector, "#main.filter(div)", "#main filter, not, end Selector" );
-        equals( test.context, document, "#main filter, not, end Context" );
+        //equals( test.context, document, "#main filter, not, end Context" );
 
         test = jQuery("#main").parent("body");
         equals( test.selector, "#main.parent(body)", "#main parent Selector" );
-        equals( test.context, document, "#main parent Context" );
+        //equals( test.context, document, "#main parent Context" );
 
         test = jQuery("#main").eq(0);
         equals( test.selector, "#main.slice(0,1)", "#main eq Selector" );
-        equals( test.context, document, "#main eq Context" );
+        //equals( test.context, document, "#main eq Context" );
     };
 
     coreSuite.testIsFunction = function () {

@@ -97,7 +97,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
 
         this.selector = selector;
-        this.context = context || document; // @todo does the document make any sense with FBJS ?!
+        this.context = context; // || document; // NOTE: does not make sense with FBJS ...
         this.length = this.nodes.length;
         return this;
     },
@@ -411,8 +411,10 @@ FBjqRY.extend({
 		return true;
 	},
 
-	error: function( msg ) {
-		throw msg;
+	error: function( /* msg */ ) {
+        FBjqRY.log.apply(this, arguments);
+		//throw msg;
+        throw arguments.join('');
 	},
 
 	parseJSON: function(data) {
@@ -431,7 +433,7 @@ FBjqRY.extend({
 
 		}
         else {
-			return FBjqRY.error("parseJSON() invalid JSON: " + data);
+			return FBjqRY.error("parseJSON() invalid JSON: ", data);
 		}
 	},
 

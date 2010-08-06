@@ -331,7 +331,7 @@ FBjqRY.find = (function() {
                 }
             }
             else {
-                return FBjqRY.error("find() invalid context: " + context);
+                return FBjqRY.error("find() invalid context: ", context);
             }
         }
         else {

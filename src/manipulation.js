@@ -615,7 +615,7 @@ FBjqRY.extend({
                 var fChild = div.getFirstChild();
                 if ( ! fChild || fChild.getTagName().toLowerCase() !== tag ) {
                     //return FBjqRY.error('clean() setInnerXHTML with "'+ xhtml +'" failed !');
-                    return FBjqRY.error('clean() setInnerXHTML with "'+ elem +'" failed !');
+                    return FBjqRY.error('clean() setInnerXHTML failed with: ', elem);
                 }
 
 				// Remove IE's autoinserted <tbody> from table fragments

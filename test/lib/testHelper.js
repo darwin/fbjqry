@@ -18,23 +18,30 @@ var removeAllElements = function() {
 
 (function() {
 
-    var logEnabled = true, throwErrors = true;
+    var logEnabled = true;
     var consoleLog = (typeof console !== 'undefined') && console.log;
 
+    FBjqRY.log = function() {
+        if ( logEnabled && consoleLog ) {
+            consoleLog.apply(console, arguments);
+        }
+    };
+
+    /*
     FBjqRY.log = function(msg, e) {
         if ( logEnabled && consoleLog ) {
             e ? consoleLog(msg, e) : consoleLog(msg);
         }
         if ( e && throwErrors ) throw e;
     };
-
+    
     FBjqRY.error = function(msg) {
-        try {throw msg;}
+        try { throw msg; }
         catch (e) {
             FBjqRY.log('[ERROR]', e);
         }
         return undefined;
-    };
+    }; */
 
     var assertEqual = Asserts.assertEqual;
     Asserts.assertEqual = function(expected, actual, message) {
