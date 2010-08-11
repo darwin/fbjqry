@@ -29,7 +29,7 @@
 
 	FBjqRY.support = {
 		// IE strips leading whitespace when .innerHTML is used
-		leadingWhitespace: false, //div.getFirstChild().nodeType === 3,
+		leadingWhitespace: div.getFirstChild().getNodeType() === 3,
 
 		// Make sure that tbody elements aren't automatically inserted
 		// IE will insert them into empty tables
@@ -126,22 +126,25 @@
 	// Technique from Juriy Zaytsev
 	// http://thinkweb2.com/projects/prototype/detecting-event-support-without-browser-sniffing/
 	var eventSupported = function( eventName ) {
-		var el = document.createElement("div");
-		eventName = "on" + eventName;
+		//var div = document.createElement("div");
 
-		var isSupported = (eventName in el);
-		if ( ! isSupported ) {
-			el.setAttribute(eventName, "return;");
-			isSupported = typeof el[eventName] === "function";
-		}
-		el = null;
-
-		return isSupported;
+		//eventName = "on" + eventName;
+		//var isSupported = (eventName in div);
+		//if ( ! isSupported ) {
+		//	div.setAttribute(eventName, "return;");
+		//	isSupported = typeof div[eventName] === "function";
+		//}
+		//div = null;
+        //return isSupported;
+        
+        div.addEventListener(eventName, function() {}, false);
+        var eventListeners = div.listEventListeners(eventName);
+        return eventListeners && eventListeners.length === 1;
+        
 	};
 
-    // @todo :
-	//FBjqRY.support.submitBubbles = eventSupported("submit");
-	//FBjqRY.support.changeBubbles = eventSupported("change");
+	FBjqRY.support.submitBubbles = eventSupported("submit");
+	FBjqRY.support.changeBubbles = eventSupported("change");
 
 	// release memory in IE
 	root = script = div = all = a = null;
@@ -278,7 +281,7 @@ var parseJSON = (function() { //Modified json parser begins here :
                   if (v !== 0) {
                     value[k] = v;
                   } else {
-                    if (!toDelete) { toDelete = []; }
+                    if (!toDelete) {toDelete = [];}
                     toDelete.push(k);
                   }
                 }
@@ -291,7 +294,7 @@ var parseJSON = (function() { //Modified json parser begins here :
             }
             return opt_reviver.call(holder, key, value);
           };
-          result = walk({ '': result }, '');
+          result = walk({'': result}, '');
         }
 
         return result;

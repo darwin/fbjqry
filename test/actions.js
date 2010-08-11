@@ -26,26 +26,32 @@ exports.index = function (req) {
     //sys.print('env:', req['env']);
     //sys.print('cfg:', req['cfg']);
     
-    var run = req.params['run'] || 'all';
+    var args = req.params['run'] || 'all';
+    if (args == 'all') {
+        args = 'allTestSuites()';
+    }
+    else {
+        if ( ! args.match(/.+?Suite/) ) args += 'Suite';
+    }
+    
+    var only = req.params['only'];
+    if (only) {
+        args += ', ';
+        if ( ! only.match(/\/.+?\//) ) {
+            args += '/' + only + '/i';
+        } 
+        else args += only;
+    }
 
     var content = renderSourceScripts();
     content = content.concat( renderTestHelpers() );
     content = content.concat( renderUnitTests() );
-    
-    if ( run == 'all' ) {
-        content.push("\
-        <script type='text/javascript'> \n\
-            jsUnity.run.apply( jsUnity, allTestSuites() ); \n\
-        </script>");
-    }
-    else {
-        if ( ! run.match(/.+?Suite/) ) run += 'Suite';
-        content.push("\
-        <script type='text/javascript'> \n\
-            jsUnity.run( "+ run +" ); \n\
-        </script>");
-    }
-    
+
+    content.push("\
+    <script type='text/javascript'> \n\
+        jsUnity.run( "+ args +" ); \n\
+    </script>");
+
     return {
         status: 200,
         headers: {'Content-Type': 'text/html'},

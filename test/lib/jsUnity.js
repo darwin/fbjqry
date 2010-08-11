@@ -48,15 +48,13 @@ jsUnity = (function () {
             }
         }
     }
-    
+
     var defaultAssertions = {
         assertException: function (fn, message) {
             try {
                 typeof(fn) === 'function' && fn();
             }
-            catch (e) {
-                return;
-            }
+            catch (e) { return; }
             this.fail( format("?: (?) does not raise an exception or not a function",
                 message || "assertException", fn) );
         },
@@ -292,6 +290,11 @@ jsUnity = (function () {
         return suite;
     }
 
+    // Is the given value a regular expression?
+    function isRegExp(obj) {
+        return !!(obj && obj.test && obj.exec && (obj.ignoreCase || obj.ignoreCase === false));
+    }
+
     return {
         TestSuite: function (suiteName, scope) {
             this.suiteName = suiteName;
@@ -369,12 +372,19 @@ jsUnity = (function () {
             
             this.start();
 
-            for (var i = 0; i < arguments.length; i++) {
+            var suites = arguments, testRegExp;
+            // last argument might be a test filter "pattern" :
+            if ( isRegExp( arguments[arguments.length - 1] ) ) {
+                testRegExp = arguments[arguments.length - 1];
+                suites = arguments.slice(0, -1);
+            }
+
+            for ( var i = 0; i < suites.length; i++ ) {
                 try {
-                    var suite = jsUnity.compile(arguments[i]);
+                    var suite = jsUnity.compile( suites[i] );
                 }
                 catch (e) {
-                    this.log('[ERROR] invalid test suite: "' + arguments[i] + '" ' + e);
+                    this.log('[ERROR] invalid test suite: "' + suites[i] + '" ' + e);
                     return false;
                 }
 
@@ -388,9 +398,14 @@ jsUnity = (function () {
                 suiteNames.push(suite.suiteName);
                 results.total += cnt;
 
-                for (var j = 0; j < cnt; j++) {
+                for ( var j = 0; j < cnt; j++ ) {
                     var test = suite.tests[j], tearedDown;
-    
+                    
+                    if ( testRegExp && ! testRegExp.test( test.name ) ) {
+                        results.total--; // don't count if not run
+                        continue;
+                    }
+                    
                     try {
                         suite.setUp && suite.setUp();
                         test.fn.call(suite.scope);

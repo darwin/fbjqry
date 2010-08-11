@@ -70,7 +70,7 @@ FBjqRY.event = {
 
 		var type, i = 0, namespaces;
 		while ( (type = types[ i++ ]) ) {
-			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : { handler: handler, data: data };
+			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : {handler: handler, data: data};
 
 			// Namespaced event handlers
 			if ( type.indexOf(".") > -1 ) {
@@ -98,8 +98,11 @@ FBjqRY.event = {
 				// Only use addEventListener/attachEvent if the special
 				// events handler returns false
 				if ( ! setup || setup.call( elem, data, namespaces, eventHandle ) === false ) {
+                    
+                    console.log('add', type, namespaces, elem);
+                    
 					// Bind the global event handler to the element
-					if (elem.addEventListener && supportedEvents.indexOf(type) !== -1) {
+					if (elem.addEventListener && supportedEvents.indexOf(type) > -1) {
                         // NOTE: FBJS logs errors for events it does not "support" !
 						elem.addEventListener( type, eventHandle, false );
 					}
@@ -128,9 +131,8 @@ FBjqRY.event = {
 	// Detach an event or set of events from an element
 	remove: function( elem, types, handler, pos ) {
 		// don't do events on text and comment nodes
-		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return;
-		//}
+        var nodeType = elem.getNodeType && elem.getNodeType();
+		if ( nodeType === 3 || nodeType === 8 ) return;
 
 		if ( handler === false ) handler = returnFalse;
 
@@ -216,7 +218,7 @@ FBjqRY.event = {
 			// remove generic event handler if no more handlers exist
 			if ( eventType.length === 0 || pos != null && eventType.length === 1 ) {
 				if ( !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
-                    if (elem.removeEventListener && supportedEvents.indexOf(type) !== -1) {
+                    if (elem.removeEventListener && supportedEvents.indexOf(type) > -1) {
                         elem.removeEventListener( type, elemData.handle, false );
                     }
 				}
@@ -242,13 +244,14 @@ FBjqRY.event = {
 		}
 	},
 
-	// bubbling is internal
-	trigger: function( event, data, elem /*, bubbling */ ) {
+	trigger: function( event, data, elem, bubbling ) { // bubbling is internal
 		// Event object or event type
-		var type = event.type || event, bubbling = arguments[3];
+		var type = event.type || event; //, bubbling = arguments[3];
+
+        console.log('trigger', event, data, elem);
 
 		if ( ! bubbling ) {
-			event = typeof event === "object" ?
+			event = ! FBjqRY.isString(event) /*typeof event === "object"*/ ?
 				// jQuery.Event object
 				event[ FBjqRY.expando ] ? event :
 				// Object literal
@@ -264,7 +267,7 @@ FBjqRY.event = {
 			// Handle a global trigger
 			if ( ! elem ) {
 				// Don't bubble custom events when global (to avoid too much overhead)
-				event.stopPropagation(); // supported in FBJS
+				event.stopPropagation();
 
 				// Only trigger if we've ever bound an event for it
 				if ( FBjqRY.event.global[ type ] ) {
@@ -279,7 +282,9 @@ FBjqRY.event = {
 			// Handle triggering a single element
 
 			// don't do events on text and comment nodes
-			if ( !elem || ( elem.getNodeType && (elem.getNodeType() === 3 || elem.getNodeType() === 8) ) ) {
+            if ( !elem ) return undefined;
+            var nodeType = elem.getNodeType && elem.getNodeType();
+			if ( nodeType && (nodeType === 3 || nodeType === 8) ) {
 				return undefined;
 			}
 
@@ -289,65 +294,118 @@ FBjqRY.event = {
 
 			// Clone the incoming data, if any
 			data = FBjqRY.makeArray( data );
-			data.unshift( event );
+			data.unshift( event ); // add the event to the front
 		}
 
 		event.currentTarget = elem;
 
 		// Trigger the event, it is assumed that "handle" is a function
 		var handle = FBjqRY.data( elem, "handle" );
-		if ( handle ) handle.apply( elem, data );
+		if ( handle ) { 
+            //console.log('trigger handle:', elem, data);
+            handle.apply( elem, data );
+        }
 
-		var parent = elem.getParentNode && elem.getParentNode(); //|| elem.ownerDocument;
+        // ------------
 
-		// Trigger an inline bound script
-        /*
-		try {
-			if ( !(elem && elem.nodeName && FBjqRY.noData[elem.getTagName().toLowerCase()]) ) {
-				if ( elem[ "on" + type ] && elem[ "on" + type ].apply( elem, data ) === false ) {
-					event.result = false;
-				}
-			}
-		// prevent IE from throwing an error for some elements with some event types, see #3533
-		} catch (inlineError) {} */
+		// Handle triggering native .onfoo handlers (and on links since we don't call .click() for links)
+		//if ( (! elem[type] || (jQuery.nodeName(elem, 'a') && type == "click")) && elem["on"+type] && elem["on"+type].apply( elem, data ) === false )
+		//	event.result = false;
 
-		if ( ! event.isPropagationStopped() && parent ) { // @todo
-			FBjqRY.event.trigger( event, data, parent, true );
+        var parent = elem.getParentNode && elem.getParentNode();
+
+		if ( ! event.isPropagationStopped() && parent ) {
+			FBjqRY.event.trigger(event, data, parent, true);
 		}
-        else if ( ! event.isDefaultPrevented() ) { // @todo
+		// Trigger the native events (except for clicks on links)
+		else if ( /*! bubbling && elem[type] &&*/ ! event.isDefaultPrevented() /*&& !(jQuery.nodeName(elem, 'a') && type == "click") */ ) {
+			//this.triggered = true;
+			//try {
+			//	elem[ type ]();
+			//// prevent IE from throwing an error for some hidden elements
+			//} catch (e) {}
             
-			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
-				isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
+			var target = event.target, targetType = type.replace(/\..*$/, ""),
 				special = FBjqRY.event.special[ targetType ] || {};
-
+            
 			if ( ( ! special._default || special._default.call( elem, event ) === false ) && 
-				! isClick && !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
-				//try {
-                    //console.log('trigger', target, targetType, event)
-                    var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
-					//if ( target[ targetType ] ) {
-                    if ( listeners && ( len = listeners.length ) ) {
-						// Make sure that we don't accidentally re-trigger the onFOO events
-						//old = target[ "on" + targetType ];
-						//if ( old ) target[ "on" + targetType ] = null;
-						FBjqRY.event.triggered = true;
-						//target[ targetType ]();
-                        for ( var i = 0; i < len; i++ ) {
-                            var listener = listeners[i];
-                            //console.log('calling: listeners[i] = ', listener, target, data);
-                            if ( ! listener ) continue; // some seem to be undefined
-                            //var ret = listener.call(target, event); // @todo
-                            //var ret = listener(target, event); // @todo
-                            var ret = listener.apply( target, data ); // @todo
-                            //if ( ret === false || event.isPropagationStopped ) break; // @todo
+				! (target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+             
+                var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
+                if ( listeners && ( len = listeners.length ) ) {
+                    
+                    FBjqRY.event.triggered = true;
+                    
+                    for ( var i = 0; i < len; i++ ) {
+                        
+                        //console.log('calling: listeners[i] = ', listeners[i], target, data);
+                        
+                        if ( ! listeners[i] ) continue; // some seem to be undefined
+                        
+                        var ret = listeners[i].apply( target, data );
+                        if ( ret === false ) { 
+                            event.result = false;
+                            if ( event.isPropagationStopped() ) break;
                         }
-					}
-				// prevent IE from throwing an error for some elements with some event types, see #3533
-				//} catch (triggerError) {}
-				//if ( old ) target[ "on" + targetType ] = old;
-				FBjqRY.event.triggered = false;
-			}
+                    }
+                }
+                
+                FBjqRY.event.triggered = false;
+            }
 		}
+
+        // ------------
+
+//		var parent = elem.getParentNode && elem.getParentNode(); //|| elem.ownerDocument;
+//
+//		// Trigger an inline bound script
+//        /*
+//		try {
+//			if ( !(elem && elem.nodeName && FBjqRY.noData[elem.getTagName().toLowerCase()]) ) {
+//				if ( elem[ "on" + type ] && elem[ "on" + type ].apply( elem, data ) === false ) {
+//					event.result = false;
+//				}
+//			}
+//		// prevent IE from throwing an error for some elements with some event types, see #3533
+//		} catch (inlineError) {} */
+//
+//		if ( ! event.isPropagationStopped() && parent ) { // @todo
+//			FBjqRY.event.trigger( event, data, parent, true );
+//		}
+//        else if ( ! event.isDefaultPrevented() ) {
+//            
+//			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
+//				//isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
+//				special = FBjqRY.event.special[ targetType ] || {};
+//
+//			if ( ( ! special._default || special._default.call( elem, event ) === false ) && 
+//				/*! isClick &&*/ !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+//				//try {
+//                    //console.log('trigger', target, targetType, event)
+//                    var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
+//					//if ( target[ targetType ] ) {
+//                    if ( listeners && ( len = listeners.length ) ) {
+//						// Make sure that we don't accidentally re-trigger the onFOO events
+//						//old = target[ "on" + targetType ];
+//						//if ( old ) target[ "on" + targetType ] = null;
+//						FBjqRY.event.triggered = true;
+//						//target[ targetType ]();
+//                        for ( var i = 0; i < len; i++ ) {
+//                            var listener = listeners[i];
+//                            //console.log('calling: listeners[i] = ', listener, target, data);
+//                            if ( ! listener ) continue; // some seem to be undefined
+//                            //var ret = listener.call(target, event); // @todo
+//                            //var ret = listener(target, event); // @todo
+//                            var ret = listener.apply( target, data ); // @todo
+//                            if ( ret === false || event.isPropagationStopped() ) break; // @todo
+//                        }
+//					}
+//				// prevent IE from throwing an error for some elements with some event types, see #3533
+//				//} catch (triggerError) {}
+//				//if ( old ) target[ "on" + targetType ] = old;
+//				FBjqRY.event.triggered = false;
+//			}
+//		}
 	},
 
 	handle: function( event ) {
@@ -357,10 +415,12 @@ FBjqRY.event = {
 		event = args[0] = FBjqRY.event.fix( event );
 		event.currentTarget = this;
 
-		// Namespaced event handlers
-		all = event.type.indexOf(".") < 0 && !event.exclusive;
+        //console.log('handle() 0', event);
 
-		if ( !all ) {
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && ! event.exclusive;
+
+		if ( ! all ) {
 			namespaces = event.type.split(".");
 			event.type = namespaces.shift();
 			namespace_sort = namespaces.slice(0).sort();
@@ -388,16 +448,78 @@ FBjqRY.event = {
 					event.handleObj = handleObj;
 	
 					var ret = handleObj.handler.apply( this, args );
+                    
+                    //console.log('handle() 1', event, this, ret);
+                    
+					if ( typeof(ret) !== 'undefined' ) {
+						event.result = ret;
+						if ( ret === false ) {
+                            //console.log('handle() 0', ret, event, event.preventDefault);
+							event.preventDefault();
+                            //console.log('handle() 1', ret, event);
+							event.stopPropagation();
+                            //console.log('handle() 2', ret, event);
+						}
+					}
+
+					if ( event.isImmediatePropagationStopped() ) break;
+				}
+			}
+		}
+
+		return event.result;
+	},
+    /*
+	handle: function( event ) {
+		var all, handlers, namespaces, namespace, events;
+        var args = FBjqRY.makeArray( arguments );
+        
+		event = args[0] = FBjqRY.event.fix( event );
+		event.currentTarget = this;
+
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && !event.exclusive;
+
+		if ( !all ) {
+			namespaces = event.type.split(".");
+			event.type = namespaces.shift();
+			namespace = new RegExp("(^|\\.)" + namespaces.slice(0).sort().join("\\.(?:.*\\.)?") + "(\\.|$)");
+		}
+
+		events = FBjqRY.data(this, "events"); 
+        handlers = events ? events[ event.type ] : undefined;
+
+		if ( events && handlers ) {
+			// Clone the handlers to prevent manipulation
+			handlers = handlers.slice(0);
+
+			for ( var j = 0, l = handlers.length; j < l; j++ ) {
+				var handleObj = handlers[ j ];
+
+				// Filter the functions by class
+				if ( all || namespace.test( handleObj.namespace ) ) {
+					// Pass in a reference to the handler function itself
+					// So that we can later remove it
+					event.handler = handleObj.handler;
+					event.data = handleObj.data;
+					event.handleObj = handleObj;
+
+                    console.log('handle() 0 calling handler', event, this);
+
+					var ret = handleObj.handler.apply( this, args );
+
+                    console.log('handle() 1 handler returned', ret);
 
 					if ( ret !== undefined ) {
 						event.result = ret;
 						if ( ret === false ) {
-							event.preventDefault(); // FBJS ok
-							event.stopPropagation(); // FBJS ok
+							event.preventDefault();
+							event.stopPropagation();
 						}
 					}
 
 					if ( event.isImmediatePropagationStopped() ) {
+                        console.log('handle() 2 breaking handler chain !');
 						break;
 					}
 				}
@@ -405,7 +527,8 @@ FBjqRY.event = {
 		}
 
 		return event.result;
-	},
+	}, */
+    
     /*
 	props: "altKey attrChange attrName bubbles button cancelable charCode " + 
            "clientX clientY ctrlKey currentTarget data detail eventPhase fromElement " +
@@ -477,24 +600,37 @@ FBjqRY.event = {
 	proxy: FBjqRY.proxy,
 
 	special: {
-		//ready: {
-		//	// Make sure the ready event is setup
-		//	setup: jQuery.bindReady,
-		//	teardown: jQuery.noop
-		//},
+        /*
+		ready: {
+			// Make sure the ready event is setup
+			setup: jQuery.bindReady,
+			teardown: jQuery.noop
+		}, */
 
 		live: {
 			add: function( handleObj ) {
-				FBjqRY.event.add( this,
-					liveConvert( handleObj.origType, handleObj.selector ),
-					FBjqRY.extend({}, handleObj, {handler: liveHandler, guid: handleObj.handler.guid}) );
+				FBjqRY.event.add( this, handleObj.origType, FBjqRY.extend({}, handleObj, { handler: liveHandler }) );
 			},
-
 			remove: function( handleObj ) {
-				FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
+				var remove = true, type = handleObj.origType.replace(rnamespaces, "");
+                    
+                var events = FBjqRY.data(this, "events").live;
+                if (events) {
+                    for ( var i = 0, len = events.length; i < len; i++ ) {
+                        if ( type === events[i].origType.replace(rnamespaces, "") ) {
+                            remove = false;
+                            break;
+                        }                        
+                    }
+                }
+
+				if (remove) FBjqRY.event.remove( this, handleObj.origType, liveHandler );
+                
+                // @todo
+                //FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
 			}
 		}
-
+        
         /*
 		beforeunload: {
 			setup: function( data, namespaces, eventHandle ) {
@@ -502,8 +638,9 @@ FBjqRY.event = {
 				if ( this.setInterval ) {
 					this.onbeforeunload = eventHandle;
 				}
-			},
 
+				return false;
+			},
 			teardown: function( namespaces, eventHandle ) {
 				if ( this.onbeforeunload === eventHandle ) {
 					this.onbeforeunload = null;
@@ -513,7 +650,13 @@ FBjqRY.event = {
 	}
 };
 
+function returnFalse() {return false;}
+function returnTrue() {return true;}
+
 FBjqRY.Event = function( src ) {
+    
+    //console.log('Event src:', src);
+    
 	// Allow instantiation without the 'new' keyword
 	if ( !this.preventDefault ) {
 		return new FBjqRY.Event( src );
@@ -535,9 +678,6 @@ FBjqRY.Event = function( src ) {
 	// Mark it as fixed
 	this[ FBjqRY.expando ] = true;
 };
-
-function returnFalse() { return false; }
-function returnTrue() { return true; }
 
 // jQuery.Event is based on DOM3 Events as specified by the ECMAScript Language Binding
 // http://www.w3.org/TR/2003/WD-DOM-Level-3-Events-20030331/ecma-script-binding.html
@@ -632,28 +772,25 @@ if ( ! FBjqRY.support.submitBubbles ) { // @todo
             var self = this;
 			if ( ! FBjqRY.nodeName(self, "form") ) {
 				FBjqRY.event.add(self, "click.specialSubmit", function( e ) {
-					var elem = e.target, type = elem.type;
+					var elem = e.target, type = elem.getType();
 
 					if ( (type === "submit" || type === "image") &&
                         FBjqRY( elem ).closest("form").length ) {
 						return trigger( "submit", this, arguments );
 					}
 				});
-	 
 				FBjqRY.event.add(self, "keypress.specialSubmit", function( e ) {
-					var elem = e.target, type = elem.type;
+					var elem = e.target, type = elem.getType();
 
 					if ( (type === "text" || type === "password") && 
                         FBjqRY( elem ).closest("form").length && e.keyCode === 13 ) {
 						return trigger( "submit", this, arguments );
 					}
 				});
-
 			} else {
 				return false;
 			}
 		},
-
 		teardown: function( namespaces ) {
 			FBjqRY.event.remove( this, ".specialSubmit" );
 		}
@@ -668,9 +805,7 @@ function getSelectOptions(select) {
 // change delegation, happens here so we have bind.
 if ( ! FBjqRY.support.changeBubbles ) { // @todo
 
-	var formElems = /textarea|input|select/i,
-    
-    changeFilters,
+	var formElems = /textarea|input|select/i, changeFilters,
 
 	getVal = function( elem ) {
 		var type = elem.getType(), val = elem.getValue();
@@ -778,8 +913,9 @@ function trigger( type, elem, args ) {
 }
 
 // Create "bubbling" focus and blur events
-if ( document.addEventListener ) { // @todo root
-	FBjqRY.each({ focus: "focusin", blur: "focusout" }, function( orig, fix ) {
+//if ( document.addEventListener ) { // @todo root
+	FBjqRY.each( { focus: "focusin", blur: "focusout" }, 
+    function( orig, fix ) {
 		FBjqRY.event.special[ fix ] = {
 			setup: function() {
 				this.addEventListener( orig, handler, true );
@@ -788,14 +924,13 @@ if ( document.addEventListener ) { // @todo root
 				this.removeEventListener( orig, handler, true );
 			}
 		};
-
 		function handler( e ) { 
 			e = FBjqRY.event.fix( e );
 			e.type = fix;
 			return FBjqRY.event.handle.call( this, e );
 		}
 	});
-}
+//}
 
 FBjqRY.each(["bind", "one"], function( i, name ) {
 	FBjqRY.fn[ name ] = function( type, data, fn ) {
@@ -917,16 +1052,20 @@ var liveMap = {
 	mouseleave: "mouseout"
 };
 
-FBjqRY.each(["live", "die"], function( i, name ) {
+FBjqRY.each( ["live", "die"], function( i, name ) {
 	FBjqRY.fn[ name ] = function( types, data, fn, origSelector /* Internal Use Only */ ) {
 		var type, i = 0, match, namespaces, preType,
 			selector = origSelector || this.selector,
-			context = origSelector ? this : FBjqRY( this.context );
+            // NOTE: in jQuery context is never null (document by default)
+            // in our case document makes no sense but we have root :
+			context = origSelector ? this : FBjqRY( this.context || document.getRootElement() );
 
 		if ( FBjqRY.isFunction( data ) ) {
 			fn = data;
 			data = undefined;
 		}
+
+        //console.log( name + '()', context, context.length);
 
 		types = (types || "").split(" ");
 
@@ -949,35 +1088,43 @@ FBjqRY.each(["live", "die"], function( i, name ) {
 			if ( type === "focus" || type === "blur" ) {
 				types.push( liveMap[ type ] + namespaces );
 				type = type + namespaces;
-
-			} else {
+			} 
+            else {
 				type = (liveMap[ type ] || type) + namespaces;
 			}
 
-			if ( name === "live" ) {
+			if ( name === "live" ) { // bind live handler
+                var liveType = liveConvert( type, selector, true );
+				//context.each(function(){
+				//	FBjqRY.event.add( this, liveType,
+				//		{ data: data, selector: selector, handler: fn, origType: type, origHandler: fn, preType: preType } );
+				//});
 				// bind live handler
-				for ( var j = 0, l = context.length; j < l; j++ ) {
-					FBjqRY.event.add( context[j], "live." + liveConvert( type, selector ),
+				for ( var j = 0, nodes = context.nodes, len = context.length; j < len; j++ ) {
+                    //console.log( name + '()', nodes[j], liveConvert( type, selector ) );
+					FBjqRY.event.add( nodes[j], liveType,
 						{ data: data, selector: selector, handler: fn, origType: type, origHandler: fn, preType: preType } );
 				}
 
 			} else {
+                //console.log( name + '()', context, liveConvert( type, selector ) );
 				// unbind live handler
-				context.unbind( "live." + liveConvert( type, selector ), fn );
+				context.unbind( liveConvert( type, selector, true ), fn );
 			}
 		}
 		
 		return this;
-	};
+	}
 });
 
 function liveHandler( event ) {
 	var stop, maxLevel, elems = [], selectors = [],
-		related, match, handleObj, elem, j, i, l, data, close, namespace,
+		related, match, handleObj, elem, j, i, l, close, namespace,
 		events = FBjqRY.data( this, "events" );
 
 	// Make sure we avoid non-left-click bubbling in Firefox (#3861)
-	if ( event.liveFired === this || !events || !events.live || event.button && event.type === "click" ) {
+	if ( event.liveFired === this || ! events || ! events.live 
+        || event.button && event.type === "click" ) {
 		return;
 	}
 
@@ -988,23 +1135,20 @@ function liveHandler( event ) {
 	event.liveFired = this;
 
 	var live = events.live.slice(0);
-
 	for ( j = 0; j < live.length; j++ ) {
 		handleObj = live[j];
-
 		if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
 			selectors.push( handleObj.selector );
-
-		} else {
+		} 
+        else {
 			live.splice( j--, 1 );
 		}
 	}
-
-    throw "liveHandler() event.currentTarget not implemented !";
-	match = FBjqRY( event.target ).closest( selectors, event.currentTarget ); // @todo currentTarget ?!
+    
+	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
 
 	for ( i = 0, l = match.length; i < l; i++ ) {
-		close = match[i];
+		close = match[i]; // match is an array - closest() returns an array
 
 		for ( j = 0; j < live.length; j++ ) {
 			handleObj = live[j];
@@ -1013,14 +1157,14 @@ function liveHandler( event ) {
 				elem = close.elem;
 				related = null;
 
-				// Those two events require additional checking
-				//if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
-				//	event.type = handleObj.preType;
-				//	related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
-				//}
+				// Those two events require additional checking @todo
+				if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+					event.type = handleObj.preType;
+					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
+				}
 
-				if ( !related || related !== elem ) {
-					elems.push({ elem: elem, handleObj: handleObj, level: close.level });
+				if ( ! related || related !== elem ) {
+					elems.push({elem: elem, handleObj: handleObj, level: close.level});
 				}
 			}
 		}
@@ -1042,16 +1186,163 @@ function liveHandler( event ) {
 		if ( ret === false || event.isPropagationStopped() ) {
 			maxLevel = match.level;
 
-			if ( ret === false ) stop = false;
+			if ( ret === false ) { 
+                stop = false;
+                break;
+            }
 		}
 	}
 
 	return stop;
 }
 
+function liveHandler1( event ) {
+	var stop, elems = [], selectors = [], args = arguments,
+		related, match, handleObj, elem, j, i, l, data,
+		events = FBjqRY.data( this, "events" );
+
+	// Make sure we avoid non-left-click bubbling in Firefox (#3861)
+	if ( event.liveFired === this || ! events || ! events.live 
+        || event.button && event.type === "click" ) {
+		return;
+	}
+
+	event.liveFired = this;
+
+	var live = events.live.slice(0);
+
+	for ( j = 0; j < live.length; j++ ) {
+		handleObj = live[j];
+
+		if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
+			selectors.push( handleObj.selector );
+		} 
+        else {
+			live.splice( j--, 1 );
+		}
+	}
+
+	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
+
+    console.log('liveHandler sel, match: ', selectors, match);
+
+	for ( i = 0, l = match.length; i < l; i++ ) {
+        var matchi = match[i];
+		for ( j = 0; j < live.length; j++ ) {
+			handleObj = live[j];
+            
+			if ( matchi.selector === handleObj.selector ) {
+				elem = matchi.elem;
+				related = null;
+
+				// Those two events require additional checking
+				if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+                    // @todo
+					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
+				}
+
+				if ( !related || related !== elem ) {
+					elems.push({ elem: elem, handleObj: handleObj });
+				}
+			}
+		}
+	}
+
+    console.log('liveHandler elems: ', elems);
+
+	for ( i = 0, l = elems.length; i < l; i++ ) {
+		match = elems[i];
+		event.currentTarget = match.elem;
+		event.data = match.handleObj.data;
+		event.handleObj = match.handleObj;
+
+		if ( match.handleObj.origHandler.apply( match.elem, args ) === false ) {
+			stop = false;
+			break;
+		}
+	}
+
+	return stop;
+}
+
+//function liveHandler( event ) {
+//    var stop, maxLevel, elems = [], selectors = [],
+//        related, match, handleObj, elem, j, i, l, data, close, namespace,
+//        events = jQuery.data( this, "events" );
+//
+//    // Make sure we avoid non-left-click bubbling in Firefox (#3861)
+//    if ( event.liveFired === this || !events || !events.live 
+//        || event.button && event.type === "click" ) {
+//        return;
+//    }
+//
+//    if ( event.namespace ) {
+//        namespace = new RegExp("(^|\\.)" + event.namespace.split(".").join("\\.(?:.*\\.)?") + "(\\.|$)");
+//    }
+//
+//    event.liveFired = this;
+//
+//    var live = events.live.slice(0);
+//
+//    for ( j = 0; j < live.length; j++ ) {
+//        handleObj = live[j];
+//
+//        if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
+//            selectors.push( handleObj.selector );
+//        } else {
+//            live.splice( j--, 1 );
+//        }
+//    }
+//
+//    match = jQuery( event.target ).closest( selectors, event.currentTarget );
+//
+//    for ( i = 0, l = match.length; i < l; i++ ) {
+//        close = match[i];
+//
+//        for ( j = 0; j < live.length; j++ ) {
+//            handleObj = live[j];
+//
+//            if ( close.selector === handleObj.selector && (!namespace || namespace.test( handleObj.namespace )) ) {
+//                elem = close.elem;
+//                related = null;
+//
+//                // Those two events require additional checking
+//                if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+//                    event.type = handleObj.preType;
+//                    related = jQuery( event.relatedTarget ).closest( handleObj.selector )[0];
+//                }
+//
+//                if ( ! related || related !== elem ) {
+//                    elems.push({ elem: elem, handleObj: handleObj, level: close.level });
+//                }
+//            }
+//        }
+//    }
+//
+//    for ( i = 0, l = elems.length; i < l; i++ ) {
+//        match = elems[i];
+//
+//        if ( maxLevel && match.level > maxLevel ) break;
+//
+//        event.currentTarget = match.elem;
+//        event.data = match.handleObj.data;
+//        event.handleObj = match.handleObj;
+//
+//        ret = match.handleObj.origHandler.apply( match.elem, arguments );
+//
+//        if ( ret === false || event.isPropagationStopped() ) {
+//            maxLevel = match.level;
+//
+//            if ( ret === false ) stop = false;
+//        }
+//    }
+//
+//    return stop;
+//}
+
 var rdot = /\./g, rspace = / /g;
-function liveConvert( type, selector ) {
-	return (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
+function liveConvert( type, selector, prefix ) {
+	return (prefix ? "live." : '') + (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
 }
 
 var supportedEvents = ("blur change click dblclick error focus keydown keypress keyup load "  +
@@ -1075,21 +1366,3 @@ addEventFn(0, 'focusin');
 addEventFn(0, 'focusout');
 addEventFn(0, 'mouseenter'); 
 addEventFn(0, 'mouseleave');
-
-// Prevent memory leaks in IE
-// Window isn't included so as not to unbind existing unload events
-// More info:
-//  - http://isaacschlueter.com/2006/10/msie-memory-leaks/
-/*
-if ( window.attachEvent && !window.addEventListener ) {
-	window.attachEvent("onunload", function() {
-		for ( var id in jQuery.cache ) {
-			if ( jQuery.cache[ id ].handle ) {
-				// Try/Catch is to handle iframes being unloaded, see #4280
-				try {
-					jQuery.event.remove( jQuery.cache[ id ].handle.elem );
-				} catch(e) {}
-			}
-		}
-	});
-} */
