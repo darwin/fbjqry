@@ -98,9 +98,7 @@ FBjqRY.event = {
 				// Only use addEventListener/attachEvent if the special
 				// events handler returns false
 				if ( ! setup || setup.call( elem, data, namespaces, eventHandle ) === false ) {
-                    
-                    console.log('add', type, namespaces, elem);
-                    
+                    //console.log('add', type, namespaces, elem);
 					// Bind the global event handler to the element
 					if (elem.addEventListener && supportedEvents.indexOf(type) > -1) {
                         // NOTE: FBJS logs errors for events it does not "support" !
@@ -149,13 +147,11 @@ FBjqRY.event = {
 		}
 
 		// Unbind all events for the element
-		if ( !types || typeof types === "string" && types.charAt(0) === "." ) {
+		if ( !types || types.charAt && types.charAt(0) === "." ) {
 			types = types || "";
-
 			for ( type in events ) {
 				FBjqRY.event.remove( elem, type + types );
 			}
-            
 			return;
 		}
 
@@ -184,31 +180,32 @@ FBjqRY.event = {
 			if ( !handler ) {
 				for ( j = 0; j < eventType.length; j++ ) {
 					handleObj = eventType[ j ];
-
 					if ( all || namespace.test( handleObj.namespace ) ) {
 						FBjqRY.event.remove( elem, origType, handleObj.handler, j );
 						eventType.splice( j--, 1 );
 					}
 				}
-
 				continue;
 			}
 
-			special = FBjqRY.event.special[ type ] || {};
+			special = FBjqRY.event.special[ type ]; //|| {};
+            //console.log('remove 0', type, eventType, eventType.length, special);
 
 			for ( j = pos || 0; j < eventType.length; j++ ) {
 				handleObj = eventType[ j ];
-
+                //console.log('remove 1', handler.guid, handleObj.guid);
 				if ( handler.guid === handleObj.guid ) {
+                    //console.log('remove 2 all namespace', all, namespace, handleObj.namespace, namespace.test( handleObj.namespace ));
 					// remove the given handler for the given type
 					if ( all || namespace.test( handleObj.namespace ) ) {
+                        //console.log('remove pre splice', pos);
 						if ( pos == null ) {
-							eventType.splice( j--, 1 );
-						}
-
-						if ( special.remove ) {
-							special.remove.call( elem, handleObj );
-						}
+                            eventType.splice( j--, 1 );
+                        }
+                        
+                        if ( special && special.remove ) {
+                            special.remove.call( elem, handleObj );
+                        }
 					}
 
 					if ( pos != null ) break;
@@ -217,13 +214,14 @@ FBjqRY.event = {
 
 			// remove generic event handler if no more handlers exist
 			if ( eventType.length === 0 || pos != null && eventType.length === 1 ) {
-				if ( !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
+                //console.log('remove 3 teardown', type, special);
+				if ( !special || !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
                     if (elem.removeEventListener && supportedEvents.indexOf(type) > -1) {
                         elem.removeEventListener( type, elemData.handle, false );
                     }
 				}
 
-				ret = null;
+				//ret = null;
 				delete events[ type ];
 			}
 		}
@@ -248,7 +246,7 @@ FBjqRY.event = {
 		// Event object or event type
 		var type = event.type || event; //, bubbling = arguments[3];
 
-        console.log('trigger', event, data, elem);
+        //console.log('trigger', event, data, elem);
 
 		if ( ! bubbling ) {
 			event = ! FBjqRY.isString(event) /*typeof event === "object"*/ ?
@@ -609,25 +607,27 @@ FBjqRY.event = {
 
 		live: {
 			add: function( handleObj ) {
-				FBjqRY.event.add( this, handleObj.origType, FBjqRY.extend({}, handleObj, { handler: liveHandler }) );
+//				FBjqRY.event.add( this, handleObj.origType, FBjqRY.extend({}, handleObj, { handler: liveHandler }) );
+
+                FBjqRY.event.add( this, liveConvert( handleObj.origType, handleObj.selector ),
+                    FBjqRY.extend({}, handleObj, { handler: liveHandler, guid: handleObj.handler.guid }) );
 			},
 			remove: function( handleObj ) {
-				var remove = true, type = handleObj.origType.replace(rnamespaces, "");
-                    
-                var events = FBjqRY.data(this, "events").live;
-                if (events) {
-                    for ( var i = 0, len = events.length; i < len; i++ ) {
-                        if ( type === events[i].origType.replace(rnamespaces, "") ) {
-                            remove = false;
-                            break;
-                        }                        
-                    }
-                }
-
-				if (remove) FBjqRY.event.remove( this, handleObj.origType, liveHandler );
+//				var remove = true, type = handleObj.origType.replace(rnamespaces, "");
+//
+//                var events = FBjqRY.data(this, "events").live;
+//                if (events) {
+//                    for ( var i = 0, len = events.length; i < len; i++ ) {
+//                        if ( type === events[i].origType.replace(rnamespaces, "") ) {
+//                            remove = false;
+//                            break;
+//                        }
+//                    }
+//                }
+//
+//				if (remove) FBjqRY.event.remove( this, handleObj.origType, liveHandler );
                 
-                // @todo
-                //FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
+                FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
 			}
 		}
         
@@ -974,7 +974,7 @@ FBjqRY.each(["bind", "one"], function( i, name ) {
 FBjqRY.fn.extend({
 	unbind: function( type, fn ) {
 		// Handle object literals
-		if ( typeof type === "object" && ! FBjqRY.isString(type) /* added */ 
+		if ( typeof type === "object" //&& ! FBjqRY.isString(type) /* added */
             && ! type.preventDefault ) {
 			for ( var key in type ) this.unbind( key, type[key] );
 		} 
@@ -1224,7 +1224,7 @@ function liveHandler1( event ) {
 
 	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
 
-    console.log('liveHandler sel, match: ', selectors, match);
+    //console.log('liveHandler sel, match: ', selectors, match);
 
 	for ( i = 0, l = match.length; i < l; i++ ) {
         var matchi = match[i];
@@ -1248,7 +1248,7 @@ function liveHandler1( event ) {
 		}
 	}
 
-    console.log('liveHandler elems: ', elems);
+    //console.log('liveHandler elems: ', elems);
 
 	for ( i = 0, l = elems.length; i < l; i++ ) {
 		match = elems[i];
