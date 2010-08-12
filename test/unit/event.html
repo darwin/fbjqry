@@ -18,7 +18,9 @@
         <option id="option2" selected>option2</option>
         <option id="option3">option3</option>
     </select>
-    <input id="text" type="text" value="" />
+    <input id="text" type="text" value="text" />
+    <input id="pass" type="password" value="pass" />
+    <textarea id="area">area</textarea>
     <select id="select2">
         <option>option1</option>
         <option>option2</option>
@@ -39,7 +41,7 @@
     <span class="live1"><a href="/">a1</a></span>
     <span class="live2"><a href="/">a2</a></span>
 </div>
-    
+
 </fb:js-string>
 
 <script type="text/javascript">
@@ -1377,98 +1379,99 @@
         
     }, eventSuite);
 
-//    test("live with change", function(){
-//        var selectChange = 0, checkboxChange = 0;
-//
-//        var select = jQuery("select[name='S1']")
-//        select.live("change", function() {
-//            selectChange++;
-//        });
-//
-//        var checkbox = jQuery("#check2"),
-//            checkboxFunction = function(){
-//                checkboxChange++;
-//            }
-//        checkbox.live("change", checkboxFunction);
-//
-//        // test click on select
-//
-//        // second click that changed it
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 1, "Change on click." );
-//
-//        // test keys on select
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 1, "Change on keyup." );
-//
-//        // test click on checkbox
-//        checkbox.trigger("change");
-//        equals( checkboxChange, 1, "Change on checkbox." );
-//
-//        // test before activate on radio
-//
-//        // test blur/focus on textarea
-//        var textarea = jQuery("#area1"), textareaChange = 0, oldVal = textarea.val();
-//        textarea.live("change", function() {
-//            textareaChange++;
-//        });
-//
-//        textarea.val(oldVal + "foo");
-//        textarea.trigger("change");
-//        equals( textareaChange, 1, "Change on textarea." );
-//
-//        textarea.val(oldVal);
-//        textarea.die("change");
-//
-//        // test blur/focus on text
-//        var text = jQuery("#name"), textChange = 0, oldTextVal = text.val();
-//        text.live("change", function() {
-//            textChange++;
-//        });
-//
-//        text.val(oldVal+"foo");
-//        text.trigger("change");
-//        equals( textChange, 1, "Change on text input." );
-//
-//        text.val(oldTextVal);
-//        text.die("change");
-//
-//        // test blur/focus on password
-//        var password = jQuery("#name"), passwordChange = 0, oldPasswordVal = password.val();
-//        password.live("change", function() {
-//            passwordChange++;
-//        });
-//
-//        password.val(oldPasswordVal + "foo");
-//        password.trigger("change");
-//        equals( passwordChange, 1, "Change on password input." );
-//
-//        password.val(oldPasswordVal);
-//        password.die("change");
-//
-//        // make sure die works
-//
-//        // die all changes
-//        selectChange = 0;
-//        select.die("change");
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 0, "Die on click works." );
-//
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 0, "Die on keyup works." );
-//
-//        // die specific checkbox
-//        checkbox.die("change", checkboxFunction);
-//        checkbox.trigger("change");
-//        equals( checkboxChange, 1, "Die on checkbox." );
-//    });
+    test("live with change", function(){
+        var selectChange = 0, checkboxChange = 0;
+
+        var select = jQuery("#select2")
+        select.live("change", function() {
+            selectChange++;
+        });
+
+        var checkbox = jQuery("#check2"),
+            checkboxFunction = function(){
+                checkboxChange++;
+            }
+        checkbox.live("change", checkboxFunction);
+
+        // test click on select
+
+        // second click that changed it
+        selectChange = 0;
+        //select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 1, "Change on click." );
+
+        // test keys on select
+        selectChange = 0;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 1, "Change on keyup." );
+
+        // test click on checkbox
+        checkbox.trigger("change");
+        equals( checkboxChange, 1, "Change on checkbox." );
+
+        // test before activate on radio
+
+        // test blur/focus on textarea
+        var textarea = jQuery("#area"), textareaChange = 0, oldVal = textarea.val();
+        textarea.live("change", function() {
+            textareaChange++;
+        });
+
+        textarea.val(oldVal + "foo");
+        textarea.trigger("change");
+        equals( textareaChange, 1, "Change on textarea." );
+
+        textarea.val(oldVal);
+        textarea.die("change");
+
+        // test blur/focus on text
+        var text = jQuery("#text"), textChange = 0, oldTextVal = text.val();
+        text.live("change", function() {
+            textChange++;
+        });
+
+        text.val(oldVal + "foo");
+        text.trigger("change");
+        equals( textChange, 1, "Change on text input." );
+
+        text.val(oldTextVal);
+        text.die("change");
+
+        // test blur/focus on password
+        var password = jQuery("#pass"), passwordChange = 0, oldPasswordVal = password.val();
+        password.live("change", function() {
+            passwordChange++;
+        });
+
+        password.val(oldPasswordVal + "foo");
+        password.trigger("change");
+        equals( passwordChange, 1, "Change on password input." );
+
+        password.val(oldPasswordVal);
+        password.die("change");
+
+        // make sure die works
+
+        // die all changes
+        selectChange = 0;
+        select.die("change");
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 0, "Die on click works." );
+
+        selectChange = 0;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 0, "Die on keyup works." );
+
+        // die specific checkbox
+        checkbox.die("change", checkboxFunction);
+        checkbox.trigger("change");
+        equals( checkboxChange, 1, "Die on checkbox." );
+    }, eventSuite);
 
     test("live() with submit", function() {
         var count1 = 0, count2 = 0;
@@ -1735,278 +1738,289 @@
         var called = 0;
         function callback(){ called++; return false; }
 
-        jQuery(":root").delegate("#foo", "click", callback);
+        jQuery(":root").delegate("#bar", "click", callback);
         jQuery(":root").delegate("#link", "click", callback);
 
-        jQuery("#foo").trigger("click");
+        jQuery("#bar").trigger("click");
         equals( called, 1, "Verify that only one click occurred." );
 
-        called = 0;
+        //called = 0;
         jQuery("#link").trigger("click");
-        equals( called, 1, "Verify that only one click occurred." );
+        equals( called, 2, "Verify that only one click occurred." );
 
         // Make sure that only one callback is removed
         jQuery(":root").undelegate("#link", "click", callback);
 
-        called = 0;
-        jQuery("#foo").trigger("click");
-        equals( called, 1, "Verify that only one click occurred." );
+        //called = 0;
+        jQuery("#bar").trigger("click");
+        equals( called, 3, "Verify that only one click occurred." );
 
-        called = 0;
+        //console.log('#link trigger click');
+        //called = 0;
         jQuery("#link").trigger("click");
-        equals( called, 0, "Verify that no click occurred." );
+        equals( called, 3, "Verify that no click occurred." );
 
         // Make sure that it still works if the selector is the same,
         // but the event type is different
-//        jQuery("#body").delegate("#nothiddendiv", "foo", callback);
-//
-//        // Cleanup
-//        jQuery("#body").undelegate("#nothiddendiv", "click", callback);
-//
-//        called = 0;
-//        jQuery("#nothiddendiv").trigger("click");
-//        equals( called, 0, "Verify that no click occurred." );
-//
-//        called = 0;
-//        jQuery("#nothiddendiv").trigger("foo");
-//        equals( called, 1, "Verify that one foo occurred." );
-//
-//        // Cleanup
-//        jQuery("#body").undelegate("#nothiddendiv", "foo", callback);
-//
-//        // Make sure we don't loose the target by DOM modifications
-//        // after the bubble already reached the liveHandler
-//        var livec = 0, elemDiv = jQuery("#nothiddendivchild").html('<span></span>').get(0);
-//
-//        jQuery("#body").delegate("#nothiddendivchild", "click", function(e){ jQuery("#nothiddendivchild").html(''); });
-//        jQuery("#body").delegate("#nothiddendivchild", "click", function(e){ if(e.target) {livec++;} });
-//
-//        jQuery("#nothiddendiv span").click();
-//        equals( jQuery("#nothiddendiv span").length, 0, "Verify that first handler occurred and modified the DOM." );
-//        equals( livec, 1, "Verify that second handler occurred even with nuked target." );
-//
-//        // Cleanup
-//        jQuery("#body").undelegate("#nothiddendivchild", "click");
-//
-//        // Verify that .live() ocurs and cancel buble in the same order as
-//        // we would expect .bind() and .click() without delegation
-//        var lived = 0, livee = 0;
-//
-//        // bind one pair in one order
-//        jQuery("#body").delegate('span#liveSpan1 a', 'click', function(){ lived++; return false; });
-//        jQuery("#body").delegate('span#liveSpan1', 'click', function(){ livee++; });
-//
-//        jQuery('span#liveSpan1 a').click();
-//        equals( lived, 1, "Verify that only one first handler occurred." );
-//        equals( livee, 0, "Verify that second handler doesn't." );
-//
-//        // and one pair in inverse
-//        jQuery("#body").delegate('span#liveSpan2', 'click', function(){ livee++; });
-//        jQuery("#body").delegate('span#liveSpan2 a', 'click', function(){ lived++; return false; });
-//
-//        lived = 0;
-//        livee = 0;
-//        jQuery('span#liveSpan2 a').click();
-//        equals( lived, 1, "Verify that only one first handler occurred." );
-//        equals( livee, 0, "Verify that second handler doesn't." );
-//
-//        // Cleanup
-//        jQuery("#body").undelegate("click");
-//
-//        // Test this, target and currentTarget are correct
-//        jQuery("#body").delegate('span#liveSpan1', 'click', function(e){
-//            equals( this.id, 'liveSpan1', 'Check the this within a delegate handler' );
-//            equals( e.currentTarget.id, 'liveSpan1', 'Check the event.currentTarget within a delegate handler' );
-//            equals( e.target.nodeName.toUpperCase(), 'A', 'Check the event.target within a delegate handler' );
-//        });
-//
-//        jQuery('span#liveSpan1 a').click();
-//
-//        jQuery("#body").undelegate('span#liveSpan1', 'click');
-//
-//        // Work with deep selectors
-//        livee = 0;
-//
-//        function clickB(){ livee++; }
-//
-//        jQuery("#body").delegate("#nothiddendiv div", "click", function(){ livee++; });
-//        jQuery("#body").delegate("#nothiddendiv div", "click", clickB);
-//        jQuery("#body").delegate("#nothiddendiv div", "mouseover", function(){ livee++; });
-//
-//        equals( livee, 0, "No clicks, deep selector." );
-//
-//        livee = 0;
-//        jQuery("#nothiddendivchild").trigger("click");
-//        equals( livee, 2, "Click, deep selector." );
-//
-//        livee = 0;
-//        jQuery("#nothiddendivchild").trigger("mouseover");
-//        equals( livee, 1, "Mouseover, deep selector." );
-//
-//        jQuery("#body").undelegate("#nothiddendiv div", "mouseover");
-//
-//        livee = 0;
-//        jQuery("#nothiddendivchild").trigger("click");
-//        equals( livee, 2, "Click, deep selector." );
-//
-//        livee = 0;
-//        jQuery("#nothiddendivchild").trigger("mouseover");
-//        equals( livee, 0, "Mouseover, deep selector." );
-//
-//        jQuery("#body").undelegate("#nothiddendiv div", "click", clickB);
-//
-//        livee = 0;
-//        jQuery("#nothiddendivchild").trigger("click");
-//        equals( livee, 1, "Click, deep selector." );
-//
-//        jQuery("#body").undelegate("#nothiddendiv div", "click");
+        jQuery(":root").delegate("#bar", "foo", callback);
+
+        // Cleanup
+        jQuery(":root").undelegate("#bar", "click", callback);
+
+        called = 0;
+        jQuery("#bar").trigger("click");
+        equals( called, 0, "Verify that no click occurred." );
+
+        //called = 0;
+        jQuery("#bar").trigger("foo");
+        equals( called, 1, "Verify that one foo occurred." );
+
+        // Cleanup
+        jQuery(":root").undelegate("#bar", "foo", callback);
+
+        // Make sure we don't loose the target by DOM modifications
+        // after the bubble already reached the liveHandler
+        var livec = 0, elemDiv = jQuery("#foochild").html('<span class="xxx"></span>').get(0);
+
+        jQuery(":root").delegate("#foochild", "click", function(e){ jQuery("#foochild").html(''); });
+        jQuery(":root").delegate("#foochild", "click", function(e){ if(e.target) {livec++;} });
+
+        jQuery("#foo span.xxx").click();
+        equals( jQuery("#foo span.xxx").length, 0, "Verify that first handler occurred and modified the DOM." );
+        equals( livec, 1, "Verify that second handler occurred even with nuked target." );
+
+        // Cleanup
+        jQuery(":root").undelegate("#foochild", "click");
 
     };
 
-//    test("undelegate all bound events", function(){
-//        expect(1);
-//
-//        var count = 0;
-//        var div = jQuery("#body");
-//
-//        div.delegate("div#nothiddendivchild", "click submit", function(){ count++; });
-//        div.undelegate();
-//
-//        jQuery("div#nothiddendivchild").trigger("click");
-//        jQuery("div#nothiddendivchild").trigger("submit");
-//
-//        equals( count, 0, "Make sure no events were triggered." );
-//    });
-//
-//    test("delegate with multiple events", function(){
-//        expect(1);
-//
-//        var count = 0;
-//        var div = jQuery("#body");
-//
-//        div.delegate("div#nothiddendivchild", "click submit", function(){ count++; });
-//
-//        jQuery("div#nothiddendivchild").trigger("click");
-//        jQuery("div#nothiddendivchild").trigger("submit");
-//
-//        equals( count, 2, "Make sure both the click and submit were triggered." );
-//
-//        jQuery("#body").undelegate();
-//    });
-//
-//    test("delegate with change", function(){
-//        var selectChange = 0, checkboxChange = 0;
-//
-//        var select = jQuery("select[name='S1']");
-//        jQuery("#body").delegate("select[name='S1']", "change", function() {
-//            selectChange++;
-//        });
-//
-//        var checkbox = jQuery("#check2"),
-//            checkboxFunction = function(){
-//                checkboxChange++;
-//            }
-//        jQuery("#body").delegate("#check2", "change", checkboxFunction);
-//
-//        // test click on select
-//
-//        // second click that changed it
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 1, "Change on click." );
-//
-//        // test keys on select
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 1, "Change on keyup." );
-//
-//        // test click on checkbox
-//        checkbox.trigger("change");
-//        equals( checkboxChange, 1, "Change on checkbox." );
-//
-//        // test before activate on radio
-//
-//        // test blur/focus on textarea
-//        var textarea = jQuery("#area1"), textareaChange = 0, oldVal = textarea.val();
-//        jQuery("#body").delegate("#area1", "change", function() {
-//            textareaChange++;
-//        });
-//
-//        textarea.val(oldVal + "foo");
-//        textarea.trigger("change");
-//        equals( textareaChange, 1, "Change on textarea." );
-//
-//        textarea.val(oldVal);
-//        jQuery("#body").undelegate("#area1", "change");
-//
-//        // test blur/focus on text
-//        var text = jQuery("#name"), textChange = 0, oldTextVal = text.val();
-//        jQuery("#body").delegate("#name", "change", function() {
-//            textChange++;
-//        });
-//
-//        text.val(oldVal+"foo");
-//        text.trigger("change");
-//        equals( textChange, 1, "Change on text input." );
-//
-//        text.val(oldTextVal);
-//        jQuery("#body").die("change");
-//
-//        // test blur/focus on password
-//        var password = jQuery("#name"), passwordChange = 0, oldPasswordVal = password.val();
-//        jQuery("#body").delegate("#name", "change", function() {
-//            passwordChange++;
-//        });
-//
-//        password.val(oldPasswordVal + "foo");
-//        password.trigger("change");
-//        equals( passwordChange, 1, "Change on password input." );
-//
-//        password.val(oldPasswordVal);
-//        jQuery("#body").undelegate("#name", "change");
-//
-//        // make sure die works
-//
-//        // die all changes
-//        selectChange = 0;
-//        jQuery("#body").undelegate("select[name='S1']", "change");
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 0, "Die on click works." );
-//
-//        selectChange = 0;
-//        select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
-//        select.trigger("change");
-//        equals( selectChange, 0, "Die on keyup works." );
-//
-//        // die specific checkbox
-//        jQuery("#body").undelegate("#check2", "change", checkboxFunction);
-//        checkbox.trigger("change");
-//        equals( checkboxChange, 1, "Die on checkbox." );
-//    });
-//
-//    test("delegate with submit", function() {
-//        var count1 = 0, count2 = 0;
-//
-//        jQuery("#body").delegate("#testForm", "submit", function(ev) {
-//            count1++;
-//            ev.preventDefault();
-//        });
-//
-//        jQuery(document).delegate("body", "submit", function(ev) {
-//            count2++;
-//            ev.preventDefault();
-//        });
-//
-//        jQuery("#testForm input[name=sub1]").submit();
-//        equals( count1, 1, "Verify form submit." );
-//        equals( count2, 1, "Verify body submit." );
-//
-//        jQuery("#body").undelegate();
-//        jQuery(document).undelegate();
-//    });
+    eventSuite.testDelegateUndelegate3 = function() {
+
+        // Verify that .live() ocurs and cancel buble in the same order as
+        // we would expect .bind() and .click() without delegation
+        var lived = 0, livee = 0;
+
+        // bind one pair in one order
+        jQuery("#main").delegate('span.live1 a', 'click', function(){ lived++; return false; });
+        jQuery("#main").delegate('span.live1', 'click', function(){ livee++; });
+
+        jQuery('span.live1 a').click();
+        equals( lived, 1, "Verify that only one first handler occurred 1" );
+        equals( livee, 0, "Verify that second handler doesn't 1" );
+
+        // and one pair in inverse
+        jQuery("#main").delegate('span.live2', 'click', function(){ livee++; });
+        jQuery("#main").delegate('span.live2 a', 'click', function(){ lived++; return false; });
+
+        lived = 0;
+        livee = 0;
+        jQuery('span.live2 a').click();
+        equals( lived, 1, "Verify that only one first handler occurred 2" );
+        // @todo fails
+        equals( livee, 0, "Verify that second handler doesn't 2" );
+
+        // Cleanup
+        jQuery("#main").undelegate("click");
+
+        // Test this, target and currentTarget are correct
+        jQuery("#main").delegate('span.live1', 'click', function(e){
+            equals( this.getClassName(), 'live1', 'Check the this within a delegate handler' );
+            equals( e.currentTarget.getClassName(), 'live1', 'Check the event.currentTarget within a delegate handler' );
+            equals( e.target.getTagName().toUpperCase(), 'A', 'Check the event.target within a delegate handler' );
+        });
+
+        jQuery('span.live1 a').click();
+
+        jQuery("#main").undelegate('span.live1', 'click');
+
+        // Work with deep selectors
+        livee = 0;
+
+        function clickB(){ livee++; }
+
+        jQuery(":root").delegate("#foo div", "click", function(){ livee++; });
+        jQuery(":root").delegate("#foo div", "click", clickB);
+        jQuery(":root").delegate("#foo div", "mouseover", function(){ livee++; });
+
+        equals( livee, 0, "No clicks, deep selector." );
+
+        livee = 0;
+        jQuery("#foochild").trigger("click");
+        equals( livee, 2, "Click, deep selector." );
+
+        livee = 0;
+        jQuery("#foochild").trigger("mouseover");
+        equals( livee, 1, "Mouseover, deep selector." );
+
+        jQuery(":root").undelegate("#foo div", "mouseover");
+
+        livee = 0;
+        jQuery("#foochild").trigger("click");
+        equals( livee, 2, "Click, deep selector." );
+
+        livee = 0;
+        jQuery("#foochild").trigger("mouseover");
+        equals( livee, 0, "Mouseover, deep selector." );
+
+        jQuery(":root").undelegate("#foo div", "click", clickB);
+
+        livee = 0;
+        jQuery("#foochild").trigger("click");
+        equals( livee, 1, "Click, deep selector." );
+
+        jQuery(":root").undelegate("#foo div", "click");
+
+    }
+
+    test("undelegate all bound events", function(){
+        expect(1);
+
+        var count = 0;
+        var div = jQuery(":root");
+
+        div.delegate("div#foochild", "click submit", function(){ count++; });
+        div.undelegate();
+
+        jQuery("div#foochild").trigger("click");
+        jQuery("div#foochild").trigger("submit");
+
+        equals( count, 0, "Make sure no events were triggered." );
+        
+    }, eventSuite);
+
+    test("delegate with multiple events", function(){
+        expect(1);
+
+        var count = 0;
+        var div = jQuery("#foo");
+
+        div.delegate("div#foochild", "click submit", function(){ count++; });
+
+        jQuery("div#foochild").trigger("click");
+        jQuery("div#foochild").trigger("submit");
+
+        equals( count, 2, "Make sure both the click and submit were triggered." );
+
+        jQuery("#foo").undelegate();
+
+    }, eventSuite);
+
+    test("delegate with change", function(){
+        var selectChange = 0, checkboxChange = 0;
+
+        var select = jQuery("#select2");
+        jQuery(":root").delegate("#select2", "change", function() {
+            selectChange++;
+        });
+
+        var checkbox = jQuery("#check2"),
+            checkboxFunction = function(){
+                checkboxChange++;
+            }
+        jQuery(":root").delegate("#check2", "change", checkboxFunction);
+
+        // test click on select
+
+        // second click that changed it
+        selectChange = 0;
+        //select[0].selectedIndex = select[0].selectedIndex ? 0 : 1;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 1, "Change on click." );
+
+        // test keys on select
+        selectChange = 0;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 1, "Change on keyup." );
+
+        // test click on checkbox
+        checkbox.trigger("change");
+        equals( checkboxChange, 1, "Change on checkbox." );
+
+        // test before activate on radio
+
+        // test blur/focus on textarea
+        var textarea = jQuery("#area"), textareaChange = 0, oldVal = textarea.val();
+        jQuery("#formwrapper").delegate("#area", "change", function() {
+            textareaChange++;
+        });
+
+        textarea.val(oldVal + "foo");
+        textarea.trigger("change");
+        equals( textareaChange, 1, "Change on textarea." );
+
+        textarea.val(oldVal);
+        jQuery("#formwrapper").undelegate("#area", "change");
+
+        // test blur/focus on text
+        var text = jQuery("#text"), textChange = 0, oldTextVal = text.val();
+        jQuery("#form").delegate("#text", "change", function() {
+            textChange++;
+        });
+
+        text.val(oldVal + "foo");
+        text.trigger("change");
+        equals( textChange, 1, "Change on text input." );
+
+        text.val(oldTextVal);
+        jQuery("#form").die("change");
+
+        // test blur/focus on password
+        var password = jQuery("#pass"), passwordChange = 0, oldPasswordVal = password.val();
+        jQuery(":root").delegate("#pass", "change", function() {
+            passwordChange++;
+        });
+
+        password.val(oldPasswordVal + "foo");
+        password.trigger("change");
+        equals( passwordChange, 1, "Change on password input." );
+
+        password.val(oldPasswordVal);
+        jQuery(":root").undelegate("#pass", "change");
+
+        // make sure die works
+
+        // die all changes
+        selectChange = 0;
+        jQuery(":root").undelegate("#select2", "change");
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 0, "Die on click works." );
+
+        selectChange = 0;
+        select.get(0).setSelectedIndex( select.get(0).getSelectedIndex() ? 0 : 1 );
+        select.trigger("change");
+        equals( selectChange, 0, "Die on keyup works." );
+
+        // die specific checkbox
+        jQuery(":root").undelegate("#check2", "change", checkboxFunction);
+        checkbox.trigger("change");
+        equals( checkboxChange, 1, "Die on checkbox." );
+        
+    }, eventSuite);
+
+    test("delegate with submit", function() {
+        var count1 = 0, count2 = 0;
+
+        jQuery("#formwrapper").delegate("#form", "submit", function(ev) {
+            count1++;
+            ev.preventDefault();
+        });
+
+        jQuery(':root').delegate("#formwrapper", "submit", function(ev) {
+            count2++;
+            ev.preventDefault();
+        });
+
+        jQuery("#form input[name=submit]").submit();
+        equals( count1, 1, "Verify form submit." );
+        equals( count2, 1, "Verify body submit." );
+
+        jQuery("#formwrapper").undelegate();
+        jQuery(':root').undelegate();
+        
+    }, eventSuite);
 
     test("Non DOM element events", function() {
         expect(1);

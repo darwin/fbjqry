@@ -246,7 +246,7 @@ FBjqRY.event = {
 		// Event object or event type
 		var type = event.type || event; //, bubbling = arguments[3];
 
-        //console.log('trigger', event, data, elem);
+        console.log('trigger', event, data, elem);
 
 		if ( ! bubbling ) {
 			event = ! FBjqRY.isString(event) /*typeof event === "object"*/ ?
@@ -336,7 +336,7 @@ FBjqRY.event = {
                     
                     for ( var i = 0; i < len; i++ ) {
                         
-                        //console.log('calling: listeners[i] = ', listeners[i], target, data);
+                        console.log('trigger listeners['+ i +'] ', listeners[i], target, data);
                         
                         if ( ! listeners[i] ) continue; // some seem to be undefined
                         
@@ -413,7 +413,7 @@ FBjqRY.event = {
 		event = args[0] = FBjqRY.event.fix( event );
 		event.currentTarget = this;
 
-        //console.log('handle() 0', event);
+        console.log('handle() 0', event);
 
 		// Namespaced event handlers
 		all = event.type.indexOf(".") < 0 && ! event.exclusive;
@@ -447,7 +447,7 @@ FBjqRY.event = {
 	
 					var ret = handleObj.handler.apply( this, args );
                     
-                    //console.log('handle() 1', event, this, ret);
+                    console.log('handle() 1', event, this, ret);
                     
 					if ( typeof(ret) !== 'undefined' ) {
 						event.result = ret;
