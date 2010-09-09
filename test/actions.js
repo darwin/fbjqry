@@ -50,7 +50,7 @@ exports.index = function (req) {
     content.push("\
     <script type='text/javascript'> \n\
         jsUnity.run( "+ args +" ); \n\
-    </script>");
+    </script>\n");
 
     return {
         status: 200,

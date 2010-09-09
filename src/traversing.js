@@ -183,7 +183,7 @@ FBjqRY.fn.extend({
 				while ( cur && ( context == null || ! sameNode(context, cur) ) ) {
 					for ( sel in matches ) {
 						var match = matches[sel];
-
+                        //console.log('closest() cur is match: ', cur, match, FBjqRY(cur).is(match));
 						if ( match.jquery ? match.index(cur) > -1 : FBjqRY(cur).is(match) ) {
 							ret.push({ selector: sel, elem: cur, level: level });
 						}
@@ -294,10 +294,19 @@ var matchesNodes = function(selector, nodes) {
 FBjqRY.filter = function( selector, nodes, not ) {
     if ( not ) selector = ":not(" + selector + ")";
 
-    var matchNodes = []; var singleNode = [];
+    /*
+    var matchNodes = [];
     for ( var i = 0, len = nodes.length; i < len; i++ ) {
-        var node = nodes[i]; singleNode[0] = node;
-        if ( FBjqRY.find(selector, false, singleNode).length > 0 ) {
+        var node = nodes[i];
+        if ( FBjqRY.find(selector, false, [ node ]).length > 0 ) {
+            matchNodes.push( node );
+        }
+    } */
+
+    var matchNodes = [], selNodes = FBjqRY.find(selector);
+    for ( var i = 0, len = nodes.length; i < len; i++ ) {
+        var node = nodes[i];
+        if ( FBjqRY.inArray(node, selNodes) >= 0 ) {
             matchNodes.push( node );
         }
     }

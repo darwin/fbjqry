@@ -294,6 +294,18 @@ jsUnity = (function () {
     function isRegExp(obj) {
         return !!(obj && obj.test && obj.exec && (obj.ignoreCase || obj.ignoreCase === false));
     }
+    function isArray(obj) {
+        return !!(obj && obj.pop && obj.push && obj.join && obj.splice);
+    }
+    function flatten(array) {
+        var flat = [];
+        for ( var i = 0; i < array.length; i++ ) {
+            var el = array[i];
+            if ( isArray(el) ) flat = flat.concat( flatten(el) );
+            else flat.push(el);
+        }
+        return flat;
+    }
 
     return {
         TestSuite: function (suiteName, scope) {
@@ -378,6 +390,9 @@ jsUnity = (function () {
                 testRegExp = arguments[arguments.length - 1];
                 suites = arguments.slice(0, -1);
             }
+            console.log('flatten', suites);
+            suites = flatten( suites );
+            console.log('flattened', suites);
 
             for ( var i = 0; i < suites.length; i++ ) {
                 try {

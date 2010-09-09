@@ -1,8 +1,7 @@
 var rnamespaces = /\.(.*)$/,
-	fcleanup = function( nm ) {
-		return nm.replace(/[^\w\s\.\|`]/g, function( ch ) {
-			return "\\" + ch;
-		});
+	rcleanup = /[^\w\s\.\|`]/g,
+    fcleanup = function( nm ) {
+		return nm.replace( rcleanup, function( ch ) { return "\\" + ch; } );
 	};
 
 /*
@@ -50,13 +49,14 @@ FBjqRY.event = {
 		var events = elemData.events = elemData.events || {},
 			eventHandle = elemData.handle;
 
-		if ( !eventHandle ) {
+		if ( ! eventHandle ) {
 			elemData.handle = eventHandle = function() {
 				// Handle the second event of a trigger and when
 				// an event is called after a page has unloaded
-				return typeof FBjqRY !== "undefined" && !FBjqRY.event.triggered ?
-					FBjqRY.event.handle.apply( eventHandle.elem, arguments ) :
-					undefined;
+                if ( typeof(FBjqRY)!== "undefined" && ! FBjqRY.event.triggered ) {
+                    return FBjqRY.event.handle.apply( eventHandle.elem, arguments );
+                }
+				return undefined;
 			};
 		}
 
@@ -102,6 +102,7 @@ FBjqRY.event = {
 					// Bind the global event handler to the element
 					if (elem.addEventListener && supportedEvents.indexOf(type) > -1) {
                         // NOTE: FBJS logs errors for events it does not "support" !
+                        eventHandle['FBjqRY_handler'] = true; // "mark" the handler @see trigger()
 						elem.addEventListener( type, eventHandle, false );
 					}
 				}
@@ -138,7 +139,7 @@ FBjqRY.event = {
 			elemData = FBjqRY.data( elem ),
 			events = elemData && elemData.events;
 
-		if ( !elemData || !events ) return;
+		if ( ! elemData || ! events ) return;
 
 		// types is actually an event object here
 		if ( types && types.type ) {
@@ -147,7 +148,7 @@ FBjqRY.event = {
 		}
 
 		// Unbind all events for the element
-		if ( !types || types.charAt && types.charAt(0) === "." ) {
+		if ( ! types || types.charAt && types.charAt(0) === "." ) {
 			types = types || "";
 			for ( type in events ) {
 				FBjqRY.event.remove( elem, type + types );
@@ -246,7 +247,7 @@ FBjqRY.event = {
 		// Event object or event type
 		var type = event.type || event; //, bubbling = arguments[3];
 
-        console.log('trigger', event, data, elem);
+        //console.log('trigger', event, data, elem);
 
 		if ( ! bubbling ) {
 			event = ! FBjqRY.isString(event) /*typeof event === "object"*/ ?
@@ -324,9 +325,9 @@ FBjqRY.event = {
 			//} catch (e) {}
             
 			var target = event.target, targetType = type.replace(/\..*$/, ""),
-				special = FBjqRY.event.special[ targetType ] || {};
+				special = FBjqRY.event.special[ targetType ]; // || {};
             
-			if ( ( ! special._default || special._default.call( elem, event ) === false ) && 
+			if ( ( ! special || ! special._default || special._default.call( elem, event ) === false ) &&
 				! (target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
              
                 var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
@@ -335,12 +336,13 @@ FBjqRY.event = {
                     FBjqRY.event.triggered = true;
                     
                     for ( var i = 0; i < len; i++ ) {
+                        var listener = listeners[i];
                         
-                        console.log('trigger listeners['+ i +'] ', listeners[i], target, data);
+                        //console.log('trigger listeners['+ i +'] ', listener, target, data);
+                        if ( ! listener ) continue; // some seem to be undefined
+                        if ( listener['FBjqRY_handler'] ) continue; // already run - FBjqRY added handle
                         
-                        if ( ! listeners[i] ) continue; // some seem to be undefined
-                        
-                        var ret = listeners[i].apply( target, data );
+                        var ret = listener.apply( target, data );
                         if ( ret === false ) { 
                             event.result = false;
                             if ( event.isPropagationStopped() ) break;
@@ -413,7 +415,7 @@ FBjqRY.event = {
 		event = args[0] = FBjqRY.event.fix( event );
 		event.currentTarget = this;
 
-        console.log('handle() 0', event);
+        //console.log('handle() 0', event);
 
 		// Namespaced event handlers
 		all = event.type.indexOf(".") < 0 && ! event.exclusive;
@@ -428,7 +430,9 @@ FBjqRY.event = {
 		event.namespace = event.namespace || namespace_sort.join(".");
 
 		events = FBjqRY.data(this, "events");
-		handlers = (events || {})[ event.type ];
+		handlers = events && events[ event.type ];
+
+        //console.log('handle() 01 all, events, handlers = ', all, events, handlers);
 
 		if ( events && handlers ) {
 			// Clone the handlers to prevent manipulation
@@ -437,6 +441,8 @@ FBjqRY.event = {
 			for ( var j = 0, l = handlers.length; j < l; j++ ) {
 				var handleObj = handlers[ j ];
 
+                //console.log('handle() 1 handleObj.namespace = ', handleObj.namespace, namespace_re);
+
 				// Filter the functions by class
 				if ( all || namespace_re.test( handleObj.namespace ) ) {
 					// Pass in a reference to the handler function itself
@@ -444,10 +450,12 @@ FBjqRY.event = {
 					event.handler = handleObj.handler;
 					event.data = handleObj.data;
 					event.handleObj = handleObj;
-	
+
+                    //console.log('handle() 2 calling handler', handleObj.handler);
+
 					var ret = handleObj.handler.apply( this, args );
                     
-                    console.log('handle() 1', event, this, ret);
+                    //console.log('handle() 2 handler returned', ret);
                     
 					if ( typeof(ret) !== 'undefined' ) {
 						event.result = ret;
@@ -467,18 +475,20 @@ FBjqRY.event = {
 
 		return event.result;
 	},
-    /*
-	handle: function( event ) {
+    
+	handle1: function( event ) {
 		var all, handlers, namespaces, namespace, events;
         var args = FBjqRY.makeArray( arguments );
         
 		event = args[0] = FBjqRY.event.fix( event );
 		event.currentTarget = this;
 
-		// Namespaced event handlers
-		all = event.type.indexOf(".") < 0 && !event.exclusive;
+        console.log('handle() 0', event);
 
-		if ( !all ) {
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && ! event.exclusive;
+
+		if ( ! all ) {
 			namespaces = event.type.split(".");
 			event.type = namespaces.shift();
 			namespace = new RegExp("(^|\\.)" + namespaces.slice(0).sort().join("\\.(?:.*\\.)?") + "(\\.|$)");
@@ -487,12 +497,16 @@ FBjqRY.event = {
 		events = FBjqRY.data(this, "events"); 
         handlers = events ? events[ event.type ] : undefined;
 
+        console.log('handle() 01 all, events, handlers = ', all, events, handlers);
+
 		if ( events && handlers ) {
 			// Clone the handlers to prevent manipulation
 			handlers = handlers.slice(0);
 
 			for ( var j = 0, l = handlers.length; j < l; j++ ) {
 				var handleObj = handlers[ j ];
+
+                console.log('handle() 1 handleObj.namespace = ', handleObj.namespace, namespace);
 
 				// Filter the functions by class
 				if ( all || namespace.test( handleObj.namespace ) ) {
@@ -502,11 +516,11 @@ FBjqRY.event = {
 					event.data = handleObj.data;
 					event.handleObj = handleObj;
 
-                    console.log('handle() 0 calling handler', event, this);
+                    console.log('handle() 2 calling handler', event, this);
 
 					var ret = handleObj.handler.apply( this, args );
 
-                    console.log('handle() 1 handler returned', ret);
+                    console.log('handle() 2 handler returned', ret);
 
 					if ( ret !== undefined ) {
 						event.result = ret;
@@ -517,7 +531,6 @@ FBjqRY.event = {
 					}
 
 					if ( event.isImmediatePropagationStopped() ) {
-                        console.log('handle() 2 breaking handler chain !');
 						break;
 					}
 				}
@@ -525,7 +538,7 @@ FBjqRY.event = {
 		}
 
 		return event.result;
-	}, */
+	},
     
     /*
 	props: "altKey attrChange attrName bubbles button cancelable charCode " + 
@@ -607,26 +620,10 @@ FBjqRY.event = {
 
 		live: {
 			add: function( handleObj ) {
-//				FBjqRY.event.add( this, handleObj.origType, FBjqRY.extend({}, handleObj, { handler: liveHandler }) );
-
                 FBjqRY.event.add( this, liveConvert( handleObj.origType, handleObj.selector ),
                     FBjqRY.extend({}, handleObj, { handler: liveHandler, guid: handleObj.handler.guid }) );
 			},
 			remove: function( handleObj ) {
-//				var remove = true, type = handleObj.origType.replace(rnamespaces, "");
-//
-//                var events = FBjqRY.data(this, "events").live;
-//                if (events) {
-//                    for ( var i = 0, len = events.length; i < len; i++ ) {
-//                        if ( type === events[i].origType.replace(rnamespaces, "") ) {
-//                            remove = false;
-//                            break;
-//                        }
-//                    }
-//                }
-//
-//				if (remove) FBjqRY.event.remove( this, handleObj.origType, liveHandler );
-                
                 FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
 			}
 		}
@@ -1147,6 +1144,9 @@ function liveHandler( event ) {
     
 	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
 
+    //console.log('liveHandler $(target).closest(selectors, currentTarget) ', event.target, selectors, event.currentTarget);
+    //console.log('liveHandler $(target).closest(selectors, currentTarget) = ', match);
+
 	for ( i = 0, l = match.length; i < l; i++ ) {
 		close = match[i]; // match is an array - closest() returns an array
 
@@ -1163,12 +1163,14 @@ function liveHandler( event ) {
 					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
 				}
 
-				if ( ! related || related !== elem ) {
+				if ( ! related || ! FBjqRY.fbjs.sameNode(elem, related) ) {
 					elems.push({elem: elem, handleObj: handleObj, level: close.level});
 				}
 			}
 		}
 	}
+
+    //console.log('liveHandler elems: ', elems);
 
 	for ( i = 0, l = elems.length; i < l; i++ ) {
 		match = elems[i];
@@ -1185,7 +1187,6 @@ function liveHandler( event ) {
 
 		if ( ret === false || event.isPropagationStopped() ) {
 			maxLevel = match.level;
-
 			if ( ret === false ) { 
                 stop = false;
                 break;
@@ -1241,7 +1242,7 @@ function liveHandler1( event ) {
 					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
 				}
 
-				if ( !related || related !== elem ) {
+				if ( !related || ! FBjqRY.fbjs.sameNode(elem, related) ) {
 					elems.push({ elem: elem, handleObj: handleObj });
 				}
 			}
@@ -1264,81 +1265,6 @@ function liveHandler1( event ) {
 
 	return stop;
 }
-
-//function liveHandler( event ) {
-//    var stop, maxLevel, elems = [], selectors = [],
-//        related, match, handleObj, elem, j, i, l, data, close, namespace,
-//        events = jQuery.data( this, "events" );
-//
-//    // Make sure we avoid non-left-click bubbling in Firefox (#3861)
-//    if ( event.liveFired === this || !events || !events.live 
-//        || event.button && event.type === "click" ) {
-//        return;
-//    }
-//
-//    if ( event.namespace ) {
-//        namespace = new RegExp("(^|\\.)" + event.namespace.split(".").join("\\.(?:.*\\.)?") + "(\\.|$)");
-//    }
-//
-//    event.liveFired = this;
-//
-//    var live = events.live.slice(0);
-//
-//    for ( j = 0; j < live.length; j++ ) {
-//        handleObj = live[j];
-//
-//        if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
-//            selectors.push( handleObj.selector );
-//        } else {
-//            live.splice( j--, 1 );
-//        }
-//    }
-//
-//    match = jQuery( event.target ).closest( selectors, event.currentTarget );
-//
-//    for ( i = 0, l = match.length; i < l; i++ ) {
-//        close = match[i];
-//
-//        for ( j = 0; j < live.length; j++ ) {
-//            handleObj = live[j];
-//
-//            if ( close.selector === handleObj.selector && (!namespace || namespace.test( handleObj.namespace )) ) {
-//                elem = close.elem;
-//                related = null;
-//
-//                // Those two events require additional checking
-//                if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
-//                    event.type = handleObj.preType;
-//                    related = jQuery( event.relatedTarget ).closest( handleObj.selector )[0];
-//                }
-//
-//                if ( ! related || related !== elem ) {
-//                    elems.push({ elem: elem, handleObj: handleObj, level: close.level });
-//                }
-//            }
-//        }
-//    }
-//
-//    for ( i = 0, l = elems.length; i < l; i++ ) {
-//        match = elems[i];
-//
-//        if ( maxLevel && match.level > maxLevel ) break;
-//
-//        event.currentTarget = match.elem;
-//        event.data = match.handleObj.data;
-//        event.handleObj = match.handleObj;
-//
-//        ret = match.handleObj.origHandler.apply( match.elem, arguments );
-//
-//        if ( ret === false || event.isPropagationStopped() ) {
-//            maxLevel = match.level;
-//
-//            if ( ret === false ) stop = false;
-//        }
-//    }
-//
-//    return stop;
-//}
 
 var rdot = /\./g, rspace = / /g;
 function liveConvert( type, selector, prefix ) {

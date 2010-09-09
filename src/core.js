@@ -106,7 +106,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "0.6.0-SNAPSHOT", //"@VERSION",
+	jquery: "0.6.0", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
@@ -530,7 +530,7 @@ FBjqRY.extend({
 		return ret;
 	},
 
-	inArray: function(elem, array) {
+	inArray: function( elem, array ) {
         var cmpFn, isNode = FBjqRY.fbjs.isNode;
         if ( isNode(elem) ) {
             var sameNode = FBjqRY.fbjs.sameNode;
@@ -549,7 +549,7 @@ FBjqRY.extend({
         return -1;
     },
 
-	merge: function(first, second) {
+	merge: function( first, second ) {
         var i = first.length, j = 0;
 
         if ( typeof(second.length) === "number" ) {

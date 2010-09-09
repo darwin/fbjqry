@@ -32,4 +32,8 @@ By default all test suites will run, if You want to limit to a particular suite
 
     http://apps.facebook.com/[CANVAS_PATH]/?run=traversingSuite
 
-This assumes a <code>traversingSuite</code> exists and is a valid test suite.
+If chasing down a concrete test it's useful to limit the tests run :
+
+    http://apps.facebook.com/[CANVAS_PATH]/?run=event&only=live|die
+
+Runs all tests from <code>eventSuite</code> who's test name matches /live|die/i.

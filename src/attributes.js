@@ -159,9 +159,8 @@ FBjqRY.fn.extend({
             }
             return this;
         }
-
-        node = this.nodes[0];
-        if ( node ) {
+        
+        if ( ( node = this.nodes[0] ) ) {
             var nodeName = node.getTagName().toUpperCase();
             // NOTE: can't read text from FB nodes !
             //if ( nodeName === 'OPTION' ) {
@@ -176,18 +175,17 @@ FBjqRY.fn.extend({
                 // Nothing was selected
                 if ( index < 0 ) return null;
 
-                values = [];
                 // Loop through all the selected options
                 for ( i = one ? index : 0, max = one ? index + 1 : options.length; i < max; i++ ) {
                     var option = options[ i ];
+                    //console.log('val() select i', option, option.getSelected());
                     if ( option.getSelected() ) {
                         // We don't need an array for one selects
-                        if ( one ) {
-                            value = option.getValue();
-                            break;
-                        }
+                        value = option.getValue();
+                        if ( one ) break;
                         // Multi-Selects return an array
-                        values.push( option.getValue() );
+                        if ( ! values ) values = [];
+                        values.push( value );
                     }
                 }
                 if ( ! one ) return values;

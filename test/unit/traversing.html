@@ -64,6 +64,7 @@
 
     test("is(String)", function() {
         expect(26);
+
         ok( jQuery('#form').is('form'), 'Check for element: A form must be a form' );
         ok( !jQuery('#form').is('div'), 'Check for element: A form is not a div' );
         ok( jQuery('#bar').is('.fooBar'), 'Check for class: Expected class "fooBar"' );
@@ -98,6 +99,17 @@
         ok( jQuery('#ltr').is('[dir="ltr"] , [dir="rtl"]'), 'Comma-seperated; Check for dir attribute: Expect ltr or rtl' );
         ok( jQuery('#ltr').is('[dir="rtl"] , [dir="ltr"]'), 'Comma-seperated; Check for dir attribute: Expect rtl or ltr' );
     }, traversingSuite);
+
+    traversingSuite.testIs = function() {
+
+        Asserts.assertTrue( $('#bar2').is('span.fooBar'), '#bar2 is span.fooBar' );
+        Asserts.assertTrue( $('#bar2').is('#foo .fooBar'), '#bar2 is #foo .fooBar' );
+
+        Asserts.assertTrue( $('#bar').is('#foo div .fooBar'), '#bar is #foo div .fooBar' );
+        Asserts.assertTrue( $('#bar').is('div span.fooBar'), '#bar is div span.fooBar' );
+        Asserts.assertTrue( $('#bar').is('div div span'), '#bar is div div span' );
+
+    };
 
     test("index()", function() {
         expect(1);

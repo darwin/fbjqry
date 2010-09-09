@@ -640,4 +640,23 @@
         }
     };
 
+    coreSuite.testInArray = function () {
+        var div = document.getElementById('main');
+        var index = FBjqRY.inArray( div, [ div ] );
+        equals( index, 0, "Div is found in array !" );
+
+        var span1 = document.getElementById('span1');
+        var span2 = document.getElementById('span2');
+        var span3 = document.getElementById('span3');
+        var span4 = document.getElementById('span4');
+        var span5 = document.getElementById('span5');
+        var span6 = document.getElementById('span6');
+        var spans = [ span1, span2, span3, span6, span5, span4 ];
+        equals( FBjqRY.inArray( div, spans ), -1, "Div is not found in array !" );
+        equals( FBjqRY.inArray( span1, spans ), 0, "span1 is not found in array !" );
+        equals( FBjqRY.inArray( span3, spans ), 2, "span3 is not found in array !" );
+        equals( FBjqRY.inArray( span6, spans ), 3, "span6 is not found in array !" );
+        equals( FBjqRY.inArray( span4, spans ), 5, "span4 is not found in array !" );
+    };
+
 </script>

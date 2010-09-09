@@ -4,7 +4,7 @@
     <p id="firstp">paragraph</p>
     <span class="foo">foo</span>
     
-    <a id="link" href="/">link</a>
+    <a id="link" href="#">link</a>
     <div id="foochild"></div>
     <ul id="ul">
         <li>1</li>
@@ -742,40 +742,6 @@
         
     }, eventSuite);
 
-    eventSuite.testNativeClick = function() {
-
-        Asserts.fail('@todo implement me !'); // @todo
-
-        var handler = function(event, a, b, c) {
-            equals( event.type, "click", "check passed data" );
-            equals( a, 1, "check passed data" );
-            equals( b, "2", "check passed data" );
-            equals( c, "abc", "check passed data" );
-            return "test";
-        };
-
-        var $elem = jQuery("#firstp");
-
-        // Simulate a "native" click
-        $elem[0].click = function(){
-            ok( true, "Native call was triggered" );
-        };
-
-        // Triggers handlrs and native
-        // Trigger 5
-        $elem.bind("click", handler).trigger("click", [1, "2", "abc"]);
-
-        // Simulate a "native" click
-        $elem[0].click = function(){
-            ok( false, "Native call was triggered" );
-        };
-
-        // Trigger only the handlers (no native)
-        // Triggers 5
-        equals( $elem.triggerHandler("click", [1, "2", "abc"]), "test", "Verify handler response" );
-        
-    };
-
     test("trigger(type, [data], [fn])", function() {
         //expect(14);
 
@@ -1201,13 +1167,14 @@
         var livea = 0, live = 0;
 
         // bind one pair in one order
-        jQuery('span.live1 a').live('click', function(){ 
+        jQuery('span.live1 a').live('click', function(){
             console.log('span.live1 a  handler()', this);
-            livea++; return false; 
+            livea++;
+            return false;
         });
-        jQuery('span.live1').live('click', function(){ 
+        jQuery('span.live1').live('click', function(){
             console.log('span.live1  handler()', this);
-            live++; 
+            live++;
         });
 
         jQuery('span.live1 a').click();
@@ -1221,12 +1188,14 @@
         });
         jQuery('span.live2 a').live('click', function(){ 
             console.log('span.live2 a  handler()', this);
-            livea++; return false; 
+            livea++;
+            return false;
         });
 
         livea = 0; live = 0;
+        console.log('span.live2 a click()');
         jQuery('span.live2 a').click();
-        // @todo failing !
+        // @todo fails :
         equals( livea, 1, "Verify that only one first handler occurred 2." );
         equals( live, 0, "Verify that second handler doesn't 2." );
 
@@ -2037,5 +2006,74 @@
         ok( triggered, "Event on non-DOM object triggered" );
         
     }, eventSuite);
+
+    eventSuite.testNativeClick = function() {
+
+        var $elem = jQuery("#firstp");
+
+        $elem.text('testNativeClick() click here to start');
+        
+        $elem.get(0).addEventListener('click', function() {
+
+            var handlerRun = 0;
+            var handler = function(event, a, b, c) {
+                event.preventDefault();
+                try {
+                    equals( event.type, "click", "check passed data" );
+                    handlerRun++;
+                }
+                catch(e) {
+                    handlerRun = e;
+                }
+
+                return "test";
+                //return false;
+            };
+
+            // Triggers handlrs and native
+            // Trigger 5
+            $('#link').bind("click", handler).trigger("click");
+            Asserts.assertTrue( handlerRun === 1 );
+
+            $('#link').text('testNativeClick() now click here to trigger a native click');
+
+            $('#ul li:first').text('testNativeClick() pending');
+
+            var verifyTestResults = function() {
+                if ( handlerRun === 0 ) {
+                    setTimeout(verifyTestResults, 500);
+                }
+                else if ( handlerRun === 1 ) {
+                    $('#ul li:first').text('testNativeClick() passed');
+                }
+                else {
+                    $('#ul li:first').text('testNativeClick() failed');
+                }
+            }
+
+            handlerRun = 0;
+            setTimeout(verifyTestResults, 500);
+
+        }, false);
+
+//        // Simulate a "native" click
+//        $elem[0].click = function(){
+//            ok( true, "Native call was triggered" );
+//        };
+//
+//        // Triggers handlrs and native
+//        // Trigger 5
+//        $elem.bind("click", handler).trigger("click", [1, "2", "abc"]);
+//
+//        // Simulate a "native" click
+//        $elem[0].click = function(){
+//            ok( false, "Native call was triggered" );
+//        };
+//
+//        // Trigger only the handlers (no native)
+//        // Triggers 5
+//        equals( $elem.triggerHandler("click", [1, "2", "abc"]), "test", "Verify handler response" );
+
+    };
 
 </script>

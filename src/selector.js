@@ -171,7 +171,6 @@ FBjqRY.find = (function() {
             case "visible":
                 retNodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
             case "has":
-                //console.log('has', innerVal, nodes);
                 retNodes = FBjqRY.grep(nodes, function(node) {
                     var matches = FBjqRY.find(innerVal, node);
                     return matches.length > 0;
@@ -335,6 +334,7 @@ FBjqRY.find = (function() {
             }
         }
         else {
+            // @todo filter doesn't work as was intended to and is not used !
             var filter = context === false; // special case to handle filter-ing
         }
 
