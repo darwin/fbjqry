@@ -114,7 +114,7 @@ FBjqRY.fn = FBjqRY.prototype = {
         }
 
         this.selector = selector;
-        this.context = context || document; // @todo does the document make any sense with FBJS ?!
+        this.context = context; // || document; // NOTE: does not make sense with FBJS ...
         this.length = this.nodes.length;
         return this;
     },
@@ -123,7 +123,7 @@ FBjqRY.fn = FBjqRY.prototype = {
 	selector: "",
 
 	// The current version of jQuery being used
-	jquery: "0.5.0", //"@VERSION",
+	jquery: "0.6.0", //"@VERSION",
 
 	// The default length of a jQuery object is 0
 	length: 0,
@@ -223,28 +223,29 @@ FBjqRY.fn.init.prototype = FBjqRY.fn;
 // ============================================================================
 /** FBJS helpers */
 // ============================================================================
+var nextId = 1;
 FBjqRY.fbjs = { // NOTE: needs to be defined before extend is first used !
-    nextId: 1,
+    //nextId: 1,
     // NOTE: __instance is not 100% reliable e.g. testSiblingClassTagSelector fails
     // having the same elements matched with a different __instance identifier !
     getNodeId: function(node, dontGenerate) {
         // __instance is a unique identifier for FBDOM nodes
         //return node && node.__instance;
-        if ( node ) {
-            if ( ! node.getId ) return undefined;
+        if ( node && node.getId ) {
             var nodeId = node.getId();
             if ( ! nodeId && ! dontGenerate ) {
-                nodeId = '_generated-' + FBjqRY.fbjs.nextId++;
+                nodeId = '_FBjqRY_generated-' + nextId++; //FBjqRY.fbjs.nextId++;
                 node.setId( nodeId );
             }
             return nodeId;
         }
-        return node;
+        return undefined; //return node;
     },
     isNode: function(node) {
         return node && (node.__instance || node.__instance === 0);
     },
     sameNode: function(node1, node2) {
+        if ( node1 === node2 ) return true;
         var getNodeId = FBjqRY.fbjs.getNodeId;
         // __instance is a unique identifier for FBDOM nodes
         //return node1.__instance == node2.__instance;
@@ -427,8 +428,10 @@ FBjqRY.extend({
 		return true;
 	},
 
-	error: function( msg ) {
-		throw msg;
+	error: function( /* msg */ ) {
+        FBjqRY.log.apply(this, arguments);
+		//throw msg;
+        throw arguments.join('');
 	},
 
 	parseJSON: function(data) {
@@ -447,7 +450,7 @@ FBjqRY.extend({
 
 		}
         else {
-			return FBjqRY.error("parseJSON() invalid JSON: " + data);
+			return FBjqRY.error("parseJSON() invalid JSON: ", data);
 		}
 	},
 
@@ -544,7 +547,7 @@ FBjqRY.extend({
 		return ret;
 	},
 
-	inArray: function(elem, array) {
+	inArray: function( elem, array ) {
         var cmpFn, isNode = FBjqRY.fbjs.isNode;
         if ( isNode(elem) ) {
             var sameNode = FBjqRY.fbjs.sameNode;
@@ -563,7 +566,7 @@ FBjqRY.extend({
         return -1;
     },
 
-	merge: function(first, second) {
+	merge: function( first, second ) {
         var i = first.length, j = 0;
 
         if ( typeof(second.length) === "number" ) {
@@ -613,6 +616,7 @@ FBjqRY.extend({
 
 	// A global GUID counter for objects
 	guid: 1,
+    
 	proxy: function( fn, proxy, thisObject ) {
 		if ( arguments.length === 2 ) {
 			if ( typeof proxy === "string" ) {
@@ -620,7 +624,7 @@ FBjqRY.extend({
 				fn = thisObject[ proxy ];
 				proxy = undefined;
 			}
-            else if ( proxy && !jQuery.isFunction( proxy ) ) {
+            else if ( proxy && ! FBjqRY.isFunction( proxy ) ) {
 				thisObject = proxy;
 				proxy = undefined;
 			}
@@ -634,7 +638,7 @@ FBjqRY.extend({
 
 		// Set the guid of unique handler to the same of original handler, so it can be removed
 		if ( fn ) {
-			proxy.guid = fn.guid = fn.guid || proxy.guid || jQuery.guid++;
+			proxy.guid = fn.guid = fn.guid || proxy.guid || FBjqRY.guid++;
 		}
 
 		// So proxy can be declared as an argument
@@ -892,22 +896,25 @@ FBjqRY.log = FBjqRY.noop; // a tracing helper
 	// Technique from Juriy Zaytsev
 	// http://thinkweb2.com/projects/prototype/detecting-event-support-without-browser-sniffing/
 	var eventSupported = function( eventName ) {
-		var el = document.createElement("div");
-		eventName = "on" + eventName;
+		//var div = document.createElement("div");
 
-		var isSupported = (eventName in el);
-		if ( ! isSupported ) {
-			el.setAttribute(eventName, "return;");
-			isSupported = typeof el[eventName] === "function";
-		}
-		el = null;
-
-		return isSupported;
+		//eventName = "on" + eventName;
+		//var isSupported = (eventName in div);
+		//if ( ! isSupported ) {
+		//	div.setAttribute(eventName, "return;");
+		//	isSupported = typeof div[eventName] === "function";
+		//}
+		//div = null;
+        //return isSupported;
+        
+        div.addEventListener(eventName, function() {}, false);
+        var eventListeners = div.listEventListeners(eventName);
+        return eventListeners && eventListeners.length === 1;
+        
 	};
 
-    // @todo :
-	//FBjqRY.support.submitBubbles = eventSupported("submit");
-	//FBjqRY.support.changeBubbles = eventSupported("change");
+	FBjqRY.support.submitBubbles = eventSupported("submit");
+	FBjqRY.support.changeBubbles = eventSupported("change");
 
 	// release memory in IE
 	root = script = div = all = a = null;
@@ -1044,7 +1051,7 @@ var parseJSON = (function() { //Modified json parser begins here :
                   if (v !== 0) {
                     value[k] = v;
                   } else {
-                    if (!toDelete) { toDelete = []; }
+                    if (!toDelete) {toDelete = [];}
                     toDelete.push(k);
                   }
                 }
@@ -1057,12 +1064,14 @@ var parseJSON = (function() { //Modified json parser begins here :
             }
             return opt_reviver.call(holder, key, value);
           };
-          result = walk({ '': result }, '');
+          result = walk({'': result}, '');
         }
 
         return result;
       };
-})();//var windowData = {};
+})();
+var expando = "FBjqRY" + FBjqRY.now(), uuid = 0;
+
 FBjqRY.extend({
 	cache: {},
 
@@ -1070,7 +1079,7 @@ FBjqRY.extend({
 	//uuid: 0,
 
 	// Unique for each copy of jQuery on the page
-	expando: "FBjqRY" + FBjqRY.now(),
+	expando: expando,
 
 	// The following elements throw uncatchable exceptions if you
 	// attempt to add expando properties to them.
@@ -1084,11 +1093,22 @@ FBjqRY.extend({
 //        else {
 //            id = getFBNodeId(elem, false);
 //        }
-        var id = FBjqRY.fbjs.getNodeId(elem), cache = FBjqRY.cache, thisCache;
+        var id, cache = FBjqRY.cache, thisCache;
+            
+        if ( FBjqRY.fbjs.isNode(elem) ) {
+            id = FBjqRY.fbjs.getNodeId(elem);
+        }
+        else {
+            // NOTE: we should allow .data to work for bare objects not just FB nodes :
+            id = elem[ expando ];
+            if ( ! id ) id = elem[ expando ] = ++uuid;
+        }
+
+        //console.log('data() ', elem, name, data);
 
 		// Avoid generating a new cache unless none exists and we
 		// want to manipulate it.
-		if ( typeof name === "object" ) {
+		if ( typeof(name) === "object" ) {
 			cache[ id ] = FBjqRY.extend(true, {}, name);
 		}
         else if ( ! cache[ id ] ) {
@@ -1096,14 +1116,22 @@ FBjqRY.extend({
 		}
 		thisCache = cache[ id ];
 
+        //console.log('data() id = ', id, thisCache);
+
 		// Prevent overriding the named cache with undefined values
 		if ( typeof(data) !== 'undefined' ) thisCache[ name ] = data;
 
-		return typeof(name) === "string" ? thisCache[ name ] : thisCache;
+		return typeof(name) === 'string' ? thisCache[ name ] : thisCache;
     },
 
     removeData: function( elem, name ) {
-        var id = FBjqRY.fbjs.getNodeId(elem, true), cache = FBjqRY.cache;
+        var id, cache = FBjqRY.cache;
+        if ( FBjqRY.fbjs.isNode(elem) ) {
+            id = FBjqRY.fbjs.getNodeId(elem, true);
+        }
+        else {
+            id = elem[ expando ];
+        }
         var thisCache = id ? cache[ id ] : undefined;
 
 		// If we want to remove a specific section of the element's data
@@ -1172,7 +1200,7 @@ FBjqRY.fn.extend({
         if ( typeof(key) === 'undefined' && this.length ) {
             return FBjqRY.data( this.nodes[0] );
         }
-        else if ( typeof key === "object" ) {
+        else if ( ! FBjqRY.isString(key) /*typeof key === "object"*/ ) {
             return this.each(function() { 
                 FBjqRY.data( this, key );
             });
@@ -1205,7 +1233,7 @@ FBjqRY.fn.extend({
     // embedded queue.js :
 
 	queue: function( type, data ) {
-		if ( typeof type !== "string" ) {
+		if ( typeof(type) !== 'string' ) {
 			data = type;
 			type = "fx";
 		}
@@ -2058,7 +2086,6 @@ FBjqRY.find = (function() {
             case "visible":
                 retNodes = FBjqRY.grep(nodes, function(node) { return ! _isHidden(node); }); break;
             case "has":
-                //console.log('has', innerVal, nodes);
                 retNodes = FBjqRY.grep(nodes, function(node) {
                     var matches = FBjqRY.find(innerVal, node);
                     return matches.length > 0;
@@ -2218,10 +2245,11 @@ FBjqRY.find = (function() {
                 }
             }
             else {
-                return FBjqRY.error("find() invalid context: " + context);
+                return FBjqRY.error("find() invalid context: ", context);
             }
         }
         else {
+            // @todo filter doesn't work as was intended to and is not used !
             var filter = context === false; // special case to handle filter-ing
         }
 
@@ -2344,6 +2372,9 @@ FBjqRY.find = (function() {
 	//rmultiselector = /,/,
 	//isSimple = /^.[^:#\[\.,]*$/;
 
+// matches POSistional selectors (from Sizzle internals) : 
+var rselectorpos = /:(nth|eq|gt|lt|first|last|even|odd)(?:\((\d*)\))?(?=[^\-]|$)/;     
+
 FBjqRY.fn.extend({
 
     find: function(selector) {
@@ -2402,52 +2433,6 @@ FBjqRY.fn.extend({
         
         return this.pushStack( nodes, "filter", selector );
     },
-
-    /* @todo not implemented !
-	closest: function( selectors, context ) {
-		if ( jQuery.isArray( selectors ) ) {
-			var ret = [], cur = this[0], match, matches = {}, selector, level = 1;
-
-			if ( cur && selectors.length ) {
-				for ( var i = 0, l = selectors.length; i < l; i++ ) {
-					selector = selectors[i];
-
-					if ( !matches[selector] ) {
-						matches[selector] = jQuery.expr.match.POS.test( selector ) ? 
-							jQuery( selector, context || this.context ) :
-							selector;
-					}
-				}
-
-				while ( cur && cur.ownerDocument && cur !== context ) {
-					for ( selector in matches ) {
-						match = matches[selector];
-
-						if ( match.jquery ? match.index(cur) > -1 : jQuery(cur).is(match) ) {
-							ret.push({ selector: selector, elem: cur, level: level });
-						}
-					}
-					cur = cur.parentNode;
-					level++;
-				}
-			}
-
-			return ret;
-		}
-
-		var pos = jQuery.expr.match.POS.test( selectors ) ? 
-			jQuery( selectors, context || this.context ) : null;
-
-		return this.map(function( i, cur ) {
-			while ( cur && cur.ownerDocument && cur !== context ) {
-				if ( pos ? pos.index(cur) > -1 : jQuery(cur).is(selectors) ) {
-					return cur;
-				}
-				cur = cur.parentNode;
-			}
-			return null;
-		});
-	}, */
 	
 	// Determine the position of an element within
 	// the matched set of elements
@@ -2476,11 +2461,10 @@ FBjqRY.fn.extend({
 
 	andSelf: function() {
 		return this.add( this.prevObject );
-	}
-});
-
-FBjqRY.fn.extend({
-
+	},
+    
+    /* */
+    
     parent: function(selector) {
         return this.pushStack( collectParents(this.nodes, selector, false), "parent", selector || '' );
     },
@@ -2545,8 +2529,54 @@ FBjqRY.fn.extend({
         
         children = len === 1 ? children : FBjqRY.unique(children);
         return this.pushStack( children, "contents", '' );
-    }
+    },
+    
+	closest: function( selector, context ) {
+        
+        var sameNode = FBjqRY.fbjs.sameNode;
+        
+		if ( FBjqRY.isArray( selector ) ) { /* live() relies on this ! */
+			var ret = [], cur = this.nodes[0], matches = {}, sel, level = 1;
 
+			if ( cur && selector.length ) {
+				for ( var i = 0, l = selector.length; i < l; i++ ) {
+					sel = selector[i];
+                    
+					if ( ! matches[sel] ) {
+						matches[sel] = rselectorpos.test( sel ) ? 
+                            FBjqRY( sel, context || this.context ) : sel;
+					}
+				}
+
+				while ( cur && ( context == null || ! sameNode(context, cur) ) ) {
+					for ( sel in matches ) {
+						var match = matches[sel];
+                        //console.log('closest() cur is match: ', cur, match, FBjqRY(cur).is(match));
+						if ( match.jquery ? match.index(cur) > -1 : FBjqRY(cur).is(match) ) {
+							ret.push({ selector: sel, elem: cur, level: level });
+						}
+					}
+					cur = cur.getParentNode();
+					level++;
+				}
+			}
+
+			return ret;
+		}
+        
+        // match POS-itional selector :
+		var pos = rselectorpos.test( selector ) ?  FBjqRY( selector, context || this.context ) : null;
+
+		return this.map(function( i, cur ) {
+			while ( cur && ( context == null || ! sameNode(context, cur) ) ) {
+				if ( pos ? pos.index(cur) > -1 : FBjqRY(cur).is(selector) ) {
+					return cur;
+				}
+				cur = cur.getParentNode();
+			}
+			return null;
+		});
+	}
 });
 
 var collectSiblings = function(nodes, selector, getSiblings, until) {
@@ -2632,10 +2662,19 @@ var matchesNodes = function(selector, nodes) {
 FBjqRY.filter = function( selector, nodes, not ) {
     if ( not ) selector = ":not(" + selector + ")";
 
-    var matchNodes = []; var singleNode = [];
+    /*
+    var matchNodes = [];
     for ( var i = 0, len = nodes.length; i < len; i++ ) {
-        var node = nodes[i]; singleNode[0] = node;
-        if ( FBjqRY.find(selector, false, singleNode).length > 0 ) {
+        var node = nodes[i];
+        if ( FBjqRY.find(selector, false, [ node ]).length > 0 ) {
+            matchNodes.push( node );
+        }
+    } */
+
+    var matchNodes = [], selNodes = FBjqRY.find(selector);
+    for ( var i = 0, len = nodes.length; i < len; i++ ) {
+        var node = nodes[i];
+        if ( FBjqRY.inArray(node, selNodes) >= 0 ) {
             matchNodes.push( node );
         }
     }
@@ -3277,7 +3316,7 @@ FBjqRY.extend({
                 var fChild = div.getFirstChild();
                 if ( ! fChild || fChild.getTagName().toLowerCase() !== tag ) {
                     //return FBjqRY.error('clean() setInnerXHTML with "'+ xhtml +'" failed !');
-                    return FBjqRY.error('clean() setInnerXHTML with "'+ elem +'" failed !');
+                    return FBjqRY.error('clean() setInnerXHTML failed with: ', elem);
                 }
 
 				// Remove IE's autoinserted <tbody> from table fragments
@@ -3380,10 +3419,9 @@ var split2XHTML = function( html, tag ) {
     //tag = tag ? tag : rtagName.exec( elem );
     //html.split();
 }; */var rnamespaces = /\.(.*)$/,
-	fcleanup = function( nm ) {
-		return nm.replace(/[^\w\s\.\|`]/g, function( ch ) {
-			return "\\" + ch;
-		});
+	rcleanup = /[^\w\s\.\|`]/g,
+    fcleanup = function( nm ) {
+		return nm.replace( rcleanup, function( ch ) { return "\\" + ch; } );
 	};
 
 /*
@@ -3393,12 +3431,13 @@ var split2XHTML = function( html, tag ) {
  */
 FBjqRY.event = {
 
+    global: {},
+
 	// Bind an event to an element
 	// Original by Dean Edwards
 	add: function( elem, types, handler, data ) {
-		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return;
-		//}
+        var nodeType = elem.getNodeType && elem.getNodeType();
+		if ( nodeType === 3 || nodeType === 8 ) return;
 
 		// For whatever reason, IE has trouble passing the window object
 		// around, causing it to be cloned in the process
@@ -3417,26 +3456,27 @@ FBjqRY.event = {
 
 		// Make sure that the function being executed has a unique ID
 		if ( ! handler.guid ) {
-			handler.guid = FBjqRY.guid++; // @todo ?
+			handler.guid = FBjqRY.guid++;
 		}
 
 		// Init the element's event structure
 		var elemData = FBjqRY.data( elem );
-
+        //console.log('add', elem, elemData);
 		// If no elemData is found then we must be trying to bind to one of the
 		// banned noData elements
-		if ( !elemData ) return;
+		if ( ! elemData ) return;
 
 		var events = elemData.events = elemData.events || {},
 			eventHandle = elemData.handle;
 
-		if ( !eventHandle ) {
+		if ( ! eventHandle ) {
 			elemData.handle = eventHandle = function() {
 				// Handle the second event of a trigger and when
 				// an event is called after a page has unloaded
-				return typeof FBjqRY !== "undefined" && !FBjqRY.event.triggered ?
-					FBjqRY.event.handle.apply( eventHandle.elem, arguments ) :
-					undefined;
+                if ( typeof(FBjqRY)!== "undefined" && ! FBjqRY.event.triggered ) {
+                    return FBjqRY.event.handle.apply( eventHandle.elem, arguments );
+                }
+				return undefined;
 			};
 		}
 
@@ -3449,46 +3489,46 @@ FBjqRY.event = {
 		types = types.split(" ");
 
 		var type, i = 0, namespaces;
-
 		while ( (type = types[ i++ ]) ) {
-			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : { handler: handler, data: data };
+			handleObj = handleObjIn ? FBjqRY.extend({}, handleObjIn) : {handler: handler, data: data};
 
 			// Namespaced event handlers
 			if ( type.indexOf(".") > -1 ) {
 				namespaces = type.split(".");
 				type = namespaces.shift();
 				handleObj.namespace = namespaces.slice(0).sort().join(".");
-
-			} else {
+			} 
+            else {
 				namespaces = [];
 				handleObj.namespace = "";
 			}
 
 			handleObj.type = type;
-			if ( !handleObj.guid ) {
-				handleObj.guid = handler.guid;
-			}
+			if ( ! handleObj.guid ) handleObj.guid = handler.guid;
 
 			// Get the current list of functions bound to this event
-			var handlers = events[ type ], special = FBjqRY.event.special[ type ] || {};
+			var handlers = events[ type ], special = FBjqRY.event.special[ type ];
 
 			// Init the event handler queue
-			if ( !handlers ) {
+			if ( ! handlers ) {
 				handlers = events[ type ] = [];
-
+                
+                var setup = special && special.setup;
 				// Check for a special event handler
 				// Only use addEventListener/attachEvent if the special
 				// events handler returns false
-				if ( ! special.setup ||
-                        special.setup.call( elem, data, namespaces, eventHandle ) === false ) {
+				if ( ! setup || setup.call( elem, data, namespaces, eventHandle ) === false ) {
+                    //console.log('add', type, namespaces, elem);
 					// Bind the global event handler to the element
-					//if (elem.addEventListener) {
+					if (elem.addEventListener && supportedEvents.indexOf(type) > -1) {
+                        // NOTE: FBJS logs errors for events it does not "support" !
+                        eventHandle['FBjqRY_handler'] = true; // "mark" the handler @see trigger()
 						elem.addEventListener( type, eventHandle, false );
-					//}
+					}
 				}
 			}
 			
-			if ( special.add ) { 
+			if ( special && special.add ) { 
 				special.add.call( elem, handleObj ); 
 
 				if ( !handleObj.handler.guid ) {
@@ -3507,14 +3547,11 @@ FBjqRY.event = {
 		elem = null;
 	},
 
-	global: {},
-
 	// Detach an event or set of events from an element
 	remove: function( elem, types, handler, pos ) {
 		// don't do events on text and comment nodes
-		//if ( elem.nodeType === 3 || elem.nodeType === 8 ) {
-		//	return;
-		//}
+        var nodeType = elem.getNodeType && elem.getNodeType();
+		if ( nodeType === 3 || nodeType === 8 ) return;
 
 		if ( handler === false ) handler = returnFalse;
 
@@ -3522,7 +3559,7 @@ FBjqRY.event = {
 			elemData = FBjqRY.data( elem ),
 			events = elemData && elemData.events;
 
-		if ( !elemData || !events ) return;
+		if ( ! elemData || ! events ) return;
 
 		// types is actually an event object here
 		if ( types && types.type ) {
@@ -3531,13 +3568,11 @@ FBjqRY.event = {
 		}
 
 		// Unbind all events for the element
-		if ( !types || typeof types === "string" && types.charAt(0) === "." ) {
+		if ( ! types || types.charAt && types.charAt(0) === "." ) {
 			types = types || "";
-
 			for ( type in events ) {
 				FBjqRY.event.remove( elem, type + types );
 			}
-            
 			return;
 		}
 
@@ -3566,31 +3601,32 @@ FBjqRY.event = {
 			if ( !handler ) {
 				for ( j = 0; j < eventType.length; j++ ) {
 					handleObj = eventType[ j ];
-
 					if ( all || namespace.test( handleObj.namespace ) ) {
 						FBjqRY.event.remove( elem, origType, handleObj.handler, j );
 						eventType.splice( j--, 1 );
 					}
 				}
-
 				continue;
 			}
 
-			special = FBjqRY.event.special[ type ] || {};
+			special = FBjqRY.event.special[ type ]; //|| {};
+            //console.log('remove 0', type, eventType, eventType.length, special);
 
 			for ( j = pos || 0; j < eventType.length; j++ ) {
 				handleObj = eventType[ j ];
-
+                //console.log('remove 1', handler.guid, handleObj.guid);
 				if ( handler.guid === handleObj.guid ) {
+                    //console.log('remove 2 all namespace', all, namespace, handleObj.namespace, namespace.test( handleObj.namespace ));
 					// remove the given handler for the given type
 					if ( all || namespace.test( handleObj.namespace ) ) {
+                        //console.log('remove pre splice', pos);
 						if ( pos == null ) {
-							eventType.splice( j--, 1 );
-						}
-
-						if ( special.remove ) {
-							special.remove.call( elem, handleObj );
-						}
+                            eventType.splice( j--, 1 );
+                        }
+                        
+                        if ( special && special.remove ) {
+                            special.remove.call( elem, handleObj );
+                        }
 					}
 
 					if ( pos != null ) break;
@@ -3599,13 +3635,14 @@ FBjqRY.event = {
 
 			// remove generic event handler if no more handlers exist
 			if ( eventType.length === 0 || pos != null && eventType.length === 1 ) {
-				if ( !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
-                    if (elem.removeEventListener) {
+                //console.log('remove 3 teardown', type, special);
+				if ( !special || !special.teardown || special.teardown.call( elem, namespaces ) === false ) {
+                    if (elem.removeEventListener && supportedEvents.indexOf(type) > -1) {
                         elem.removeEventListener( type, elemData.handle, false );
                     }
 				}
 
-				ret = null;
+				//ret = null;
 				delete events[ type ];
 			}
 		}
@@ -3626,13 +3663,14 @@ FBjqRY.event = {
 		}
 	},
 
-	// bubbling is internal
-	trigger: function( event, data, elem /*, bubbling */ ) {
+	trigger: function( event, data, elem, bubbling ) { // bubbling is internal
 		// Event object or event type
-		var type = event.type || event, bubbling = arguments[3];
+		var type = event.type || event; //, bubbling = arguments[3];
 
-		if ( !bubbling ) {
-			event = typeof event === "object" ?
+        //console.log('trigger', event, data, elem);
+
+		if ( ! bubbling ) {
+			event = ! FBjqRY.isString(event) /*typeof event === "object"*/ ?
 				// jQuery.Event object
 				event[ FBjqRY.expando ] ? event :
 				// Object literal
@@ -3646,9 +3684,9 @@ FBjqRY.event = {
 			}
 
 			// Handle a global trigger
-			if ( !elem ) {
+			if ( ! elem ) {
 				// Don't bubble custom events when global (to avoid too much overhead)
-				event.stopPropagation(); // supported in FBJS
+				event.stopPropagation();
 
 				// Only trigger if we've ever bound an event for it
 				if ( FBjqRY.event.global[ type ] ) {
@@ -3663,9 +3701,11 @@ FBjqRY.event = {
 			// Handle triggering a single element
 
 			// don't do events on text and comment nodes
-			//if ( !elem || elem.nodeType === 3 || elem.nodeType === 8 ) {
-			//	return undefined;
-			//}
+            if ( !elem ) return undefined;
+            var nodeType = elem.getNodeType && elem.getNodeType();
+			if ( nodeType && (nodeType === 3 || nodeType === 8) ) {
+				return undefined;
+			}
 
 			// Clean up in case it is reused
 			event.result = undefined;
@@ -3673,62 +3713,119 @@ FBjqRY.event = {
 
 			// Clone the incoming data, if any
 			data = FBjqRY.makeArray( data );
-			data.unshift( event );
+			data.unshift( event ); // add the event to the front
 		}
 
 		event.currentTarget = elem;
 
 		// Trigger the event, it is assumed that "handle" is a function
 		var handle = FBjqRY.data( elem, "handle" );
-		if ( handle ) handle.apply( elem, data );
+		if ( handle ) { 
+            //console.log('trigger handle:', elem, data);
+            handle.apply( elem, data );
+        }
 
-		var parent = elem.getParentNode(); //|| elem.ownerDocument;
+        // ------------
 
-		// Trigger an inline bound script
-        /*
-		try {
-			if ( !(elem && elem.nodeName && FBjqRY.noData[elem.getTagName().toLowerCase()]) ) {
-				if ( elem[ "on" + type ] && elem[ "on" + type ].apply( elem, data ) === false ) {
-					event.result = false;
-				}
-			}
-		// prevent IE from throwing an error for some elements with some event types, see #3533
-		} catch (inlineError) {} */
+		// Handle triggering native .onfoo handlers (and on links since we don't call .click() for links)
+		//if ( (! elem[type] || (jQuery.nodeName(elem, 'a') && type == "click")) && elem["on"+type] && elem["on"+type].apply( elem, data ) === false )
+		//	event.result = false;
 
-		if ( !event.isPropagationStopped() && parent ) { // @todo
-			FBjqRY.event.trigger( event, data, parent, true );
+        var parent = elem.getParentNode && elem.getParentNode();
+
+		if ( ! event.isPropagationStopped() && parent ) {
+			FBjqRY.event.trigger(event, data, parent, true);
 		}
-        else if ( !event.isDefaultPrevented() ) { // @todo
-			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
-				isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
-				special = FBjqRY.event.special[ targetType ] || {};
-
-			if ( (!special._default || special._default.call( elem, event ) === false) && 
-				!isClick && !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
-                /* @todo ?!
-				try {
-					if ( target[ targetType ] ) {
-						// Make sure that we don't accidentally re-trigger the onFOO events
-						old = target[ "on" + targetType ];
-
-						if ( old ) {
-							target[ "on" + targetType ] = null;
-						}
-
-						FBjqRY.event.triggered = true;
-						target[ targetType ]();
-					}
-
-				// prevent IE from throwing an error for some elements with some event types, see #3533
-				} catch (triggerError) {}
-
-				if ( old ) {
-					target[ "on" + targetType ] = old;
-				} */
-
-				FBjqRY.event.triggered = false;
-			}
+		// Trigger the native events (except for clicks on links)
+		else if ( /*! bubbling && elem[type] &&*/ ! event.isDefaultPrevented() /*&& !(jQuery.nodeName(elem, 'a') && type == "click") */ ) {
+			//this.triggered = true;
+			//try {
+			//	elem[ type ]();
+			//// prevent IE from throwing an error for some hidden elements
+			//} catch (e) {}
+            
+			var target = event.target, targetType = type.replace(/\..*$/, ""),
+				special = FBjqRY.event.special[ targetType ]; // || {};
+            
+			if ( ( ! special || ! special._default || special._default.call( elem, event ) === false ) &&
+				! (target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+             
+                var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
+                if ( listeners && ( len = listeners.length ) ) {
+                    
+                    FBjqRY.event.triggered = true;
+                    
+                    for ( var i = 0; i < len; i++ ) {
+                        var listener = listeners[i];
+                        
+                        //console.log('trigger listeners['+ i +'] ', listener, target, data);
+                        if ( ! listener ) continue; // some seem to be undefined
+                        if ( listener['FBjqRY_handler'] ) continue; // already run - FBjqRY added handle
+                        
+                        var ret = listener.apply( target, data );
+                        if ( ret === false ) { 
+                            event.result = false;
+                            if ( event.isPropagationStopped() ) break;
+                        }
+                    }
+                }
+                
+                FBjqRY.event.triggered = false;
+            }
 		}
+
+        // ------------
+
+//		var parent = elem.getParentNode && elem.getParentNode(); //|| elem.ownerDocument;
+//
+//		// Trigger an inline bound script
+//        /*
+//		try {
+//			if ( !(elem && elem.nodeName && FBjqRY.noData[elem.getTagName().toLowerCase()]) ) {
+//				if ( elem[ "on" + type ] && elem[ "on" + type ].apply( elem, data ) === false ) {
+//					event.result = false;
+//				}
+//			}
+//		// prevent IE from throwing an error for some elements with some event types, see #3533
+//		} catch (inlineError) {} */
+//
+//		if ( ! event.isPropagationStopped() && parent ) { // @todo
+//			FBjqRY.event.trigger( event, data, parent, true );
+//		}
+//        else if ( ! event.isDefaultPrevented() ) {
+//            
+//			var target = event.target, old, targetType = type.replace(/\..*$/, ""),
+//				//isClick = FBjqRY.nodeName(target, "a") && targetType === "click",
+//				special = FBjqRY.event.special[ targetType ] || {};
+//
+//			if ( ( ! special._default || special._default.call( elem, event ) === false ) && 
+//				/*! isClick &&*/ !(target && target.getTagName && FBjqRY.noData[target.getTagName().toLowerCase()]) ) {
+//				//try {
+//                    //console.log('trigger', target, targetType, event)
+//                    var listeners = target.listEventListeners && target.listEventListeners(targetType), len;
+//					//if ( target[ targetType ] ) {
+//                    if ( listeners && ( len = listeners.length ) ) {
+//						// Make sure that we don't accidentally re-trigger the onFOO events
+//						//old = target[ "on" + targetType ];
+//						//if ( old ) target[ "on" + targetType ] = null;
+//						FBjqRY.event.triggered = true;
+//						//target[ targetType ]();
+//                        for ( var i = 0; i < len; i++ ) {
+//                            var listener = listeners[i];
+//                            //console.log('calling: listeners[i] = ', listener, target, data);
+//                            if ( ! listener ) continue; // some seem to be undefined
+//                            //var ret = listener.call(target, event); // @todo
+//                            //var ret = listener(target, event); // @todo
+//                            var ret = listener.apply( target, data ); // @todo
+//                            if ( ret === false || event.isPropagationStopped() ) break; // @todo
+//                        }
+//					}
+//				// prevent IE from throwing an error for some elements with some event types, see #3533
+//				//} catch (triggerError) {}
+//				//if ( old ) target[ "on" + targetType ] = old;
+//				FBjqRY.event.triggered = false;
+//			}
+//		}
 	},
 
 	handle: function( event ) {
@@ -3738,10 +3835,12 @@ FBjqRY.event = {
 		event = args[0] = FBjqRY.event.fix( event );
 		event.currentTarget = this;
 
-		// Namespaced event handlers
-		all = event.type.indexOf(".") < 0 && !event.exclusive;
+        //console.log('handle() 0', event);
 
-		if ( !all ) {
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && ! event.exclusive;
+
+		if ( ! all ) {
 			namespaces = event.type.split(".");
 			event.type = namespaces.shift();
 			namespace_sort = namespaces.slice(0).sort();
@@ -3751,7 +3850,9 @@ FBjqRY.event = {
 		event.namespace = event.namespace || namespace_sort.join(".");
 
 		events = FBjqRY.data(this, "events");
-		handlers = (events || {})[ event.type ];
+		handlers = events && events[ event.type ];
+
+        //console.log('handle() 01 all, events, handlers = ', all, events, handlers);
 
 		if ( events && handlers ) {
 			// Clone the handlers to prevent manipulation
@@ -3760,6 +3861,8 @@ FBjqRY.event = {
 			for ( var j = 0, l = handlers.length; j < l; j++ ) {
 				var handleObj = handlers[ j ];
 
+                //console.log('handle() 1 handleObj.namespace = ', handleObj.namespace, namespace_re);
+
 				// Filter the functions by class
 				if ( all || namespace_re.test( handleObj.namespace ) ) {
 					// Pass in a reference to the handler function itself
@@ -3767,14 +3870,83 @@ FBjqRY.event = {
 					event.handler = handleObj.handler;
 					event.data = handleObj.data;
 					event.handleObj = handleObj;
-	
+
+                    //console.log('handle() 2 calling handler', handleObj.handler);
+
 					var ret = handleObj.handler.apply( this, args );
+                    
+                    //console.log('handle() 2 handler returned', ret);
+                    
+					if ( typeof(ret) !== 'undefined' ) {
+						event.result = ret;
+						if ( ret === false ) {
+                            //console.log('handle() 0', ret, event, event.preventDefault);
+							event.preventDefault();
+                            //console.log('handle() 1', ret, event);
+							event.stopPropagation();
+                            //console.log('handle() 2', ret, event);
+						}
+					}
+
+					if ( event.isImmediatePropagationStopped() ) break;
+				}
+			}
+		}
+
+		return event.result;
+	},
+    
+	handle1: function( event ) {
+		var all, handlers, namespaces, namespace, events;
+        var args = FBjqRY.makeArray( arguments );
+        
+		event = args[0] = FBjqRY.event.fix( event );
+		event.currentTarget = this;
+
+        console.log('handle() 0', event);
+
+		// Namespaced event handlers
+		all = event.type.indexOf(".") < 0 && ! event.exclusive;
+
+		if ( ! all ) {
+			namespaces = event.type.split(".");
+			event.type = namespaces.shift();
+			namespace = new RegExp("(^|\\.)" + namespaces.slice(0).sort().join("\\.(?:.*\\.)?") + "(\\.|$)");
+		}
+
+		events = FBjqRY.data(this, "events"); 
+        handlers = events ? events[ event.type ] : undefined;
+
+        console.log('handle() 01 all, events, handlers = ', all, events, handlers);
+
+		if ( events && handlers ) {
+			// Clone the handlers to prevent manipulation
+			handlers = handlers.slice(0);
+
+			for ( var j = 0, l = handlers.length; j < l; j++ ) {
+				var handleObj = handlers[ j ];
+
+                console.log('handle() 1 handleObj.namespace = ', handleObj.namespace, namespace);
+
+				// Filter the functions by class
+				if ( all || namespace.test( handleObj.namespace ) ) {
+					// Pass in a reference to the handler function itself
+					// So that we can later remove it
+					event.handler = handleObj.handler;
+					event.data = handleObj.data;
+					event.handleObj = handleObj;
+
+                    console.log('handle() 2 calling handler', event, this);
+
+					var ret = handleObj.handler.apply( this, args );
+
+                    console.log('handle() 2 handler returned', ret);
 
 					if ( ret !== undefined ) {
 						event.result = ret;
 						if ( ret === false ) {
-							event.preventDefault(); // FBJS ok
-							event.stopPropagation(); // FBJS ok
+							event.preventDefault();
+							event.stopPropagation();
 						}
 					}
 
@@ -3787,6 +3959,7 @@ FBjqRY.event = {
 
 		return event.result;
 	},
+    
     /*
 	props: "altKey attrChange attrName bubbles button cancelable charCode " + 
            "clientX clientY ctrlKey currentTarget data detail eventPhase fromElement " +
@@ -3852,30 +4025,29 @@ FBjqRY.event = {
 	},
 
 	// Deprecated, use jQuery.guid instead
-	guid: 100000000, //1E8,
+	//guid: 100000000, //1E8,
 
 	// Deprecated, use jQuery.proxy instead
 	proxy: FBjqRY.proxy,
 
 	special: {
-		//ready: {
-		//	// Make sure the ready event is setup
-		//	setup: jQuery.bindReady,
-		//	teardown: jQuery.noop
-		//},
+        /*
+		ready: {
+			// Make sure the ready event is setup
+			setup: jQuery.bindReady,
+			teardown: jQuery.noop
+		}, */
 
 		live: {
 			add: function( handleObj ) {
-				FBjqRY.event.add( this,
-					liveConvert( handleObj.origType, handleObj.selector ),
-					FBjqRY.extend({}, handleObj, {handler: liveHandler, guid: handleObj.handler.guid}) );
+                FBjqRY.event.add( this, liveConvert( handleObj.origType, handleObj.selector ),
+                    FBjqRY.extend({}, handleObj, { handler: liveHandler, guid: handleObj.handler.guid }) );
 			},
-
 			remove: function( handleObj ) {
-				FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
+                FBjqRY.event.remove( this, liveConvert( handleObj.origType, handleObj.selector ), handleObj );
 			}
 		}
-
+        
         /*
 		beforeunload: {
 			setup: function( data, namespaces, eventHandle ) {
@@ -3883,8 +4055,9 @@ FBjqRY.event = {
 				if ( this.setInterval ) {
 					this.onbeforeunload = eventHandle;
 				}
-			},
 
+				return false;
+			},
 			teardown: function( namespaces, eventHandle ) {
 				if ( this.onbeforeunload === eventHandle ) {
 					this.onbeforeunload = null;
@@ -3894,7 +4067,13 @@ FBjqRY.event = {
 	}
 };
 
+function returnFalse() {return false;}
+function returnTrue() {return true;}
+
 FBjqRY.Event = function( src ) {
+    
+    //console.log('Event src:', src);
+    
 	// Allow instantiation without the 'new' keyword
 	if ( !this.preventDefault ) {
 		return new FBjqRY.Event( src );
@@ -3916,9 +4095,6 @@ FBjqRY.Event = function( src ) {
 	// Mark it as fixed
 	this[ FBjqRY.expando ] = true;
 };
-
-function returnFalse() { return false; }
-function returnTrue() { return true; }
 
 // jQuery.Event is based on DOM3 Events as specified by the ECMAScript Language Binding
 // http://www.w3.org/TR/2003/WD-DOM-Level-3-Events-20030331/ecma-script-binding.html
@@ -4010,30 +4186,28 @@ if ( ! FBjqRY.support.submitBubbles ) { // @todo
     
 	FBjqRY.event.special.submit = {
 		setup: function( data, namespaces ) {
-			if ( this.nodeName.toLowerCase() !== "form" ) {
-				FBjqRY.event.add(this, "click.specialSubmit", function( e ) {
-					var elem = e.target, type = elem.type;
+            var self = this;
+			if ( ! FBjqRY.nodeName(self, "form") ) {
+				FBjqRY.event.add(self, "click.specialSubmit", function( e ) {
+					var elem = e.target, type = elem.getType();
 
 					if ( (type === "submit" || type === "image") &&
                         FBjqRY( elem ).closest("form").length ) {
 						return trigger( "submit", this, arguments );
 					}
 				});
-	 
-				FBjqRY.event.add(this, "keypress.specialSubmit", function( e ) {
-					var elem = e.target, type = elem.type;
+				FBjqRY.event.add(self, "keypress.specialSubmit", function( e ) {
+					var elem = e.target, type = elem.getType();
 
 					if ( (type === "text" || type === "password") && 
                         FBjqRY( elem ).closest("form").length && e.keyCode === 13 ) {
 						return trigger( "submit", this, arguments );
 					}
 				});
-
 			} else {
 				return false;
 			}
 		},
-
 		teardown: function( namespaces ) {
 			FBjqRY.event.remove( this, ".specialSubmit" );
 		}
@@ -4048,9 +4222,7 @@ function getSelectOptions(select) {
 // change delegation, happens here so we have bind.
 if ( ! FBjqRY.support.changeBubbles ) { // @todo
 
-	var formElems = /textarea|input|select/i,
-    
-    changeFilters,
+	var formElems = /textarea|input|select/i, changeFilters,
 
 	getVal = function( elem ) {
 		var type = elem.getType(), val = elem.getValue();
@@ -4065,7 +4237,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 				}).join("-") :
 				"";
 		}
-        else if ( FBjqRY.nodeName(elem) === "select" ) {
+        else if ( FBjqRY.nodeName(elem, "select") ) {
 			val = elem.getSelectedIndex();
 		}
 
@@ -4104,7 +4276,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 			click: function( e ) {
 				var elem = e.target, type = elem.getType();
 
-				if ( type === "radio" || type === "checkbox" || FBjqRY.nodeName(elem) === "select" ) {
+				if ( type === "radio" || type === "checkbox" || FBjqRY.nodeName(elem, "select") ) {
 					return testChange.call( this, e );
 				}
 			},
@@ -4114,7 +4286,7 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 			keydown: function( e ) {
 				var elem = e.target, type = elem.getType();
 
-				if ( (e.keyCode === 13 && FBjqRY.nodeName(elem) !== "textarea") ||
+				if ( (e.keyCode === 13 && ! FBjqRY.nodeName(elem, "textarea")) ||
 					(e.keyCode === 32 && (type === "checkbox" || type === "radio")) ||
 					type === "select-multiple" ) {
 					return testChange.call( this, e );
@@ -4132,18 +4304,20 @@ if ( ! FBjqRY.support.changeBubbles ) { // @todo
 
 		setup: function( data, namespaces ) {
 			if ( this.type === "file" ) return false;
-
+            
+            var self = this;
 			for ( var type in changeFilters ) {
-				FBjqRY.event.add( this, type + ".specialChange", changeFilters[type] );
+				FBjqRY.event.add( self, type + ".specialChange", changeFilters[type] );
 			}
 
-			return formElems.test( this.nodeName );
+			return formElems.test( self.getTagName() );
 		},
 
 		teardown: function( namespaces ) {
-			FBjqRY.event.remove( this, ".specialChange" );
+            var self = this;
+			FBjqRY.event.remove( self, ".specialChange" );
 
-			return formElems.test( this.nodeName );
+			return formElems.test( self.getTagName() );
 		}
 	};
 
@@ -4156,8 +4330,9 @@ function trigger( type, elem, args ) {
 }
 
 // Create "bubbling" focus and blur events
-if ( document.addEventListener ) {
-	FBjqRY.each({ focus: "focusin", blur: "focusout" }, function( orig, fix ) {
+//if ( document.addEventListener ) { // @todo root
+	FBjqRY.each( { focus: "focusin", blur: "focusout" }, 
+    function( orig, fix ) {
 		FBjqRY.event.special[ fix ] = {
 			setup: function() {
 				this.addEventListener( orig, handler, true );
@@ -4166,19 +4341,21 @@ if ( document.addEventListener ) {
 				this.removeEventListener( orig, handler, true );
 			}
 		};
-
 		function handler( e ) { 
 			e = FBjqRY.event.fix( e );
 			e.type = fix;
 			return FBjqRY.event.handle.call( this, e );
 		}
 	});
-}
+//}
 
 FBjqRY.each(["bind", "one"], function( i, name ) {
 	FBjqRY.fn[ name ] = function( type, data, fn ) {
+        
+        //console.log(name, type, data);
+        
 		// Handle object literals
-		if ( typeof type === "object" ) {
+		if ( ! FBjqRY.isString(type) /*typeof type === "object"*/ ) {
 			for ( var key in type ) {
 				this[ name ](key, data, type[key], fn);
 			}
@@ -4199,8 +4376,11 @@ FBjqRY.each(["bind", "one"], function( i, name ) {
 			this.one( type, data, fn );
 		}
         else {
+            var nodes = this.nodes;
+            //console.log(name, type, nodes);
 			for ( var i = 0, l = this.length; i < l; i++ ) {
-				FBjqRY.event.add( this[i], type, handler, data );
+                //console.log(name, type, nodes[i]);
+				FBjqRY.event.add( nodes[i], type, handler, data );
 			}
 		}
 
@@ -4211,14 +4391,14 @@ FBjqRY.each(["bind", "one"], function( i, name ) {
 FBjqRY.fn.extend({
 	unbind: function( type, fn ) {
 		// Handle object literals
-		if ( typeof type === "object" && !type.preventDefault ) {
-			for ( var key in type ) {
-				this.unbind(key, type[key]);
-			}
-
-		} else {
+		if ( typeof type === "object" //&& ! FBjqRY.isString(type) /* added */
+            && ! type.preventDefault ) {
+			for ( var key in type ) this.unbind( key, type[key] );
+		} 
+        else {
+            var nodes = this.nodes;
 			for ( var i = 0, l = this.length; i < l; i++ ) {
-				FBjqRY.event.remove( this[i], type, fn );
+				FBjqRY.event.remove( nodes[i], type, fn );
 			}
 		}
 
@@ -4289,16 +4469,20 @@ var liveMap = {
 	mouseleave: "mouseout"
 };
 
-FBjqRY.each(["live", "die"], function( i, name ) {
+FBjqRY.each( ["live", "die"], function( i, name ) {
 	FBjqRY.fn[ name ] = function( types, data, fn, origSelector /* Internal Use Only */ ) {
 		var type, i = 0, match, namespaces, preType,
 			selector = origSelector || this.selector,
-			context = origSelector ? this : FBjqRY( this.context );
+            // NOTE: in jQuery context is never null (document by default)
+            // in our case document makes no sense but we have root :
+			context = origSelector ? this : FBjqRY( this.context || document.getRootElement() );
 
 		if ( FBjqRY.isFunction( data ) ) {
 			fn = data;
 			data = undefined;
 		}
+
+        //console.log( name + '()', context, context.length);
 
 		types = (types || "").split(" ");
 
@@ -4321,35 +4505,43 @@ FBjqRY.each(["live", "die"], function( i, name ) {
 			if ( type === "focus" || type === "blur" ) {
 				types.push( liveMap[ type ] + namespaces );
 				type = type + namespaces;
-
-			} else {
+			} 
+            else {
 				type = (liveMap[ type ] || type) + namespaces;
 			}
 
-			if ( name === "live" ) {
+			if ( name === "live" ) { // bind live handler
+                var liveType = liveConvert( type, selector, true );
+				//context.each(function(){
+				//	FBjqRY.event.add( this, liveType,
+				//		{ data: data, selector: selector, handler: fn, origType: type, origHandler: fn, preType: preType } );
+				//});
 				// bind live handler
-				for ( var j = 0, l = context.length; j < l; j++ ) {
-					FBjqRY.event.add( context[j], "live." + liveConvert( type, selector ),
+				for ( var j = 0, nodes = context.nodes, len = context.length; j < len; j++ ) {
+                    //console.log( name + '()', nodes[j], liveConvert( type, selector ) );
+					FBjqRY.event.add( nodes[j], liveType,
 						{ data: data, selector: selector, handler: fn, origType: type, origHandler: fn, preType: preType } );
 				}
 
 			} else {
+                //console.log( name + '()', context, liveConvert( type, selector ) );
 				// unbind live handler
-				context.unbind( "live." + liveConvert( type, selector ), fn );
+				context.unbind( liveConvert( type, selector, true ), fn );
 			}
 		}
 		
 		return this;
-	};
+	}
 });
 
 function liveHandler( event ) {
 	var stop, maxLevel, elems = [], selectors = [],
-		related, match, handleObj, elem, j, i, l, data, close, namespace,
+		related, match, handleObj, elem, j, i, l, close, namespace,
 		events = FBjqRY.data( this, "events" );
 
 	// Make sure we avoid non-left-click bubbling in Firefox (#3861)
-	if ( event.liveFired === this || !events || !events.live || event.button && event.type === "click" ) {
+	if ( event.liveFired === this || ! events || ! events.live 
+        || event.button && event.type === "click" ) {
 		return;
 	}
 
@@ -4360,23 +4552,23 @@ function liveHandler( event ) {
 	event.liveFired = this;
 
 	var live = events.live.slice(0);
-
 	for ( j = 0; j < live.length; j++ ) {
 		handleObj = live[j];
-
 		if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
 			selectors.push( handleObj.selector );
-
-		} else {
+		} 
+        else {
 			live.splice( j--, 1 );
 		}
 	}
+    
+	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
 
-    throw "liveHandler() event.currentTarget not implemented !";
-	match = FBjqRY( event.target ).closest( selectors, event.currentTarget ); // @todo currentTarget ?!
+    //console.log('liveHandler $(target).closest(selectors, currentTarget) ', event.target, selectors, event.currentTarget);
+    //console.log('liveHandler $(target).closest(selectors, currentTarget) = ', match);
 
 	for ( i = 0, l = match.length; i < l; i++ ) {
-		close = match[i];
+		close = match[i]; // match is an array - closest() returns an array
 
 		for ( j = 0; j < live.length; j++ ) {
 			handleObj = live[j];
@@ -4385,18 +4577,20 @@ function liveHandler( event ) {
 				elem = close.elem;
 				related = null;
 
-				// Those two events require additional checking
-				//if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
-				//	event.type = handleObj.preType;
-				//	related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
-				//}
+				// Those two events require additional checking @todo
+				if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+					event.type = handleObj.preType;
+					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
+				}
 
-				if ( !related || related !== elem ) {
-					elems.push({ elem: elem, handleObj: handleObj, level: close.level });
+				if ( ! related || ! FBjqRY.fbjs.sameNode(elem, related) ) {
+					elems.push({elem: elem, handleObj: handleObj, level: close.level});
 				}
 			}
 		}
 	}
+
+    //console.log('liveHandler elems: ', elems);
 
 	for ( i = 0, l = elems.length; i < l; i++ ) {
 		match = elems[i];
@@ -4413,8 +4607,79 @@ function liveHandler( event ) {
 
 		if ( ret === false || event.isPropagationStopped() ) {
 			maxLevel = match.level;
+			if ( ret === false ) { 
+                stop = false;
+                break;
+            }
+		}
+	}
 
-			if ( ret === false ) stop = false;
+	return stop;
+}
+
+function liveHandler1( event ) {
+	var stop, elems = [], selectors = [], args = arguments,
+		related, match, handleObj, elem, j, i, l, data,
+		events = FBjqRY.data( this, "events" );
+
+	// Make sure we avoid non-left-click bubbling in Firefox (#3861)
+	if ( event.liveFired === this || ! events || ! events.live 
+        || event.button && event.type === "click" ) {
+		return;
+	}
+
+	event.liveFired = this;
+
+	var live = events.live.slice(0);
+
+	for ( j = 0; j < live.length; j++ ) {
+		handleObj = live[j];
+
+		if ( handleObj.origType.replace( rnamespaces, "" ) === event.type ) {
+			selectors.push( handleObj.selector );
+		} 
+        else {
+			live.splice( j--, 1 );
+		}
+	}
+
+	match = FBjqRY( event.target ).closest( selectors, event.currentTarget );
+
+    //console.log('liveHandler sel, match: ', selectors, match);
+
+	for ( i = 0, l = match.length; i < l; i++ ) {
+        var matchi = match[i];
+		for ( j = 0; j < live.length; j++ ) {
+			handleObj = live[j];
+            
+			if ( matchi.selector === handleObj.selector ) {
+				elem = matchi.elem;
+				related = null;
+
+				// Those two events require additional checking
+				if ( handleObj.preType === "mouseenter" || handleObj.preType === "mouseleave" ) {
+                    // @todo
+					related = FBjqRY( event.relatedTarget ).closest( handleObj.selector )[0];
+				}
+
+				if ( !related || ! FBjqRY.fbjs.sameNode(elem, related) ) {
+					elems.push({ elem: elem, handleObj: handleObj });
+				}
+			}
+		}
+	}
+
+    //console.log('liveHandler elems: ', elems);
+
+	for ( i = 0, l = elems.length; i < l; i++ ) {
+		match = elems[i];
+		event.currentTarget = match.elem;
+		event.data = match.handleObj.data;
+		event.handleObj = match.handleObj;
+
+		if ( match.handleObj.origHandler.apply( match.elem, args ) === false ) {
+			stop = false;
+			break;
 		}
 	}
 
@@ -4422,18 +4687,14 @@ function liveHandler( event ) {
 }
 
 var rdot = /\./g, rspace = / /g;
-function liveConvert( type, selector ) {
-	return (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
+function liveConvert( type, selector, prefix ) {
+	return (prefix ? "live." : '') + (type && type !== "*" ? type + "." : "") + selector.replace(rdot, "`").replace(rspace, "&");
 }
 
-//var supportedEvents = ("blur focus focusin focusout load resize scroll unload click dblclick " +
-//	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
-//	"change select submit keydown keypress keyup error").split(" ");
 var supportedEvents = ("blur change click dblclick error focus keydown keypress keyup load "  +
                    "mousedown mousemove mouseout mouseover mouseup resize scroll select " +
                    "submit unload").split(" ");
-FBjqRY.each( supportedEvents, function( i, name ) {
-
+var addEventFn = function( i, name ) {
 	// Handle event binding
 	FBjqRY.fn[ name ] = function( data, fn ) {
 		if ( fn == null ) {
@@ -4442,27 +4703,15 @@ FBjqRY.each( supportedEvents, function( i, name ) {
 		}
 		return arguments.length > 0 ? this.bind( name, data, fn ) : this.trigger( name );
 	};
-
 	if ( FBjqRY.attrFn ) FBjqRY.attrFn[ name ] = true;
-});
-
-// Prevent memory leaks in IE
-// Window isn't included so as not to unbind existing unload events
-// More info:
-//  - http://isaacschlueter.com/2006/10/msie-memory-leaks/
-/*
-if ( window.attachEvent && !window.addEventListener ) {
-	window.attachEvent("onunload", function() {
-		for ( var id in jQuery.cache ) {
-			if ( jQuery.cache[ id ].handle ) {
-				// Try/Catch is to handle iframes being unloaded, see #4280
-				try {
-					jQuery.event.remove( jQuery.cache[ id ].handle.elem );
-				} catch(e) {}
-			}
-		}
-	});
-} */
+};
+FBjqRY.each(supportedEvents, addEventFn);
+// NOTE: jQuery has 4 extra events on top what FBJS supports :
+// these won't be bind to FB elements using addEventListener !
+addEventFn(0, 'focusin'); 
+addEventFn(0, 'focusout');
+addEventFn(0, 'mouseenter'); 
+addEventFn(0, 'mouseleave');
 var jsc = FBjqRY.now(),
 	rscript = /<script(.|\s)*?\/script>/gi,
 	rselectTextarea = /select|textarea/i,
@@ -5275,137 +5524,147 @@ FBjqRY.extend({
 
 });
 
-/* @todo except for this.elem[this.prop] it should work !!!
 FBjqRY.fx.prototype = {
 	// Simple function for setting a style value
-	update: function(){
-		if ( this.options.step ) this.options.step.call( this.elem, this.now, this );
+	update: function() {
+        var self = this;
+		if ( self.options.step ) self.options.step.call( self.elem, self.now, this );
 
-		(FBjqRY.fx.step[this.prop] || FBjqRY.fx.step._default)( this );
+        var prop = self.prop;
+		(FBjqRY.fx.step[prop] || FBjqRY.fx.step._default)( self );
 
 		// Set display property to block for height/width animations
-		if ( this.prop == "height" || this.prop == "width" ) {
-			this.elem.setStyle('display', "block");
+		if ( prop == "height" || prop == "width" ) {
+			self.elem.setStyle('display', "block");
         }
 	},
     
 	// Get the current size
 	cur: function( force ) {
-		if ( this.elem[this.prop] != null && (this.elem.getStyle(this.prop) == null) ) {
-			return this.elem[ this.prop ];
+        var self = this;
+        var elem = self.elem, prop = self.prop;
+        //var elemProp = elem[ prop ]; // @todo
+        var elemProp = FBjqRY.attr(elem, prop); // @todo
+		if ( elemProp != null && (elem.getStyle(prop) == null) ) {
+			return elemProp;
 		}
 
-		var r = parseFloat(FBjqRY.css(this.elem, this.prop, force));
-		return r && r > -10000 ? r : parseFloat(FBjqRY.curCSS(this.elem, this.prop)) || 0;
+		var r = parseFloat( FBjqRY.css(elem, prop, force) );
+		return r && r > -10000 ? r : parseFloat( FBjqRY.curCSS(elem, prop) ) || 0;
 	},
 
 	// Start an animation from one number to another
 	custom: function( from, to, unit ) {
-		this.startTime = jQuery.now();
-		this.start = from;
-		this.end = to;
-		this.unit = unit || this.unit || "px";
-		this.now = this.start;
-		this.pos = this.state = 0;
+        var self = this;
+		self.startTime = FBjqRY.now();
+		self.start = from;
+		self.end = to;
+		self.unit = unit || self.unit || "px";
+		self.now = self.start;
+		self.pos = self.state = 0;
 
-		var self = this;
 		function t( gotoEnd ) {
 			return self.step(gotoEnd);
 		}
 
-		t.elem = this.elem;
+		t.elem = self.elem;
 
 		if ( t() && FBjqRY.timers.push(t) && !timerId ) {
-			timerId = setInterval(FBjqRY.fx.tick, 13);
+			timerId = setInterval( FBjqRY.fx.tick, 13 );
 		}
 	},
 
 	// Simple 'show' function
 	show: function() {
+        var self = this;
+        var elem = self.elem, prop = self.prop;
 		// Remember where we started, so that we can go back to it later
-		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
-		this.options.show = true;
+		self.options.orig[ prop ] = FBjqRY.style( elem, prop );
+		self.options.show = true;
 
 		// Begin the animation
 		// Make sure that we start at a small width/height to avoid any
 		// flash of content
-		this.custom(this.prop === "width" || this.prop === "height" ? 1 : 0, this.cur());
+		self.custom(prop === "width" || prop === "height" ? 1 : 0, self.cur());
 
 		// Start by showing the element
-		FBjqRY( this.elem ).show();
+		FBjqRY( elem ).show();
 	},
 
 	// Simple 'hide' function
 	hide: function() {
+        var self = this;
+        var elem = self.elem, prop = self.prop;
 		// Remember where we started, so that we can go back to it later
-		this.options.orig[this.prop] = FBjqRY.style( this.elem, this.prop );
-		this.options.hide = true;
+		self.options.orig[ prop ] = FBjqRY.style( elem, prop );
+		self.options.hide = true;
 
 		// Begin the animation
-		this.custom(this.cur(), 0);
+		self.custom( self.cur(), 0 );
 	},
 
 	// Each step of an animation
 	step: function( gotoEnd ) {
+        var self = this;
+        var options = self.options, elem = self.elem;
+        
 		var t = FBjqRY.now(), done = true;
 
-		if ( gotoEnd || t >= this.options.duration + this.startTime ) {
-			this.now = this.end;
-			this.pos = this.state = 1;
-			this.update();
+		if ( gotoEnd || t >= options.duration + self.startTime ) {
+			self.now = self.end;
+			self.pos = self.state = 1;
+			self.update();
+            
+			options.curAnim[ self.prop ] = true;
 
-			this.options.curAnim[ this.prop ] = true;
-
-			for ( var i in this.options.curAnim ) {
-				if ( this.options.curAnim[i] !== true ) {
+			for ( var i in options.curAnim ) {
+				if ( options.curAnim[i] !== true ) {
 					done = false;
 				}
 			}
 
 			if ( done ) {
-				if ( this.options.display != null ) {
+				if ( options.display != null ) {
 					// Reset the overflow
-					this.elem.setStyle('overflow', this.options.overflow);
+					elem.setStyle('overflow', options.overflow);
 
 					// Reset the display
-					var old = FBjqRY.data(this.elem, "olddisplay");
-					this.elem.setStyle('display', old ? old : this.options.display);
+					var old = FBjqRY.data(elem, "olddisplay");
+					elem.setStyle('display', old ? old : options.display);
 
-					if ( FBjqRY.css(this.elem, "display") === "none" ) {
-                        this.elem.setStyle('display', "block");
+					if ( FBjqRY.css(elem, "display") === "none" ) {
+                        elem.setStyle('display', "block");
 					}
 				}
 
 				// Hide the element if the "hide" operation was done
-				if ( this.options.hide ) {
-					FBjqRY(this.elem).hide();
-				}
+				if ( options.hide ) FBjqRY(elem).hide();
 
 				// Reset the properties, if the item has been hidden or shown
-				if ( this.options.hide || this.options.show ) {
-					for ( var p in this.options.curAnim ) {
-						FBjqRY.style(this.elem, p, this.options.orig[p]);
+				if ( options.hide || options.show ) {
+					for ( var p in options.curAnim ) {
+						FBjqRY.style( elem, p, options.orig[p] );
 					}
 				}
 
 				// Execute the complete function
-				this.options.complete.call( this.elem );
+				options.complete.call( elem );
 			}
 
 			return false;
 
 		} else {
-			var n = t - this.startTime;
-			this.state = n / this.options.duration;
+			var n = t - self.startTime;
+			self.state = n / options.duration;
 
 			// Perform the easing function, defaults to swing
-			var specialEasing = this.options.specialEasing && this.options.specialEasing[this.prop];
-			var defaultEasing = this.options.easing || (FBjqRY.easing.swing ? "swing" : "linear");
-			this.pos = FBjqRY.easing[specialEasing || defaultEasing](this.state, n, 0, 1, this.options.duration);
-			this.now = this.start + ((this.end - this.start) * this.pos);
+			var specialEasing = options.specialEasing && options.specialEasing[ self.prop ];
+			var defaultEasing = options.easing || ( FBjqRY.easing.swing ? "swing" : "linear" );
+			self.pos = FBjqRY.easing[ specialEasing || defaultEasing ](self.state, n, 0, 1, options.duration);
+			self.now = self.start + ((self.end - self.start) * self.pos);
 
 			// Perform the next step of the animation
-			this.update();
+			self.update();
 		}
 
 		return true;
@@ -5417,10 +5676,10 @@ FBjqRY.extend( FBjqRY.fx, {
 		var timers = FBjqRY.timers;
 
 		for ( var i = 0; i < timers.length; i++ ) {
-			if ( !timers[i]() ) timers.splice(i--, 1);
+			if ( ! timers[i]() ) timers.splice(i--, 1);
 		}
 
-		if ( !timers.length ) FBjqRY.fx.stop();
+		if ( ! timers.length ) FBjqRY.fx.stop();
 	},
 		
 	stop: function() {
@@ -5441,14 +5700,16 @@ FBjqRY.extend( FBjqRY.fx, {
 		},
 
 		_default: function( fx ) {
-			if ( fx.elem.getStyle && fx.elem.getStyle(fx.prop) != null ) {
-				fx.elem.setStyle( fx.prop, (fx.prop === "width" || fx.prop === "height" ? Math.max(0, fx.now) : fx.now) + fx.unit );
-			} else {
-				fx.elem[ fx.prop ] = fx.now;
+            var elem = fx.elem, prop = fx.prop;
+			if ( elem.getStyle && elem.getStyle(prop) != null ) {
+				elem.setStyle( prop, (prop === "width" || prop === "height" ? Math.max(0, fx.now) : fx.now) + fx.unit );
+			} 
+            else {
+				elem[ fx.prop ] = fx.now; // @todo ?
 			}
 		}
 	}
-}); */
+});
 
 if ( FBjqRY.expr && FBjqRY.expr.filters ) {
 	FBjqRY.expr.filters.animated = function( elem ) {
